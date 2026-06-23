@@ -3,7 +3,7 @@ import express from 'express';
 import tasksRoutes from './routes/tasksRoutes.js';
 import historyRoutes from './routes/historyRoute.js';
 import { takeSnapshot } from './jobs/snapshotjob.js';
-// import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
+import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
 import { connectDB } from './config/db.js';
 import cors from 'cors';
 
