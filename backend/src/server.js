@@ -1,8 +1,9 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import tasksRoutes from './routes/tasksRoutes.js';
-import historyRoutes from './routes/historyRoute.js'; // Đã sửa thành import và thêm .js
+import historyRoutes from './routes/historyRoute.js';
 import { takeSnapshot } from './jobs/snapshotjob.js';
+// import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
 import { connectDB } from './config/db.js';
 import cors from 'cors';
 
