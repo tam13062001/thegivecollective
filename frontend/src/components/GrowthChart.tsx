@@ -84,7 +84,7 @@ function ChartPanel({
 }) {
   const gradId = useId();
 
-  // Nếu chỉ có 1 điểm, thêm điểm ghost ở đầu để recharts vẽ được đường
+  // If there is only 1 data point, add a ghost point at the start so Recharts can draw the line properly
   const chartData = data.length === 1
     ? [{ ...data[0], date: '—' }, ...data.map((d) => ({ ...d, date: fmtDate(d.date) }))]
     : data.map((d) => ({ ...d, date: fmtDate(d.date) }));
@@ -126,7 +126,7 @@ function ChartPanel({
       <div className="px-2 pb-3">
         {data.length === 0 ? (
           <div className="h-40 flex items-center justify-center text-sm text-slate-400">
-            Chưa có dữ liệu lịch sử
+            No historical data available
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={200}>
@@ -180,7 +180,7 @@ export function GrowthChart() {
   const [data, setData]             = useState<ChartPoint[]>([]);
   const [loading, setLoading]       = useState(false);
 
-  // Load danh sách platform có lịch sử
+  // Load history-enabled platforms
   useEffect(() => {
     fetch(`${API}/platforms`)
       .then((r) => r.json())
@@ -188,7 +188,7 @@ export function GrowthChart() {
       .catch(console.error);
   }, []);
 
-  // Load chart data mỗi khi đổi filter
+  // Fetch chart data on filter change
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams({ days: String(days) });
@@ -212,7 +212,7 @@ export function GrowthChart() {
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Daily Growth</h2>
           <p className="text-sm text-slate-400 mt-0.5">
             {selectedId === 'all'
-              ? 'Tổng hợp tất cả nền tảng'
+              ? 'Aggregated summary of all platforms'
               : `${selectedPlatform?.platformName} · @${selectedPlatform?.accountHandle}`}
           </p>
         </div>
@@ -258,7 +258,7 @@ export function GrowthChart() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
           </svg>
-          Đang tải...
+          Loading...
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

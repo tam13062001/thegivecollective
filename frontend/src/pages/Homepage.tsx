@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { GrowthChart } from '../components/GrowthChart';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Metric {
@@ -37,8 +38,8 @@ function fmtNum(n: number): string {
 
 const TREND = {
   up:   { color: '#10b981', badge: 'bg-emerald-500/15 text-emerald-600 border border-emerald-200', dot: 'bg-emerald-500', border: 'border-emerald-200', bg: 'bg-emerald-50/60', label: 'text-emerald-600' },
-  down: { color: '#f43f5e', badge: 'bg-rose-500/15 text-rose-600 border border-rose-200',         dot: 'bg-rose-500',     border: 'border-rose-200',     bg: 'bg-rose-50/60',     label: 'text-rose-600' },
-  none: { color: '#6366f1', badge: 'bg-slate-100 text-slate-500 border border-slate-200',         dot: 'bg-slate-400',    border: 'border-slate-100',    bg: 'bg-slate-50',       label: 'text-slate-500' },
+  down: { color: '#f43f5e', badge: 'bg-rose-500/15 text-rose-600 border border-rose-200',        dot: 'bg-rose-500',    border: 'border-rose-200',    bg: 'bg-rose-50/60',    label: 'text-rose-600' },
+  none: { color: '#6366f1', badge: 'bg-slate-100 text-slate-500 border border-slate-200',        dot: 'bg-slate-400',   border: 'border-slate-100',   bg: 'bg-slate-50',       label: 'text-slate-500' },
 };
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -108,7 +109,7 @@ const Homepage = () => {
       const data = await response.json();
       setMetrics(data);
     } catch (error) {
-      console.error('Lỗi khi lấy dữ liệu:', error);
+      console.error('Error fetching data:', error);
     }
   };
 
@@ -116,7 +117,7 @@ const Homepage = () => {
 
   const handleAddMetric = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!urlInput.trim()) return alert('Vui lòng nhập URL!');
+    if (!urlInput.trim()) return alert('Please enter a URL!');
     setIsLoading(true);
     try {
       const response = await fetch(API_BASE_URL, {
@@ -126,18 +127,18 @@ const Homepage = () => {
       });
       const result = await response.json();
       if (response.ok) { setUrlInput(''); fetchMetrics(); }
-      else alert(result.message || 'Có lỗi xảy ra');
-    } catch { alert('Lỗi kết nối đến server'); }
+      else alert(result.message || 'An error occurred');
+    } catch { alert('Error connecting to server'); }
     finally { setIsLoading(false); }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa?')) return;
+    if (!window.confirm('Are you sure you want to delete?')) return;
     try {
       const response = await fetch(`${API_BASE_URL}/${id}`, { method: 'DELETE' });
       if (response.ok) setMetrics(metrics.filter((item) => item._id !== id));
-      else alert('Lỗi khi xóa dữ liệu');
-    } catch { alert('Lỗi kết nối đến server'); }
+      else alert('Error deleting data');
+    } catch { alert('Error connecting to server'); }
   };
 
   // Summary totals
@@ -163,9 +164,9 @@ const Homepage = () => {
 
           {/* Stat cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard label="Total Views"     value={totalViews}     sub={`Tổng từ ${metrics.length} nền tảng`} colorKey="up"   />
-            <StatCard label="Total Posts"     value={totalPosts}     sub={`Tổng từ ${metrics.length} nền tảng`} colorKey="none" />
-            <StatCard label="Total Followers" value={totalFollowers} sub={`Tổng từ ${metrics.length} nền tảng`} colorKey="none" />
+            <StatCard label="Total Views"     value={totalViews}     sub={`Total from ${metrics.length} platforms`} colorKey="up"   />
+            <StatCard label="Total Posts"     value={totalPosts}     sub={`Total from ${metrics.length} platforms`} colorKey="none" />
+            <StatCard label="Total Followers" value={totalFollowers} sub={`Total from ${metrics.length} platforms`} colorKey="none" />
           </div>
 
           {/* Charts */}
@@ -228,7 +229,7 @@ const Homepage = () => {
             <form onSubmit={handleAddMetric} className="flex w-full md:w-auto gap-2">
               <input
                 type="text"
-                placeholder="Nhập link TikTok, Facebook..."
+                placeholder="Enter TikTok, Facebook link..."
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 className="w-full md:w-72 rounded-lg border border-slate-200 px-4 py-2 text-sm bg-white focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-300"
@@ -239,7 +240,7 @@ const Homepage = () => {
                 disabled={isLoading}
                 className="whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:bg-slate-300"
               >
-                {isLoading ? 'Đang tải...' : 'Cập nhật'}
+                {isLoading ? 'Updating...' : 'Update'}
               </button>
             </form>
           </div>
@@ -274,7 +275,7 @@ const Homepage = () => {
                 <button
                   onClick={() => handleDelete(metric._id)}
                   className="absolute right-4 top-4 text-slate-300 hover:text-red-400 transition-colors text-lg leading-none"
-                  title="Xóa"
+                  title="Delete"
                 >
                   ✕
                 </button>
@@ -313,8 +314,8 @@ const Homepage = () => {
 
             {metrics.length === 0 && (
               <div className="col-span-full py-14 text-center text-slate-400">
-                <p className="text-sm">Chưa có dữ liệu nền tảng nào.</p>
-                <p className="text-xs mt-1 text-slate-300">Nhập link phía trên để bắt đầu.</p>
+                <p className="text-sm">No platform data available yet.</p>
+                <p className="text-xs mt-1 text-slate-300">Enter a link above to get started.</p>
               </div>
             )}
           </div>
