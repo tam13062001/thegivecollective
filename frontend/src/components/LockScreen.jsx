@@ -3,48 +3,66 @@ import { useState } from "react"
 import { toast } from "sonner"
 
 export default function LockScreen({ onUnlock }) {
-  const [pin, setPin] = useState("")
+  const [password, setPassword] = useState("")
 
   const handleSubmit = (e) => {
     e.preventDefault()
     
-    // Check PIN code
-    if (pin === "Collective") {
+    // Check password (case-sensitive)
+    if (password === "Collective") {
       // Store mock refresh token in localStorage
       localStorage.setItem("app_refresh_token", "fake-secure-jwt-token-12345")
       toast.success("Unlocked successfully!")
       onUnlock() // Update authentication state in App.jsx
     } else {
-      toast.error("Incorrect. Please try again!")
-      setPin("")
+      toast.error("Incorrect password. Please try again!")
+      setPassword("")
     }
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h2>Access Portal</h2>
-        <p>Enter the password to continue</p>
-        <form onSubmit={handleSubmit}>
-          <input
-            type="password"
-            maxLength={5}
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            placeholder="Input pass"
-            style={styles.input}
-          />
-          <button type="submit" style={styles.button}>Enter</button>
-        </form>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans">
+      <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 p-8 text-center relative overflow-hidden">
+        
+        {/* Decorative background element */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-50 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-blue-50 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
+
+        <div className="relative z-10">
+          {/* Lock Icon */}
+          <div className="mx-auto w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-slate-900/20">
+            <svg 
+              className="w-7 h-7 text-white" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight mb-2">Access Portal</h2>
+          <p className="text-sm text-slate-500 mb-8">Enter the master password to continue</p>
+          
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password..."
+                className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all placeholder:text-slate-400 text-center tracking-widest font-medium"
+              />
+            </div>
+            <button 
+              type="submit" 
+              className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+            >
+              Unlock
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )
-}
-
-// Basic clean styling
-const styles = {
-  container: { display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#f3f4f6" },
-  card: { padding: "2rem", background: "#fff", borderRadius: "8px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)", textAlign: "center", width: "300px" },
-  input: { display: "block", width: "100%", padding: "10px", margin: "1rem 0", boxSizing: "border-box", textAlign: "center", fontSize: "1.2rem", letterSpacing: "5px", borderRadius: "4px", border: "1px solid #ccc" },
-  button: { width: "100%", padding: "10px", background: "#0070f3", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }
 }
