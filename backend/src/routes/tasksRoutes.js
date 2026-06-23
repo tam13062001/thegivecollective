@@ -2,12 +2,12 @@ import express from 'express';
 import {getAllMetric, CreateMetric, UpdateMetric, DeleteMetric} from '../controllers/taskcontrollers.js'
 const router = express.Router();
 
-router.get("/", getAllMetric)
+router.get("/tasks/", getAllMetric)
 
-router.post("/", CreateMetric)
+router.post("/tasks/", CreateMetric)
 
-router.put("/:id", UpdateMetric)
+router.put("/tasks/:id", UpdateMetric)
 
-router.delete("/:id", DeleteMetric)
+router.delete("/tasks/:id", DeleteMetric)
 
 export default router;
