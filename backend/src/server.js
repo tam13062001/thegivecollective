@@ -14,12 +14,27 @@ const app = express();
 // --- 1. MIDDLEWARE PHẢI ĐỂ Ở TRÊN CÙNG ---
 
 // Chuyển CORS lên đầu tiên để mở cửa trước khi làm bất cứ việc gì khác
-app.use(cors({ origin: 'http://localhost:5173' }));
+const allowedOrigins = [
+  'http://localhost:5173', // Cho phép khi bạn test ở máy local
+  'https://thegivecollective.vercel.app/' // Link Frontend thật trên Vercel của bạn
+];
 
-// Kích hoạt middleware để Express đọc được JSON từ request body
+app.use(cors({
+  origin: function (origin, callback) {
+    // Cho phép các request không có origin (như Postman, mobile app hoặc npx chạy ngầm)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Bị chặn bởi cơ chế bảo mật CORS của TheGiveCollective!'));
+    }
+  }
+}));
+
+// Hoặc nếu bạn muốn nhanh/tiện nhất để test mọi link: app.use(cors());
+
 app.use(express.json());
-
-// Kích hoạt để đọc dữ liệu từ form-urlencoded
 app.use(express.urlencoded({ extended: true }));
 
 
