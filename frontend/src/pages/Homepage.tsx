@@ -23,7 +23,7 @@ interface Metric {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const API_BASE_URL = 'http://localhost:5001/api/v1/tasks';
+const API_BASE_URL = 'https://thegivecollective.vercel.app/api/v1/tasks';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

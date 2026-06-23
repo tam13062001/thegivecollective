@@ -23,7 +23,7 @@ interface Platform {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const API = 'http://localhost:5001/api/v1/history';
+const API = 'https://thegivecollective.vercel.app/api/v1/history';
 
 const RANGES = [
   { label: '7D',  days: 7  },
