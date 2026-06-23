@@ -1,24 +1,19 @@
-import Metric from "../models/Metric.js"
-import {fetchTikTokStats,fetchInstagramStats,fetchLinkedInStats,fetchMetaStats} from '../services/scraperService.js'
+import Metric from "../models/Metric.js";
+import { fetchTikTokStats, fetchInstagramStats, fetchLinkedInStats, fetchMetaStats, fetchYouTubeStats } from '../services/scraperService.js';
 
-
-export const getAllMetric = async (req,res) =>{
-    try{
-        const metrics = await Metric.find();
-
+export const getAllMetric = async (req, res) => {
+    try {
+        const metrics = await Metric.find().sort({ createdAt: -1 }); // Nên sort mới nhất lên đầu
         res.status(200).json(metrics);
-    }
-    catch(error){
-        console.log(error);
-        res.status(500).json({message : "loi he thong"});
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Lỗi hệ thống" });
     }
 }
 
-
 export const CreateMetric = async (req, res) => {
     try {
-        // Nhận mảng URLs từ Frontend gửi lên: { "urls": ["https://facebook.com/...", "https://tiktok.com/..."] }
-        const { urls } = req.body; 
+        const { urls } = req.body;
 
         if (!Array.isArray(urls) || urls.length === 0) {
             return res.status(400).json({ message: "Vui lòng cung cấp một mảng các đường link (urls)." });
@@ -27,55 +22,31 @@ export const CreateMetric = async (req, res) => {
         const results = [];
         const errors = [];
 
-        // Hàm phân tích URL để lấy Platform và Handle
         const parseSocialUrl = (url) => {
             try {
                 const urlObj = new URL(url);
                 const hostname = urlObj.hostname.toLowerCase();
                 let pathname = urlObj.pathname;
 
-                // Xóa dấu '/' ở cuối nếu có
-                if (pathname.endsWith('/')) {
-                    pathname = pathname.slice(0, -1);
-                }
+                if (pathname.endsWith('/')) pathname = pathname.slice(0, -1);
 
                 let platform = '';
-                let handle = '';
+                let handle = pathname.split('/').pop();
 
-                if (hostname.includes('facebook.com')) {
-                    platform = 'Facebook';
-                    handle = pathname.split('/').pop(); 
-                } 
-                else if (hostname.includes('instagram.com')) {
-                    platform = 'Instagram';
-                    handle = pathname.split('/').pop();
-                } 
-                else if (hostname.includes('tiktok.com')) {
-                    platform = 'Tiktok';
-                    handle = pathname.split('/').pop(); // Lấy phần @username
-                } 
-                else if (hostname.includes('youtube.com')) {
-                    platform = 'Youtube';
-                    // Youtube có thể là /channel/ID hoặc /@username
-                    handle = pathname.split('/').pop(); 
-                } 
-                else if (hostname.includes('linkedin.com')) {
-                    platform = 'LinkedIn';
-                    handle = pathname.split('/').pop(); 
-                }
-                else if (hostname.includes('threads.net')) {
-                    platform = 'Threads';
-                    handle = pathname.split('/').pop();
-                }
+                if (hostname.includes('facebook.com')) platform = 'Facebook';
+                else if (hostname.includes('instagram.com')) platform = 'Instagram';
+                else if (hostname.includes('tiktok.com')) platform = 'Tiktok';
+                else if (hostname.includes('youtube.com')) platform = 'Youtube';
+                else if (hostname.includes('linkedin.com')) platform = 'LinkedIn';
+                else if (hostname.includes('threads.net')) platform = 'Threads';
 
                 return { platform, handle };
             } catch (error) {
                 return { platform: null, handle: null };
             }
         };
-        // Lặp qua từng URL để xử lý
+
         for (const targetUrl of urls) {
-            // 1. Phân tích URL lấy platform và handle
             const { platform, handle } = parseSocialUrl(targetUrl);
 
             if (!platform || !handle) {
@@ -83,12 +54,9 @@ export const CreateMetric = async (req, res) => {
                 continue;
             }
 
-            // 2. Lấy API Key/Token (Cái này bạn có thể lưu ở file .env hoặc query từ DB)
-            // Ví dụ: process.env.APIFY_TOKEN, process.env.META_ACCESS_TOKEN...
             let stats = { followers: 0, posts: 0, views: 0 };
             let hasError = false;
 
-            // 3. Gọi hàm scrape tương ứng với nền tảng
             switch (platform.toLowerCase()) {
                 case 'tiktok':
                     stats = await fetchTikTokStats(handle, process.env.APIFY_TOKEN);
@@ -113,40 +81,113 @@ export const CreateMetric = async (req, res) => {
 
             if (hasError || stats.error) {
                 errors.push({ url: targetUrl, reason: stats.error || "Lỗi cào dữ liệu" });
-                continue; // Bỏ qua, không lưu URL này vào DB
+                continue;
             }
 
-            // 4. Lưu thông tin và Data vừa scrape được vào DB Mongoose
-            const newMetric = new Metric({
-                platformName: platform,
-                accountHandle: handle,
-                profileUrl: targetUrl,
-                followersCount: stats.followers,
-                postsCount: stats.posts,
-                viewsCount: stats.views
-            });
+            // KIỂM TRA XEM URL ĐÃ TỒN TẠI TRONG DB CHƯA
+            let existingMetric = await Metric.findOne({ profileUrl: targetUrl });
 
-            await newMetric.save();
-            results.push(newMetric);
+            if (existingMetric) {
+                // LOGIC: Nếu scrape ra 0, nhưng DB cũ có số > 0, thì lấy lại số cũ
+                const finalPosts = (stats.posts === 0 && existingMetric.postsCount > 0) 
+                    ? existingMetric.postsCount 
+                    : stats.posts;
+
+                const finalViews = (stats.views === 0 && existingMetric.viewsCount > 0) 
+                    ? existingMetric.viewsCount 
+                    : stats.views;
+
+                // Cập nhật record đã có
+                existingMetric.followersCount = stats.followers;
+                existingMetric.postsCount = finalPosts;
+                existingMetric.viewsCount = finalViews;
+                existingMetric.scrapedAt = new Date(); // Cập nhật thời gian cào mới nhất
+
+                await existingMetric.save();
+                results.push(existingMetric);
+            } else {
+                // Tạo record mới nếu chưa có
+                const newMetric = new Metric({
+                    platformName: platform,
+                    accountHandle: handle,
+                    profileUrl: targetUrl,
+                    followersCount: stats.followers,
+                    postsCount: stats.posts,
+                    viewsCount: stats.views
+                });
+
+                await newMetric.save();
+                results.push(newMetric);
+            }
         }
 
-        // Trả về kết quả
-        res.status(201).json({ 
+        res.status(201).json({
             message: `Xử lý hoàn tất. Thành công: ${results.length}, Lỗi: ${errors.length}`,
             successData: results,
             failedData: errors
         });
 
     } catch (error) {
-        console.log(error);
+        console.error(error);
         res.status(500).json({ message: "Lỗi hệ thống khi tạo và scrape dữ liệu" });
     }
 }
 
-export const UpaateTask = (req,res) =>{
-    res.status(201).json({message : "Upate thành công"});
+// Cập nhật thủ công theo ID (Dùng khi bạn muốn sửa tay dữ liệu)
+export const UpdateMetric = async (req, res) => {
+    try {
+        const { id } = req.params; // Lấy ID từ URL (VD: PUT /metrics/:id)
+        const updateData = req.body; 
+
+        const existingMetric = await Metric.findById(id);
+        if (!existingMetric) {
+            return res.status(404).json({ message: "Không tìm thấy dữ liệu để cập nhật" });
+        }
+
+        // Logic giữ lại dữ liệu cũ nếu người dùng truyền lên 0
+        if (updateData.postsCount === 0 && existingMetric.postsCount > 0) {
+            updateData.postsCount = existingMetric.postsCount;
+        }
+        if (updateData.viewsCount === 0 && existingMetric.viewsCount > 0) {
+            updateData.viewsCount = existingMetric.viewsCount;
+        }
+
+        // Cập nhật Database
+        const updatedMetric = await Metric.findByIdAndUpdate(
+            id,
+            { $set: updateData },
+            { new: true, runValidators: true } // Trả về data mới sau khi update
+        );
+
+        res.status(200).json({ 
+            message: "Cập nhật thành công", 
+            data: updatedMetric 
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Lỗi hệ thống khi cập nhật dữ liệu" });
+    }
 }
 
-export const DeleteTask = (req,res) =>{
-    res.status(201).json({message : "xóa thành công"});
+// Xóa theo ID
+export const DeleteMetric = async (req, res) => {
+    try {
+        const { id } = req.params; // Lấy ID từ URL (VD: DELETE /metrics/:id)
+
+        const deletedMetric = await Metric.findByIdAndDelete(id);
+
+        if (!deletedMetric) {
+            return res.status(404).json({ message: "Không tìm thấy dữ liệu để xóa" });
+        }
+
+        res.status(200).json({ 
+            message: "Xóa thành công", 
+            deletedId: id 
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Lỗi hệ thống khi xóa dữ liệu" });
+    }
 }
