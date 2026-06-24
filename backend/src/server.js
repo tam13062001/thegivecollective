@@ -36,6 +36,17 @@ app.use("/api/v1", historyRoutes);
 // Gợi ý: Chắc là bạn sẽ cần khai báo sử dụng historyRoutes ở đây
 // app.use("/api/v1/history", historyRoutes); 
 
+app.get('/api/v1/trigger-snapshot', async (req, res) => {
+  try {
+    console.log("Bắt đầu chạy snapshot thủ công...");
+    await takeSnapshot();
+    res.status(200).json({ success: true, message: "Snapshot đã chạy thành công!" });
+  } catch (error) {
+    console.error("Lỗi khi chạy snapshot:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // --- 3. KẾT NỐI DB VÀ CHẠY SERVER ---
 connectDB().then(() => {
     // Chỉ listen port khi chạy ở máy tính (local)

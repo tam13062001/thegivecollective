@@ -25,7 +25,7 @@ export async function triggerAutoScrape() {
 
     console.log(`[AutoScrape] Đang tiến hành gọi API cập nhật cho ${urls.length} profile...`);
 
-    const apiUrl = 'http://localhost:5001/api/v1/tasks';
+    const apiUrl = 'https://thegivecollective-backend.vercel.app/api/v1/tasks';
     
     const response = await fetch(apiUrl, {
       method: 'POST',

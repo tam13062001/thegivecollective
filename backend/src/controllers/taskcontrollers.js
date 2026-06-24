@@ -65,7 +65,7 @@ export const CreateMetric = async (req, res) => {
                     stats = await fetchMetaStats(handle, process.env.META_ACCESS_TOKEN);
                     break;
                 case 'instagram':
-                    stats = await fetchInstagramStats(handle, process.env.META_ACCESS_TOKEN);
+                    stats = await fetchInstagramStats(handle, process.env.META_ACCESS_TOKEN_INSTAGRAM);
                     break;
                 case 'youtube':
                     stats = await fetchYouTubeStats(handle, process.env.YOUTUBE_API_KEY);

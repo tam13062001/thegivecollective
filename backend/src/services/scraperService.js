@@ -179,16 +179,25 @@ export const fetchMetaStats = async (pageId, accessToken) => {
 export const fetchInstagramStats = async (handle, apiKey) => {
   try {
     const BASE = 'https://graph.facebook.com/v19.0';
-    const igUserId = handle.replace('@', '');
+    
+    // Đã hardcode cứng ID của The Give Collective
+    // (Bỏ qua hoàn toàn biến 'handle' được truyền từ Postman xuống)
+    const igAccountId = '17841422427064625';
 
-    const profileRes = await fetch(`${BASE}/${igUserId}?fields=followers_count,media_count&access_token=${apiKey}`);
-    if (!profileRes.ok) return { followers: 0, posts: 0, views: 0, error: `Graph API Error: ${profileRes.status}` };
+    // 1. Lấy thông tin Profile cơ bản (Followers, Số lượng bài post)
+    const profileRes = await fetch(`${BASE}/${igAccountId}?fields=followers_count,media_count&access_token=${apiKey}`);
+    if (!profileRes.ok) {
+      return { followers: 0, posts: 0, views: 0, error: `Graph API Error: ${profileRes.status}` };
+    }
     
     const profile = await profileRes.json();
-    if (profile.error) return { followers: 0, posts: 0, views: 0, error: profile.error.message };
+    if (profile.error) {
+      return { followers: 0, posts: 0, views: 0, error: profile.error.message };
+    }
 
-    const allMediaIds = [];
-    let nextUrl = `${BASE}/${igUserId}/media?fields=id,media_type&limit=100&access_token=${apiKey}`;
+    // 2. Lấy danh sách TẤT CẢ bài viết kèm theo loại (media_type)
+    const allMedia = [];
+    let nextUrl = `${BASE}/${igAccountId}/media?fields=id,media_type&limit=100&access_token=${apiKey}`;
 
     while (nextUrl) {
       const mediaRes = await fetch(nextUrl);
@@ -196,38 +205,47 @@ export const fetchInstagramStats = async (handle, apiKey) => {
 
       const mediaData = await mediaRes.json();
       for (const item of mediaData.data || []) {
-        allMediaIds.push(item.id);
+        // Lưu cả id và type để xử lý metric đếm view cho phù hợp
+        allMedia.push({ id: item.id, type: item.media_type });
       }
       nextUrl = mediaData.paging?.next ?? null;
     }
 
+    // 3. Tính tổng lượt xem (Views/Impressions)
     let totalViews = 0;
     const BATCH_SIZE = 20;
 
-    for (let i = 0; i < allMediaIds.length; i += BATCH_SIZE) {
-      const batch = allMediaIds.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < allMedia.length; i += BATCH_SIZE) {
+      const batch = allMedia.slice(i, i + BATCH_SIZE);
       const batchViews = await Promise.all(
-        batch.map(async (mediaId) => {
+        batch.map(async (media) => {
           try {
-            const insightRes = await fetch(`${BASE}/${mediaId}/insights?metric=views&access_token=${apiKey}`);
+            // Phân loại tự động: Video/Reels dùng 'views', Ảnh/Album dùng 'impressions'
+            const metric = media.type === 'VIDEO' ? 'views' : 'impressions';
+            
+            const insightRes = await fetch(`${BASE}/${media.id}/insights?metric=${metric}&access_token=${apiKey}`);
             if (!insightRes.ok) return 0;
 
             const insightData = await insightRes.json();
             const insight = insightData.data?.[0];
-            return insight?.value ?? insight?.values?.[0]?.value ?? 0;
+            
+            return insight?.values?.[0]?.value ?? insight?.value ?? 0;
           } catch {
-            return 0;
+            return 0; // Tránh sập luồng nếu 1 bài post bị lỗi API
           }
         })
       );
+      
       totalViews += batchViews.reduce((sum, v) => sum + v, 0);
     }
 
+    // 4. Trả về kết quả cuối cùng
     return {
       followers: profile.followers_count ?? 0,
       posts: profile.media_count ?? 0,
       views: totalViews,
     };
+    
   } catch (error) {
     console.error('[Instagram] Fetch error:', error);
     return { followers: 0, posts: 0, views: 0, error: 'Failed to fetch Instagram stats' };
@@ -238,12 +256,17 @@ export const fetchLinkedInStats = async (handle, apiToken) => {
   try {
     const companySlug = handle.replace(/\/$/, '').split('/').pop() || handle;
     const linkedinUrl = `https://www.linkedin.com/company/${companySlug}/`;
-    const ACTOR_ID = 'harvestapi~linkedin-company'; 
 
-    console.log(`[LinkedIn] Requesting Apify for: ${linkedinUrl}`);
+    console.log(`[LinkedIn] Bắt đầu lấy dữ liệu cho: ${linkedinUrl}`);
 
-    const response = await fetch(
-      `https://api.apify.com/v2/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${apiToken}`,
+    // ==========================================
+    // 1. LẤY FOLLOWERS (Dùng Actor: linkedin-company)
+    // ==========================================
+    const PROFILE_ACTOR_ID = 'harvestapi~linkedin-company';
+    let followersCount = 0;
+
+    const profileResponse = await fetch(
+      `https://api.apify.com/v2/acts/${PROFILE_ACTOR_ID}/run-sync-get-dataset-items?token=${apiToken}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -251,25 +274,59 @@ export const fetchLinkedInStats = async (handle, apiToken) => {
       }
     );
 
-    if (!response.ok) {
-      return { followers: 0, posts: 0, views: 0, error: `Apify Error: ${response.status}` };
+    if (profileResponse.ok) {
+      const profileDataset = await profileResponse.json();
+      if (profileDataset && profileDataset.length > 0) {
+        followersCount = profileDataset[0].followerCount || profileDataset[0].follower_count || profileDataset[0].followers || 0;
+      }
+    } else {
+      console.error('[LinkedIn] Lỗi lấy Profile:', await profileResponse.text());
     }
 
-    const dataset = await response.json();
+    // ==========================================
+    // 2. LẤY POSTS COUNT (Dùng Actor: linkedin-profile-posts)
+    // ==========================================
+    const POSTS_ACTOR_ID = 'harvestapi~linkedin-profile-posts';
+    let postsCount = 0;
 
-    if (!dataset || dataset.length === 0) {
-      return { followers: 0, posts: 0, views: 0, error: 'Apify returned empty data' };
-    }
-
-    const companyData = dataset[0];
-    
-    return {
-      followers: companyData.followerCount || companyData.follower_count || companyData.followers || 0,
-      posts: 0, 
-      views: 0,
+    // MẸO: Bạn hãy click sang tab "JSON" (cạnh chữ Form trong ảnh của bạn) trên Apify 
+    // để xem chính xác các key cần truyền vào body. Thông thường nó sẽ như sau:
+    const postsInputParams = {
+      targetUrls: [linkedinUrl],
+      maxPosts: 100, // Set một số cực lớn để lấy TẤT CẢ bài viết (thay vì 10 như mặc định)
+      // includeQuotePosts: true, 
+      // includeReposts: true 
     };
+
+    console.log(`[LinkedIn] Đang cào Posts... (việc này có thể mất thời gian)`);
+    const postsResponse = await fetch(
+      `https://api.apify.com/v2/acts/${POSTS_ACTOR_ID}/run-sync-get-dataset-items?token=${apiToken}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(postsInputParams),
+      }
+    );
+
+    if (postsResponse.ok) {
+      const postsDataset = await postsResponse.json();
+      // Số lượng post chính là số lượng phần tử (objects) trong mảng dataset trả về
+      postsCount = postsDataset ? postsDataset.length : 0;
+    } else {
+      console.error('[LinkedIn] Lỗi lấy Posts:', await postsResponse.text());
+    }
+
+    // ==========================================
+    // 3. TRẢ VỀ KẾT QUẢ CUỐI CÙNG
+    // ==========================================
+    return {
+      followers: followersCount,
+      posts: postsCount,
+      views: 0, // Lưu ý: Vẫn phải để 0 vì Views của tổng trang không thể cào bằng bot (cần tài khoản Admin)
+    };
+
   } catch (error) {
     console.error('[LinkedIn] Fetch error:', error);
-    return { followers: 0, posts: 0, views: 0, error: 'Failed to fetch LinkedIn stats via Apify' };
+    return { followers: 0, posts: 0, views: 0, error: 'Failed to fetch LinkedIn stats' };
   }
 };
