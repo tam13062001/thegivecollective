@@ -20,6 +20,7 @@ app.use(cors({
     'https://thegivecollective.vercel.app',  // FE domain
     'http://localhost:5173',                  // local dev
     'http://localhost:3000',
+    'https://analytics.thegivecollective.com',
   ],
   credentials: true,
 }));
