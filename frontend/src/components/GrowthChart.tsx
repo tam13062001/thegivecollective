@@ -261,22 +261,11 @@ export function GrowthChart() {
           Loading...
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartPanel
-            title="Views over time"
-            data={data}
-            dataKey="views"
-            color="#10b981"
-            days={days}
-          />
-          <ChartPanel
-            title="Posts over time"
-            data={data}
-            dataKey="posts"
-            color="#10b981"
-            days={days}
-          />
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ChartPanel title="Views over time"     data={data} dataKey="views"     color="#10b981" days={days} />
+        <ChartPanel title="Posts over time"     data={data} dataKey="posts"     color="#10b981" days={days} />
+        <ChartPanel title="Followers over time" data={data} dataKey="followers" color="#6366f1" days={days} />
+      </div>
       )}
 
     </section>

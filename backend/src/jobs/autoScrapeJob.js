@@ -27,16 +27,25 @@ export async function triggerAutoScrape() {
 
     const apiUrl = 'https://thegivecollective-backend.vercel.app/api/v1/tasks';
     
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ urls: urls })
-    });
+const response = await fetch(apiUrl, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ urls: urls })
+});
 
-    // Lấy kết quả JSON từ API
-    const result = await response.json();
+// Đọc text trước, sau đó mới parse
+const rawText = await response.text();
+console.log('[AutoScrape] Raw response:', rawText); // xem server trả về gì
+
+let result;
+try {
+  result = JSON.parse(rawText);
+} catch {
+  console.error('[AutoScrape] Response không phải JSON:', rawText);
+  return;
+}
 
     // --------------------------------------------------------
     // ĐOẠN MỚI: GHI JSON RA FILE (log_scrape.json)
@@ -65,6 +74,6 @@ export async function triggerAutoScrape() {
 }
 
 // Set lại thời gian chạy thực tế khi đẩy lên production nhé!
-cron.schedule('30 23 * * *', () => {
-  triggerAutoScrape();
-});
+// cron.schedule('30 23 * * *', () => {
+//   triggerAutoScrape();
+// });

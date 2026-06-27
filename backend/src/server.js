@@ -48,6 +48,18 @@ app.get('/api/v1/trigger-snapshot', async (req, res) => {
   }
 });
 
+app.get('/api/v1/trigger-autoscrape', async (req, res) => {
+  try {
+    console.log("Bắt đầu chạy auto-scrape thủ công...");
+    await triggerAutoScrape();
+    res.status(200).json({ success: true, message: "Auto-scrape đã chạy thành công!" });
+  } catch (error) {
+    console.error("Lỗi khi chạy auto-scrape:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 // --- 3. KẾT NỐI DB VÀ CHẠY SERVER ---
 connectDB().then(() => {
     // Chỉ listen port khi chạy ở máy tính (local)

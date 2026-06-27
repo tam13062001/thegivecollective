@@ -1,17 +1,17 @@
 {
-  "message": "Xử lý hoàn tất. Thành công: 3, Lỗi: 0",
+  "message": "Xử lý hoàn tất. Thành công: 5, Lỗi: 0",
   "successData": [
     {
       "_id": "6a39da3bf776db0fe69e9f7b",
       "platformName": "Youtube",
       "profileUrl": "https://www.youtube.com/@thegivecollectivesg",
       "accountHandle": "@thegivecollectivesg",
-      "followersCount": 16,
-      "postsCount": 10,
-      "viewsCount": 6151,
-      "scrapedAt": "2026-06-23T07:16:00.616Z",
+      "followersCount": 19,
+      "postsCount": 11,
+      "viewsCount": 7856,
+      "scrapedAt": "2026-06-27T00:32:33.054Z",
       "createdAt": "2026-06-23T00:58:35.125Z",
-      "updatedAt": "2026-06-23T07:16:00.623Z",
+      "updatedAt": "2026-06-27T00:32:33.058Z",
       "__v": 0
     },
     {
@@ -19,12 +19,12 @@
       "platformName": "Tiktok",
       "profileUrl": "https://www.tiktok.com/@thegivecollectivesg",
       "accountHandle": "@thegivecollectivesg",
-      "followersCount": 43,
-      "postsCount": 15,
-      "viewsCount": 17369,
-      "scrapedAt": "2026-06-23T07:16:33.044Z",
+      "followersCount": 46,
+      "postsCount": 16,
+      "viewsCount": 16440,
+      "scrapedAt": "2026-06-27T00:32:49.083Z",
       "createdAt": "2026-06-23T01:17:38.671Z",
-      "updatedAt": "2026-06-23T07:16:33.045Z",
+      "updatedAt": "2026-06-27T00:32:49.083Z",
       "__v": 0
     },
     {
@@ -33,11 +33,37 @@
       "profileUrl": "https://www.facebook.com/thegivecollectivesg",
       "accountHandle": "thegivecollectivesg",
       "followersCount": 3,
-      "postsCount": 0,
-      "viewsCount": 0,
-      "scrapedAt": "2026-06-23T07:16:34.371Z",
+      "postsCount": 16,
+      "viewsCount": 3372,
+      "scrapedAt": "2026-06-27T00:32:52.999Z",
       "createdAt": "2026-06-23T04:17:22.728Z",
-      "updatedAt": "2026-06-23T07:16:34.371Z",
+      "updatedAt": "2026-06-27T00:32:53.000Z",
+      "__v": 0
+    },
+    {
+      "_id": "6a3b80f259e869a43a1adc60",
+      "platformName": "Instagram",
+      "profileUrl": "https://www.instagram.com/thegivecollectivesg",
+      "accountHandle": "thegivecollectivesg",
+      "followersCount": 351,
+      "postsCount": 17,
+      "viewsCount": 230509,
+      "scrapedAt": "2026-06-27T00:32:54.700Z",
+      "createdAt": "2026-06-24T07:02:10.321Z",
+      "updatedAt": "2026-06-27T00:32:54.701Z",
+      "__v": 0
+    },
+    {
+      "_id": "6a3b82653769fdb1979b0832",
+      "platformName": "LinkedIn",
+      "profileUrl": "https://www.linkedin.com/company/thegivecollectivesg/",
+      "accountHandle": "thegivecollectivesg",
+      "followersCount": 12,
+      "postsCount": 7,
+      "viewsCount": 0,
+      "scrapedAt": "2026-06-27T00:33:17.959Z",
+      "createdAt": "2026-06-24T07:08:21.571Z",
+      "updatedAt": "2026-06-27T00:33:17.959Z",
       "__v": 0
     }
   ],

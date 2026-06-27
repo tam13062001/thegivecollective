@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Homepage from "./pages/Homepage"
 import NotFound from "./pages/404"
 import LockScreen from "./components/LockScreen"
+import { Navbar } from './components/Navbar';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(null)
@@ -28,6 +29,7 @@ function App() {
   return (
     <>
       <BrowserRouter>
+        <Navbar />
         <Routes>
           {/* Nếu chưa xác thực, tất cả các route đều hướng về LockScreen */}
           {!isAuthenticated ? (

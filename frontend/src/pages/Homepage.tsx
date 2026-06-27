@@ -156,7 +156,7 @@ const Homepage = () => {
   const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#f43f5e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16">
       <div className="mx-auto max-w-7xl px-6 py-8 space-y-10">
         <GrowthChart />
         {/* ── SECTION 1: Overview stats + charts ── */}
