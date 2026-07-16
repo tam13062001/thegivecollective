@@ -3,7 +3,7 @@ import express from 'express';
 import tasksRoutes from './routes/tasksRoutes.js';
 import historyRoutes from './routes/historyRoute.js';
 import insightsRoutes from './routes/Insights.js';
-import topPostsRouter from './routes/TopPosts.js';
+import topPostsRouter from './routes/ToppostsRoute.js';
 import { takeSnapshot } from './jobs/snapshotjob.js';
 import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
 import { connectDB } from './config/db.js';
@@ -63,6 +63,7 @@ app.get('/api/v1/trigger-autoscrape', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 app.get('/api/v1/cron/daily-job', async (req, res) => {
   // Bảo vệ endpoint khỏi bị gọi từ bên ngoài (Vercel gửi header này khi cron gọi)

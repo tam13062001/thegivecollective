@@ -1,0 +1,71 @@
+{
+  "message": "Xử lý hoàn tất. Thành công: 5, Lỗi: 0",
+  "successData": [
+    {
+      "_id": "6a39da3bf776db0fe69e9f7b",
+      "platformName": "Youtube",
+      "profileUrl": "https://www.youtube.com/@thegivecollectivesg",
+      "accountHandle": "@thegivecollectivesg",
+      "followersCount": 19,
+      "postsCount": 11,
+      "viewsCount": 7863,
+      "scrapedAt": "2026-06-29T02:56:04.687Z",
+      "createdAt": "2026-06-23T00:58:35.125Z",
+      "updatedAt": "2026-06-29T02:56:04.692Z",
+      "__v": 0
+    },
+    {
+      "_id": "6a39deb2b9dbbfc75bd753e4",
+      "platformName": "Tiktok",
+      "profileUrl": "https://www.tiktok.com/@thegivecollectivesg",
+      "accountHandle": "@thegivecollectivesg",
+      "followersCount": 0,
+      "postsCount": 16,
+      "viewsCount": 16488,
+      "scrapedAt": "2026-06-29T02:56:12.202Z",
+      "createdAt": "2026-06-23T01:17:38.671Z",
+      "updatedAt": "2026-06-29T02:56:12.203Z",
+      "__v": 0
+    },
+    {
+      "_id": "6a3a08d2657a16bd22a92dd8",
+      "platformName": "Facebook",
+      "profileUrl": "https://www.facebook.com/thegivecollectivesg",
+      "accountHandle": "thegivecollectivesg",
+      "followersCount": 3,
+      "postsCount": 17,
+      "viewsCount": 3656,
+      "scrapedAt": "2026-06-29T02:56:15.160Z",
+      "createdAt": "2026-06-23T04:17:22.728Z",
+      "updatedAt": "2026-06-29T02:56:15.160Z",
+      "__v": 0
+    },
+    {
+      "_id": "6a3b80f259e869a43a1adc60",
+      "platformName": "Instagram",
+      "profileUrl": "https://www.instagram.com/thegivecollectivesg",
+      "accountHandle": "thegivecollectivesg",
+      "followersCount": 364,
+      "postsCount": 15,
+      "viewsCount": 250426,
+      "scrapedAt": "2026-06-29T02:56:18.451Z",
+      "createdAt": "2026-06-24T07:02:10.321Z",
+      "updatedAt": "2026-06-29T02:56:18.451Z",
+      "__v": 0
+    },
+    {
+      "_id": "6a3b82653769fdb1979b0832",
+      "platformName": "LinkedIn",
+      "profileUrl": "https://www.linkedin.com/company/thegivecollectivesg/",
+      "accountHandle": "thegivecollectivesg",
+      "followersCount": 15,
+      "postsCount": 11,
+      "viewsCount": 0,
+      "scrapedAt": "2026-06-29T02:56:38.203Z",
+      "createdAt": "2026-06-24T07:08:21.571Z",
+      "updatedAt": "2026-06-29T02:56:38.204Z",
+      "__v": 0
+    }
+  ],
+  "failedData": []
+}

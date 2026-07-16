@@ -1,7 +1,7 @@
 // controllers/topPostController.js
 import Metric from '../models/Metric.js';
-import TopPost from '../models/TopPost.js';
-import { fetchTopPostForPlatform } from '../services/topPosts.js';
+import TopPost from '../models/ToppostModels.js';
+import { fetchTopPostForPlatform } from '../services/Topposts.js';
 
 // Bỏ LinkedIn (chưa hỗ trợ), bỏ Threads (chưa có fetcher)
 const SUPPORTED_PLATFORMS = ['Facebook', 'Instagram', 'Tiktok', 'Youtube'];
