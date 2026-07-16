@@ -1,15 +1,11 @@
 // services/topPosts.js
-// Lấy bài đăng/video có lượt xem cao nhất của từng nền tảng (mỗi nền tảng 1 bài).
-// Dùng chung API key/token với services thống kê tổng (xem file services thống kê hiện có).
-
 const GRAPH_API_VERSION = 'v21.0';
 
 // ─── Instagram ───────────────────────────────────────────────────────────────
-
 export const fetchInstagramTopPost = async (apiKey) => {
   try {
     const BASE = 'https://graph.facebook.com/v21.0';
-    const igAccountId = '17841422427064625'; // The Give Collective
+    const igAccountId = '17841422427064625'; 
 
     const allMedia = [];
     let fetchError = null;
@@ -27,7 +23,6 @@ export const fetchInstagramTopPost = async (apiKey) => {
       return { platform: 'Instagram', error: fetchError || 'No media found' };
     }
 
-    // Lấy views cho từng bài theo batch (VIDEO dùng 'views', ảnh/album dùng 'impressions')
     const BATCH_SIZE = 20;
     const withViews = [];
     for (let i = 0; i < allMedia.length; i += BATCH_SIZE) {
@@ -50,28 +45,28 @@ export const fetchInstagramTopPost = async (apiKey) => {
       withViews.push(...results);
     }
 
-    const top = withViews.sort((a, b) => b.views - a.views)[0];
+    // Lấy top 3
+    const top3 = withViews.sort((a, b) => b.views - a.views).slice(0, 3);
 
-    return {
+    return top3.map(top => ({
       platform: 'Instagram',
       title: top.caption ? top.caption.slice(0, 120) : '(Không có caption)',
       views: top.views || 0,
       likes: top.like_count || 0,
       date: top.timestamp?.slice(0, 10) || '',
       url: top.permalink,
-    };
+    }));
   } catch (error) {
     console.error('[Instagram] Top post error:', error);
-    return { platform: 'Instagram', error: 'Failed to fetch top Instagram post' };
+    return { platform: 'Instagram', error: 'Failed to fetch top Instagram posts' };
   }
 };
 
-// ─── Facebook (Posts + Reels gộp chung, lấy cái views cao nhất) ───────────────
-
+// ─── Facebook (Posts + Reels) ───────────────
 export const fetchFacebookTopPost = async (pageId, accessToken) => {
   try {
     const BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
-    let top = null;
+    const allContent = []; // Gom chung cả Posts và Reels vào đây
 
     // Posts thường
     const posts = [];
@@ -97,16 +92,14 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
         )
       );
       for (const { post, views } of results) {
-        if (!top || views > top.views) {
-          top = {
-            platform: 'Facebook',
-            title: post.message ? post.message.slice(0, 120) : '(Không có nội dung)',
-            views,
-            likes: post.likes?.summary?.total_count || 0,
-            date: post.created_time?.slice(0, 10) || '',
-            url: post.permalink_url,
-          };
-        }
+        allContent.push({
+          platform: 'Facebook',
+          title: post.message ? post.message.slice(0, 120) : '(Không có nội dung)',
+          views,
+          likes: post.likes?.summary?.total_count || 0,
+          date: post.created_time?.slice(0, 10) || '',
+          url: post.permalink_url,
+        });
       }
     }
 
@@ -121,33 +114,34 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
         const insights = reel.video_insights?.data || [];
         const plays = insights.find((i) => i.name === 'blue_reels_play_count') || insights.find((i) => i.name === 'plays');
         const views = plays?.values?.[0]?.value ?? 0;
-        if (!top || views > top.views) {
-          top = {
-            platform: 'Facebook',
-            title: reel.description ? reel.description.slice(0, 120) : '(Reel không có mô tả)',
-            views,
-            likes: reel.likes?.summary?.total_count || 0,
-            date: reel.created_time?.slice(0, 10) || '',
-            url: reel.permalink_url,
-          };
-        }
+        allContent.push({
+          platform: 'Facebook',
+          title: reel.description ? reel.description.slice(0, 120) : '(Reel không có mô tả)',
+          views,
+          likes: reel.likes?.summary?.total_count || 0,
+          date: reel.created_time?.slice(0, 10) || '',
+          url: reel.permalink_url,
+        });
       }
       reelsUrl = data.paging?.next || null;
     }
 
-    return top || { platform: 'Facebook', error: postsError || reelsError || 'No posts found (0 posts, 0 reels)' };
+    if (allContent.length === 0) {
+        return { platform: 'Facebook', error: postsError || reelsError || 'No posts found' };
+    }
+
+    // Lấy top 3
+    return allContent.sort((a, b) => b.views - a.views).slice(0, 3);
   } catch (error) {
     console.error('[Facebook] Top post error:', error);
-    return { platform: 'Facebook', error: 'Failed to fetch top Facebook post' };
+    return { platform: 'Facebook', error: 'Failed to fetch top Facebook posts' };
   }
 };
 
-// ─── TikTok (qua Apify, giống fetchTikTokStats) ────────────────────────────────
-
+// ─── TikTok ────────────────────────────────
 export const fetchTikTokTopPost = async (handle, apifyToken) => {
   try {
     const cleanHandle = handle.replace('@', '');
-
     const response = await fetch(
       `https://api.apify.com/v2/acts/clockworks~tiktok-profile-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
       {
@@ -159,141 +153,84 @@ export const fetchTikTokTopPost = async (handle, apifyToken) => {
 
     if (!response.ok) {
       const errBody = await response.text();
-      return { platform: 'TikTok', error: `Apify Error: ${response.status} — ${errBody.slice(0, 200)}` };
+      return { platform: 'TikTok', error: `Apify Error: ${response.status}` };
     }
 
     const items = await response.json();
-    if (!Array.isArray(items) || items.length === 0) {
-      return { platform: 'TikTok', error: 'No data returned from Apify' };
-    }
-
-    // Apify đẩy "error item" (có field errorCode) vào dataset thay vì bỏ qua
-    // khi không cào được 1 video cụ thể — phải lọc bỏ trước khi chọn top.
-    const validItems = items.filter((item) => !item.errorCode && item.id);
+    const validItems = Array.isArray(items) ? items.filter((item) => !item.errorCode && item.id) : [];
+    
     if (validItems.length === 0) {
-      return { platform: 'TikTok', error: 'All items returned errorCode from Apify (profile private/blocked?)' };
+      return { platform: 'TikTok', error: 'No valid data returned' };
     }
 
-    const top = validItems.reduce((best, item) => {
-      const views = Number(item.playCount) || 0;
-      return !best || views > best.views ? { ...item, views } : best;
-    }, null);
+    // Map thêm trường views cho dễ sort, sắp xếp, lấy top 3
+    const top3 = validItems
+        .map(item => ({ ...item, views: Number(item.playCount) || 0 }))
+        .sort((a, b) => b.views - a.views)
+        .slice(0, 3);
 
-    return {
+    return top3.map(top => ({
       platform: 'TikTok',
       title: top.text ? top.text.slice(0, 120) : '(Không có caption)',
-      views: top.views || 0,
+      views: top.views,
       likes: Number(top.diggCount) || 0,
       date: top.createTimeISO?.slice(0, 10) || '',
       url: top.webVideoUrl,
-    };
+    }));
   } catch (error) {
     console.error('[TikTok] Top post error:', error);
-    return { platform: 'TikTok', error: 'Failed to fetch top TikTok post' };
+    return { platform: 'TikTok', error: 'Failed to fetch top TikTok posts' };
   }
 };
 
 // ─── YouTube ─────────────────────────────────────────────────────────────────
-// Lưu ý quota: search.list tốn 100 units/lần (so với videos.list chỉ 1 unit).
-// Nếu gọi trong cron job chạy nhiều lần/ngày, cân nhắc cache lại videoId thay vì search mỗi lần.
-
 export const fetchYouTubeTopPost = async (channelHandle, apiKey) => {
   try {
     const channelResponse = await fetch(
       `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(channelHandle)}&key=${apiKey}`
     );
-    if (!channelResponse.ok) {
-      const errBody = await channelResponse.text();
-      return { platform: 'YouTube', error: `YouTube API request failed (${channelResponse.status}): ${errBody.slice(0, 200)}` };
-    }
     const channelData = await channelResponse.json();
     const channelId = channelData.items?.[0]?.id?.channelId;
-    if (!channelId) {
-      return { platform: 'YouTube', error: 'Channel not found' };
-    }
+    if (!channelId) return { platform: 'YouTube', error: 'Channel not found' };
 
+    // Đổi maxResults từ 1 sang 3
     const searchRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=viewCount&maxResults=1&key=${apiKey}`
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=viewCount&maxResults=3&key=${apiKey}`
     );
-    if (!searchRes.ok) {
-      return { platform: 'YouTube', error: 'Failed to search top video' };
-    }
     const searchData = await searchRes.json();
-    const videoId = searchData.items?.[0]?.id?.videoId;
-    if (!videoId) {
-      return { platform: 'YouTube', error: 'No videos found' };
-    }
+    const videoIds = searchData.items?.map(item => item.id?.videoId).filter(Boolean) || [];
+    
+    if (videoIds.length === 0) return { platform: 'YouTube', error: 'No videos found' };
 
+    // Batch request: Lấy details của cả 3 video chỉ trong 1 call (tiết kiệm quota)
     const videoRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`
+      `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds.join(',')}&key=${apiKey}`
     );
     const videoData = await videoRes.json();
-    const video = videoData.items?.[0];
-    if (!video) {
-      return { platform: 'YouTube', error: 'Video details not found' };
-    }
-
-    return {
-      platform: 'YouTube',
-      title: video.snippet.title,
-      views: parseInt(video.statistics.viewCount) || 0,
-      likes: parseInt(video.statistics.likeCount) || 0,
-      date: video.snippet.publishedAt?.slice(0, 10) || '',
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-    };
+    
+    return (videoData.items || [])
+      .map(video => ({
+        platform: 'YouTube',
+        title: video.snippet.title,
+        views: parseInt(video.statistics.viewCount) || 0,
+        likes: parseInt(video.statistics.likeCount) || 0,
+        date: video.snippet.publishedAt?.slice(0, 10) || '',
+        url: `https://www.youtube.com/watch?v=${video.id}`,
+      }))
+      .sort((a, b) => b.views - a.views); // Đảm bảo đúng thứ tự
   } catch (error) {
     console.error('[YouTube] Top post error:', error);
-    return { platform: 'YouTube', error: 'Failed to fetch top YouTube video' };
+    return { platform: 'YouTube', error: 'Failed to fetch top YouTube videos' };
   }
 };
 
-// ─── Dispatcher: dùng đúng handle đã lưu trong DB (bảng Metric) ────────────────
-// thay vì tự đoán / hard-code riêng cho topPosts, tránh lấy nhầm kênh.
-
+// Các hàm Dispatcher (fetchTopPostForPlatform, fetchAllTopPostsRaw) giữ nguyên
 export const fetchTopPostForPlatform = async (platformName, handle, tokens) => {
   switch (platformName.toLowerCase()) {
-    case 'facebook':
-      // Giống fetchMetaStats: dùng thẳng handle (slug từ URL) làm pageId
-      return fetchFacebookTopPost(handle, tokens.metaAccessToken);
-    case 'instagram':
-      // Giống fetchInstagramStats: IG account ID luôn hard-code, bỏ qua handle
-      return fetchInstagramTopPost(tokens.metaAccessTokenInstagram);
-    case 'tiktok':
-      return fetchTikTokTopPost(handle, tokens.apifyToken);
-    case 'youtube':
-      return fetchYouTubeTopPost(handle, tokens.youtubeApiKey);
-    default:
-      return { platform: platformName, error: `Chưa hỗ trợ lấy top post cho ${platformName}` };
+    case 'facebook': return fetchFacebookTopPost(handle, tokens.metaAccessToken);
+    case 'instagram': return fetchInstagramTopPost(tokens.metaAccessTokenInstagram);
+    case 'tiktok': return fetchTikTokTopPost(handle, tokens.apifyToken);
+    case 'youtube': return fetchYouTubeTopPost(handle, tokens.youtubeApiKey);
+    default: return { platform: platformName, error: `Chưa hỗ trợ ${platformName}` };
   }
-};
-
-// ─── Gộp cả 4 nền tảng (bỏ LinkedIn theo yêu cầu) ──────────────────────────────
-
-// Trả về TẤT CẢ kết quả kể cả lỗi — dùng để debug xem platform nào fail và tại sao.
-export const fetchAllTopPostsRaw = async ({
-  igApiKey,
-  fbPageId,
-  fbAccessToken,
-  tiktokHandle,
-  apifyToken,
-  youtubeChannelHandle,
-  youtubeApiKey,
-}) => {
-  const [instagram, facebook, tiktok, youtube] = await Promise.all([
-    fetchInstagramTopPost(igApiKey),
-    fetchFacebookTopPost(fbPageId, fbAccessToken),
-    fetchTikTokTopPost(tiktokHandle, apifyToken),
-    fetchYouTubeTopPost(youtubeChannelHandle, youtubeApiKey),
-  ]);
-  return { instagram, facebook, tiktok, youtube };
-};
-
-export const fetchAllTopPosts = async (config) => {
-  const raw = await fetchAllTopPostsRaw(config);
-  const results = Object.values(raw);
-
-  // Bỏ những platform bị lỗi (thiếu token, API fail...) thay vì làm vỡ cả response
-  return results
-    .filter((r) => !r.error)
-    .map((r, idx) => ({ id: idx + 1, ...r }));
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -22,17 +22,6 @@ type Post = {
   url?: string;
 };
 
-// Actual shape returned from MongoDB (TopPost collection) — includes _id, createdAt, updatedAt...
-type TopPostDoc = {
-  _id: string;
-  platform: string;
-  title: string;
-  views: number;
-  likes: number;
-  date: string;
-  url?: string;
-};
-
 type DemographicRow = {
   age: string;
   female: number;
@@ -44,17 +33,6 @@ type DemographicRow = {
 
 const API_BASE_URL = 'https://thegivecollective-backend.vercel.app/api/v1';
 
-// ─── Mock data (fallback if backend/API fails or cache is empty) ──────────────
-
-const MOCK_TOP_POSTS: Post[] = [
-  { id: 1, platform: 'Instagram', title: 'Behind the scenes: Give Collective team behind the scenes', views: 125000, likes: 14200, date: '2026-07-10' },
-  { id: 2, platform: 'TikTok', title: 'A day in the life of our volunteers', views: 45000, likes: 5100, date: '2026-07-12' },
-  { id: 3, platform: 'Facebook', title: 'Join our upcoming charity event this weekend!', views: 1500, likes: 120, date: '2026-07-14' },
-  { id: 4, platform: 'YouTube', title: 'The Give Collective — 2026 Impact Recap', views: 8600, likes: 410, date: '2026-06-28' },
-];
-
-// Real snapshot from Meta Graph API v25.0
-// GET /17841422427064625/insights?metric=follower_demographics&period=lifetime&timeframe=this_month&breakdown=age,gender
 const REAL_DEMOGRAPHICS_SNAPSHOT: DemographicRow[] = [
   { age: '13-17', female: 8,  male: 6,  undisclosed: 10 },
   { age: '18-24', female: 33, male: 25, undisclosed: 30 },
@@ -74,30 +52,35 @@ function fmtNum(n: number): string {
 }
 
 /**
- * Backend /insights/top-posts returns 2 formats:
- * - Flat array TopPostDoc[], when cache has data
- * - { message, posts: [] } when cache is empty (never refreshed)
- * Normalize to Post[] (numeric id) for shared UI usage in both cases.
+ * Xử lý dữ liệu BE trả về: hỗ trợ cả Mảng 1D, Mảng 2D (Array of Arrays)
+ * hoặc bọc trong object { posts: [...] }
  */
 function normalizeTopPosts(raw: unknown): Post[] {
-  const docs: TopPostDoc[] = Array.isArray(raw)
-    ? raw
-    : Array.isArray((raw as any)?.posts)
-      ? (raw as any).posts
-      : [];
+  let rawArray: any[] = [];
 
-  return docs.map((doc, idx) => ({
+  // 1. Lấy ra mảng posts
+  if (Array.isArray(raw)) {
+    rawArray = raw;
+  } else if (raw && typeof raw === 'object' && Array.isArray((raw as any).posts)) {
+    rawArray = (raw as any).posts;
+  }
+
+  // 2. Dùng .flat() để trải phẳng nếu nó là mảng 2D (Array of Arrays)
+  const flatDocs = rawArray.flat();
+
+  // 3. Map thành chuẩn Post[] cho UI
+  return flatDocs.map((doc, idx) => ({
     id: idx + 1,
-    platform: doc.platform,
-    title: doc.title,
-    views: doc.views,
-    likes: doc.likes,
-    date: doc.date,
-    url: doc.url,
+    platform: doc.platform || 'Unknown',
+    title: doc.title || '(Không có tiêu đề)',
+    views: doc.views || 0,
+    likes: doc.likes || 0,
+    date: doc.date || '',
+    url: doc.url || '',
   }));
 }
 
-// ─── Trend styles (shared with Homepage) ───────────────────────────────────────
+// ─── Trend styles ──────────────────────────────────────────────────────────────
 
 const TREND = {
   up:   { dot: 'bg-emerald-500', border: 'border-emerald-200', bg: 'bg-emerald-50/60' },
@@ -139,7 +122,7 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
-// ─── Platform Icon (shared with Homepage) ──────────────────────────────────────
+// ─── Platform Icon ─────────────────────────────────────────────────────────────
 
 function PlatformIcon({ name }: { name: string }) {
   const map: Record<string, { bg: string; label: string }> = {
@@ -162,25 +145,25 @@ function PlatformIcon({ name }: { name: string }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
-  const [topPosts, setTopPosts] = useState<Post[]>(MOCK_TOP_POSTS);
+  const [topPosts, setTopPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
 
   const [demographics, setDemographics] = useState<DemographicRow[]>(REAL_DEMOGRAPHICS_SNAPSHOT);
   const [demoLoading, setDemoLoading] = useState(false);
 
-  // Top posts: read cache from /insights/top-posts (see controllers/topPostController.js)
   useEffect(() => {
     const fetchTopPosts = async () => {
       setPostsLoading(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/insights/top-posts`);
-        if (!res.ok) return; // keep mock if backend fails
+        const res = await fetch(`${API_BASE_URL}/insights/top-posts/refresh`); // hoặc đổi thành endpoint GET cache của bạn
+        if (!res.ok) return;
         const raw = await res.json();
+        
+        // Gọi hàm normalize đã được cập nhật .flat()
         const posts = normalizeTopPosts(raw);
-        if (posts.length > 0) setTopPosts(posts);
-        // If posts.length === 0 (no data in cache yet) → keep MOCK_TOP_POSTS
-      } catch {
-        // keep MOCK_TOP_POSTS if fetch fails
+        setTopPosts(posts);
+      } catch (error) {
+        console.error("Lỗi fetch top posts:", error);
       } finally {
         setPostsLoading(false);
       }
@@ -188,7 +171,6 @@ export default function InsightsPage() {
     fetchTopPosts();
   }, []);
 
-  // Demographics: see routes/Insights.js on backend
   useEffect(() => {
     const fetchDemographics = async () => {
       setDemoLoading(true);
@@ -198,7 +180,7 @@ export default function InsightsPage() {
         const parsed: DemographicRow[] = await res.json();
         if (Array.isArray(parsed) && parsed.length > 0) setDemographics(parsed);
       } catch {
-        // keep REAL_DEMOGRAPHICS_SNAPSHOT if fetch fails
+        // Fallback
       } finally {
         setDemoLoading(false);
       }
@@ -213,6 +195,17 @@ export default function InsightsPage() {
   const totalKnownFollowers = demographics.reduce(
     (s, d) => s + d.female + d.male + d.undisclosed, 0,
   );
+
+  // Gom nhóm bài viết theo platform (nhờ hàm flat ở trên, giờ mảng topPosts đã phẳng nên dùng reduce rất dễ)
+  const groupedPosts = useMemo(() => {
+    return topPosts.reduce((acc, post) => {
+      if (!acc[post.platform]) acc[post.platform] = [];
+      acc[post.platform].push(post);
+      return acc;
+    }, {} as Record<string, Post[]>);
+  }, [topPosts]);
+
+  const platformCount = Object.keys(groupedPosts).length;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16 pb-12">
@@ -231,8 +224,8 @@ export default function InsightsPage() {
 
           {/* Stat cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard label="Total Views"      value={fmtNum(totalViews)}     sub={`Top posts across ${topPosts.length} platforms`}   colorKey="up"   />
-            <StatCard label="Total Likes"      value={fmtNum(totalLikes)}     sub={`Top posts across ${topPosts.length} platforms`}   colorKey="none" />
+            <StatCard label="Total Views"      value={fmtNum(totalViews)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="up"   />
+            <StatCard label="Total Likes"      value={fmtNum(totalLikes)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="none" />
             <StatCard label="Engagement Rate"  value={`${engagementRate}%`}   sub="Likes / views, top posts"                        colorKey="none" />
           </div>
 
@@ -271,7 +264,7 @@ export default function InsightsPage() {
                   <div>
                     <p className="text-sm text-emerald-800 font-semibold mb-1">Quick Insight</p>
                     <p className="text-xs text-emerald-600 leading-relaxed">
-                      The 25-44 age group makes up the majority of followers with available demographic data (Meta only includes followers with identifiable age/gender).
+                      The 25-44 age group makes up the majority of followers with available demographic data.
                     </p>
                   </div>
                 </div>
@@ -283,45 +276,58 @@ export default function InsightsPage() {
               <div className="px-5 py-3 flex items-center justify-between bg-slate-50 border-b border-slate-200">
                 <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Top performing posts</span>
                 <span className="text-xs font-mono text-slate-400">
-                  {postsLoading ? 'Loading...' : '1 post / platform'}
+                  {postsLoading ? 'Loading...' : 'Top 3 posts / platform'}
                 </span>
               </div>
 
-              <div className="p-4 grid grid-cols-1 gap-3 flex-1">
-                {topPosts.map((post) => {
-                  const card = (
-                    <div className="flex items-start gap-2.5 mb-3">
-                      <PlatformIcon name={post.platform} />
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-semibold text-slate-800 leading-tight truncate" title={post.title}>
-                          {post.title}
-                        </h3>
-                        <p className="text-xs text-slate-400 mt-0.5">{post.date}</p>
-                      </div>
+              {/* Khu vực cuộn hiển thị tất cả bài viết */}
+              <div className="p-5 flex-1 overflow-y-auto max-h-[460px] space-y-8">
+                {Object.entries(groupedPosts).map(([platform, posts]) => (
+                  <div key={platform}>
+                    {/* Tên Nền Tảng */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <PlatformIcon name={platform} />
+                      <h3 className="text-sm font-bold text-slate-700 capitalize">{platform}</h3>
                     </div>
-                  );
-                  return (
-                    <a
-                      key={post.id}
-                      href={post.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`relative rounded-2xl border border-slate-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow block ${!post.url ? 'pointer-events-none' : ''}`}
-                    >
-                      {card}
-                      <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 border border-slate-100 p-3 text-center">
-                        <div>
-                          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-700">{fmtNum(post.views)}</p>
-                        </div>
-                        <div className="border-l border-slate-200">
-                          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-700">{fmtNum(post.likes)}</p>
-                        </div>
-                      </div>
-                    </a>
-                  );
-                })}
+
+                    {/* Lưới các bài viết */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {posts.map((post) => (
+                        <a
+                          key={post.id}
+                          href={post.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between ${!post.url ? 'pointer-events-none' : ''}`}
+                        >
+                          <div className="mb-4">
+                            <h4 className="text-[13px] font-semibold text-slate-800 leading-snug line-clamp-3" title={post.title}>
+                              {post.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-400 mt-1.5">{post.date}</p>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2.5 text-center mt-auto">
+                            <div>
+                              <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
+                              <p className="mt-0.5 text-[13px] font-bold text-slate-700">{fmtNum(post.views)}</p>
+                            </div>
+                            <div className="border-l border-slate-200">
+                              <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
+                              <p className="mt-0.5 text-[13px] font-bold text-slate-700">{fmtNum(post.likes)}</p>
+                            </div>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {Object.keys(groupedPosts).length === 0 && !postsLoading && (
+                  <div className="flex items-center justify-center h-full text-sm text-slate-400 py-10">
+                    No posts available.
+                  </div>
+                )}
               </div>
             </div>
 
