@@ -2,6 +2,8 @@ import dotenv from 'dotenv';
 import express from 'express';
 import tasksRoutes from './routes/tasksRoutes.js';
 import historyRoutes from './routes/historyRoute.js';
+import insightsRoutes from './routes/Insights.js';
+import topPostsRouter from './routes/TopPosts.js';
 import { takeSnapshot } from './jobs/snapshotjob.js';
 import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
 import { connectDB } from './config/db.js';
@@ -34,6 +36,8 @@ app.use(express.urlencoded({ extended: true }));
 // --- 2. KHAI BÁO ROUTER SAU KHI ĐÃ ĐI QUA CÁC MIDDLEWARE ---
 app.use("/api/v1", tasksRoutes);
 app.use("/api/v1", historyRoutes);
+app.use('/api/v1/insights', insightsRoutes);
+app.use('/api/v1/insights', topPostsRouter);
 // Gợi ý: Chắc là bạn sẽ cần khai báo sử dụng historyRoutes ở đây
 // app.use("/api/v1/history", historyRoutes); 
 
