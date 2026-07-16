@@ -156,7 +156,7 @@ export default function InsightsPage() {
       setPostsLoading(true); // Bật loading
       try {
         // Bạn có thể cân nhắc đổi url này thành `${API_BASE_URL}/insights/top-posts` cho đồng bộ
-        const response = await fetch('https://analytics.thegivecollective.com/insights/api/v1/insights/top-posts');
+        const response = await fetch('https://thegivecollective-backend.vercel.app/api/v1/insights/top-posts');
         const data = await response.json();
 
         // Sử dụng hàm normalize để trích xuất array an toàn
