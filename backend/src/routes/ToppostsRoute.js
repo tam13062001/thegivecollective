@@ -1,6 +1,6 @@
 // routes/TopPosts.js
 import express from 'express';
-import { getCachedTopPosts, refreshTopPostsFromDb } from '../controllers/topPostController.js';
+import { getCachedTopPosts, refreshTopPostsFromDb } from '../controllers/toppostcontroller.js';
 
 const router = express.Router();
 
