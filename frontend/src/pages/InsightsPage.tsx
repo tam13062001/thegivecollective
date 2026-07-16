@@ -13,7 +13,7 @@ import {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Post = {
-  id: number;
+  id: string | number; // Cập nhật để nhận _id từ MongoDB
   platform: string;
   title: string;
   views: number;
@@ -55,22 +55,22 @@ function fmtNum(n: number): string {
  * Xử lý dữ liệu BE trả về: hỗ trợ cả Mảng 1D, Mảng 2D (Array of Arrays)
  * hoặc bọc trong object { posts: [...] }
  */
-function normalizeTopPosts(raw: unknown): Post[] {
+function normalizeTopPosts(raw: any): Post[] {
   let rawArray: any[] = [];
 
-  // 1. Lấy ra mảng posts
+  // 1. Lấy ra mảng posts an toàn
   if (Array.isArray(raw)) {
     rawArray = raw;
-  } else if (raw && typeof raw === 'object' && Array.isArray((raw as any).posts)) {
-    rawArray = (raw as any).posts;
+  } else if (raw && typeof raw === 'object' && Array.isArray(raw.posts)) {
+    rawArray = raw.posts;
   }
 
-  // 2. Dùng .flat() để trải phẳng nếu nó là mảng 2D (Array of Arrays)
+  // 2. Dùng .flat() để trải phẳng nếu nó là mảng 2D
   const flatDocs = rawArray.flat();
 
   // 3. Map thành chuẩn Post[] cho UI
   return flatDocs.map((doc, idx) => ({
-    id: idx + 1,
+    id: doc._id || idx + 1, // Ưu tiên _id của MongoDB
     platform: doc.platform || 'Unknown',
     title: doc.title || '(Không có tiêu đề)',
     views: doc.views || 0,
@@ -153,19 +153,19 @@ export default function InsightsPage() {
 
   useEffect(() => {
     const fetchTopPosts = async () => {
-      setPostsLoading(true);
+      setPostsLoading(true); // Bật loading
       try {
-        const res = await fetch(`${API_BASE_URL}/insights/top-posts/refresh`); // hoặc đổi thành endpoint GET cache của bạn
-        if (!res.ok) return;
-        const raw = await res.json();
-        
-        // Gọi hàm normalize đã được cập nhật .flat()
-        const posts = normalizeTopPosts(raw);
-        setTopPosts(posts);
+        // Bạn có thể cân nhắc đổi url này thành `${API_BASE_URL}/insights/top-posts` cho đồng bộ
+        const response = await fetch('https://analytics.thegivecollective.com/insights/api/v1/insights/top-posts');
+        const data = await response.json();
+
+        // Sử dụng hàm normalize để trích xuất array an toàn
+        const normalizedPosts = normalizeTopPosts(data);
+        setTopPosts(normalizedPosts);
       } catch (error) {
-        console.error("Lỗi fetch top posts:", error);
+        console.error("Lỗi khi tải top posts:", error);
       } finally {
-        setPostsLoading(false);
+        setPostsLoading(false); // Tắt loading dù thành công hay thất bại
       }
     };
     fetchTopPosts();
@@ -180,7 +180,7 @@ export default function InsightsPage() {
         const parsed: DemographicRow[] = await res.json();
         if (Array.isArray(parsed) && parsed.length > 0) setDemographics(parsed);
       } catch {
-        // Fallback
+        // Fallback giữ nguyên data mẫu nếu lỗi
       } finally {
         setDemoLoading(false);
       }
@@ -196,7 +196,7 @@ export default function InsightsPage() {
     (s, d) => s + d.female + d.male + d.undisclosed, 0,
   );
 
-  // Gom nhóm bài viết theo platform (nhờ hàm flat ở trên, giờ mảng topPosts đã phẳng nên dùng reduce rất dễ)
+  // Gom nhóm bài viết theo platform 
   const groupedPosts = useMemo(() => {
     return topPosts.reduce((acc, post) => {
       if (!acc[post.platform]) acc[post.platform] = [];
@@ -282,51 +282,55 @@ export default function InsightsPage() {
 
               {/* Khu vực cuộn hiển thị tất cả bài viết */}
               <div className="p-5 flex-1 overflow-y-auto max-h-[460px] space-y-8">
-                {Object.entries(groupedPosts).map(([platform, posts]) => (
-                  <div key={platform}>
-                    {/* Tên Nền Tảng */}
-                    <div className="flex items-center gap-2 mb-4">
-                      <PlatformIcon name={platform} />
-                      <h3 className="text-sm font-bold text-slate-700 capitalize">{platform}</h3>
-                    </div>
-
-                    {/* Lưới các bài viết */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {posts.map((post) => (
-                        <a
-                          key={post.id}
-                          href={post.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between ${!post.url ? 'pointer-events-none' : ''}`}
-                        >
-                          <div className="mb-4">
-                            <h4 className="text-[13px] font-semibold text-slate-800 leading-snug line-clamp-3" title={post.title}>
-                              {post.title}
-                            </h4>
-                            <p className="text-[11px] text-slate-400 mt-1.5">{post.date}</p>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2.5 text-center mt-auto">
-                            <div>
-                              <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
-                              <p className="mt-0.5 text-[13px] font-bold text-slate-700">{fmtNum(post.views)}</p>
-                            </div>
-                            <div className="border-l border-slate-200">
-                              <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
-                              <p className="mt-0.5 text-[13px] font-bold text-slate-700">{fmtNum(post.likes)}</p>
-                            </div>
-                          </div>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                {Object.keys(groupedPosts).length === 0 && !postsLoading && (
+                {postsLoading && topPosts.length === 0 ? (
+                   <div className="flex items-center justify-center h-full text-sm text-slate-400 py-10">
+                     Loading posts...
+                   </div>
+                ) : Object.keys(groupedPosts).length === 0 ? (
                   <div className="flex items-center justify-center h-full text-sm text-slate-400 py-10">
                     No posts available.
                   </div>
+                ) : (
+                  Object.entries(groupedPosts).map(([platform, posts]) => (
+                    <div key={platform}>
+                      {/* Tên Nền Tảng */}
+                      <div className="flex items-center gap-2 mb-4">
+                        <PlatformIcon name={platform} />
+                        <h3 className="text-sm font-bold text-slate-700 capitalize">{platform}</h3>
+                      </div>
+
+                      {/* Lưới các bài viết */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {posts.map((post) => (
+                          <a
+                            key={post.id}
+                            href={post.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between ${!post.url ? 'pointer-events-none' : ''}`}
+                          >
+                            <div className="mb-4">
+                              <h4 className="text-[13px] font-semibold text-slate-800 leading-snug line-clamp-3" title={post.title}>
+                                {post.title}
+                              </h4>
+                              <p className="text-[11px] text-slate-400 mt-1.5">{post.date}</p>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2.5 text-center mt-auto">
+                              <div>
+                                <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
+                                <p className="mt-0.5 text-[13px] font-bold text-slate-700">{fmtNum(post.views)}</p>
+                              </div>
+                              <div className="border-l border-slate-200">
+                                <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
+                                <p className="mt-0.5 text-[13px] font-bold text-slate-700">{fmtNum(post.likes)}</p>
+                              </div>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>

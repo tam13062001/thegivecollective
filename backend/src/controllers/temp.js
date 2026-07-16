@@ -3,19 +3,10 @@ import Metric from '../models/Metric.js';
 import TopPost from '../models/ToppostModels.js';
 import { fetchTopPostForPlatform } from '../services/ToppostsService.js';
 
-// Bỏ LinkedIn (chưa hỗ trợ), bỏ Threads (chưa có fetcher)
 const SUPPORTED_PLATFORMS = ['Facebook', 'Instagram', 'Tiktok', 'Youtube'];
 
-/**
- * Chạy LIVE: lấy đúng handle của từng platform từ DB (bảng Metric — nơi bạn
- * đã "Add" link kênh ở Homepage), gọi API tương ứng, rồi cache vào TopPost.
- * Gọi cái này từ cron job hằng ngày (giống cách Metric được refresh),
- * KHÔNG gọi trực tiếp từ frontend vì tốn quota/API call.
- */
 export const refreshTopPostsFromDb = async (req, res) => {
   try {
-    // QUAN TRỌNG: đọc process.env BÊN TRONG function (lúc gọi thật),
-    // không phải ở module scope — tránh bug đọc env trước khi dotenv load xong.
     const tokens = {
       metaAccessToken: process.env.META_ACCESS_TOKEN,
       metaAccessTokenInstagram: process.env.META_ACCESS_TOKEN_INSTAGRAM,
@@ -23,30 +14,14 @@ export const refreshTopPostsFromDb = async (req, res) => {
       youtubeApiKey: process.env.YOUTUBE_API_KEY,
     };
 
-    // ─── DEBUG TẠM — xoá sau khi tìm ra nguyên nhân ───
-    console.log('[DEBUG] token lengths:', {
-      metaAccessToken: tokens.metaAccessToken?.length ?? 'undefined',
-      metaAccessTokenInstagram: tokens.metaAccessTokenInstagram?.length ?? 'undefined',
-      apifyToken: tokens.apifyToken?.length ?? 'undefined',
-      youtubeApiKey: tokens.youtubeApiKey?.length ?? 'undefined',
-    });
-    // ─────────────────────────────────────────────────
-
     const metrics = await Metric.find({ platformName: { $in: SUPPORTED_PLATFORMS } });
-
-    // ─── DEBUG TẠM ───
-    console.log('[DEBUG] metrics found:', metrics.map((m) => ({
-      platform: m.platformName,
-      handle: m.accountHandle,
-    })));
-    // ─────────────────
 
     if (metrics.length === 0) {
       const msg = 'Chưa có kênh nào trong DB (bảng Metric) để lấy top post.';
       return res ? res.status(200).json({ message: msg, posts: [] }) : [];
     }
 
-    // Nếu lỡ add trùng nhiều URL cùng 1 platform, chỉ lấy bản ghi mới nhất
+    // Lọc lấy bản ghi mới nhất cho từng platform
     const latestPerPlatform = new Map();
     for (const m of metrics) {
       const existing = latestPerPlatform.get(m.platformName);
@@ -55,29 +30,48 @@ export const refreshTopPostsFromDb = async (req, res) => {
       }
     }
 
+    // Gọi API cào dữ liệu cho tất cả platform
     const results = await Promise.all(
-      Array.from(latestPerPlatform.values()).map((m) =>
-        fetchTopPostForPlatform(m.platformName, m.accountHandle, tokens)
-      )
+      Array.from(latestPerPlatform.values()).map(async (m) => {
+        const data = await fetchTopPostForPlatform(m.platformName, m.accountHandle, tokens);
+        return { platform: m.platformName, data };
+      })
     );
 
-    const validPosts = results.filter((r) => !r.error);
-    const failedPosts = results.filter((r) => r.error);
+    const successfulPlatforms = [];
+    const allNewPosts = [];
+    const failedPosts = [];
 
-    // Cache lại (upsert theo platform) để endpoint đọc nhanh, không phải cào live mỗi lần
-    await Promise.all(
-      validPosts.map((post) =>
-        TopPost.findOneAndUpdate(
-          { platform: post.platform },
-          { platform: post.platform, title: post.title, views: post.views, likes: post.likes, date: post.date, url: post.url },
-          { upsert: true, returnDocument: 'after' }
-        )
-      )
-    );
+    // Phân loại kết quả trả về
+    results.forEach((resItem) => {
+      if (resItem.data && resItem.data.error) {
+        failedPosts.push(resItem);
+      } else if (Array.isArray(resItem.data) && resItem.data.length > 0) {
+        // Nếu Service trả về mảng -> Lấy top 3 và đẩy vào danh sách insert
+        successfulPlatforms.push(resItem.platform);
+        allNewPosts.push(...resItem.data.slice(0, 3)); 
+      } else if (resItem.data && !Array.isArray(resItem.data)) {
+        // Fallback: Nếu Service chỉ trả về 1 object -> Vẫn giữ lại
+        successfulPlatforms.push(resItem.platform);
+        allNewPosts.push(resItem.data);
+      }
+    });
+
+    // Xóa cache cũ & Lưu cache mới (Chỉ áp dụng cho các platform cào thành công)
+    if (successfulPlatforms.length > 0) {
+      // 1. Xóa các bài posts cũ của những platform đã lấy được data mới
+      await TopPost.deleteMany({ platform: { $in: successfulPlatforms } });
+      
+      // 2. Chèn toàn bộ các bài posts mới vào DB
+      // Bỏ qua lỗi duplicate key (nếu có URL trùng nhau bị lọt vào)
+      await TopPost.insertMany(allNewPosts, { ordered: false }).catch(err => {
+         console.warn('[TopPosts] Một số post bị trùng URL và bị bỏ qua:', err.message);
+      });
+    }
 
     const summary = {
-      message: `Cập nhật top posts hoàn tất. Thành công: ${validPosts.length}/${results.length}`,
-      posts: validPosts,
+      message: `Cập nhật top posts hoàn tất. Đã lưu ${allNewPosts.length} bài viết mới.`,
+      insertedPosts: allNewPosts,
       errors: failedPosts,
     };
 
@@ -89,23 +83,30 @@ export const refreshTopPostsFromDb = async (req, res) => {
   }
 };
 
-/**
- * Đọc top posts đã cache trong DB — dùng cho InsightsPage, nhanh và
- * không tốn API quota mỗi lần user vào trang.
- */
 export const getCachedTopPosts = async (req, res) => {
   try {
     const posts = await TopPost.find().sort({ updatedAt: -1 });
 
     if (posts.length === 0) {
-      // Không trả về mảng rỗng vô hồn nữa — nói rõ lý do và hướng xử lý.
       return res.status(200).json({
         message: 'Chưa có dữ liệu cache. Gọi GET /api/v1/insights/top-posts/refresh trước để cào dữ liệu lần đầu.',
         posts: [],
       });
     }
 
-    res.status(200).json(posts);
+    // Tùy chọn: Nhóm dữ liệu theo platform cho Frontend dễ render
+    const groupedPosts = posts.reduce((acc, post) => {
+      if (!acc[post.platform]) acc[post.platform] = [];
+      acc[post.platform].push(post);
+      return acc;
+    }, {});
+
+    // Trả về cả mảng phẳng và mảng đã nhóm
+    res.status(200).json({
+       total: posts.length,
+       posts: posts,
+       groupedByPlatform: groupedPosts
+    });
   } catch (error) {
     console.error('[TopPosts] Get cached error:', error);
     res.status(500).json({ message: 'Lỗi hệ thống khi lấy top posts', error: error.message });

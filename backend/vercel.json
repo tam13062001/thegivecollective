@@ -16,6 +16,10 @@
     {
       "path": "/api/v1/cron/daily-job",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/v1/insights/top-posts/refresh",
+      "schedule": "0 0 * * *" 
     }
   ]
 }
