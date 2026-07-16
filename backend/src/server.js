@@ -8,6 +8,7 @@ import { takeSnapshot } from './jobs/snapshotjob.js';
 import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
 import { connectDB } from './config/db.js';
 import cors from 'cors';
+import CronLog from './models/CronLog.js';
 
 dotenv.config();
 const port = process.env.PORT || 5001;
@@ -63,6 +64,41 @@ app.get('/api/v1/trigger-autoscrape', async (req, res) => {
   }
 });
 
+app.get('/api/v1/cron/daily-job', async (req, res) => {
+  // Bảo vệ endpoint khỏi bị gọi từ bên ngoài (Vercel gửi header này khi cron gọi)
+  const authHeader = req.headers['authorization'];
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  const log = { startedAt: new Date(), steps: [] };
+
+  try {
+    console.log('[CRON] Bắt đầu daily job:', new Date().toISOString());
+
+    await triggerAutoScrape();
+    log.steps.push({ step: 'autoscrape', status: 'success', at: new Date() });
+
+    await takeSnapshot();
+    log.steps.push({ step: 'snapshot', status: 'success', at: new Date() });
+
+    log.status = 'success';
+  } catch (error) {
+    console.error('[CRON] Lỗi:', error);
+    log.status = 'failed';
+    log.error = error.message;
+  } finally {
+    log.finishedAt = new Date();
+    await CronLog.create(log); // xem mục 3
+  }
+
+  res.status(200).json(log);
+});
+
+app.get('/api/v1/cron/logs', async (req, res) => {
+  const logs = await CronLog.find().sort({ startedAt: -1 }).limit(20);
+  res.json(logs);
+});
 
 // --- 3. KẾT NỐI DB VÀ CHẠY SERVER ---
 connectDB().then(() => {
