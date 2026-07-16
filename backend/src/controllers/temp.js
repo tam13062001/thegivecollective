@@ -21,7 +21,6 @@ export const refreshTopPostsFromDb = async (req, res) => {
       return res ? res.status(200).json({ message: msg, posts: [] }) : [];
     }
 
-    // Lọc lấy bản ghi mới nhất cho từng platform
     const latestPerPlatform = new Map();
     for (const m of metrics) {
       const existing = latestPerPlatform.get(m.platformName);
@@ -30,7 +29,6 @@ export const refreshTopPostsFromDb = async (req, res) => {
       }
     }
 
-    // Gọi API cào dữ liệu cho tất cả platform
     const results = await Promise.all(
       Array.from(latestPerPlatform.values()).map(async (m) => {
         const data = await fetchTopPostForPlatform(m.platformName, m.accountHandle, tokens);
@@ -42,30 +40,37 @@ export const refreshTopPostsFromDb = async (req, res) => {
     const allNewPosts = [];
     const failedPosts = [];
 
-    // Phân loại kết quả trả về
     results.forEach((resItem) => {
       if (resItem.data && resItem.data.error) {
         failedPosts.push(resItem);
       } else if (Array.isArray(resItem.data) && resItem.data.length > 0) {
-        // Nếu Service trả về mảng -> Lấy top 3 và đẩy vào danh sách insert
         successfulPlatforms.push(resItem.platform);
         allNewPosts.push(...resItem.data.slice(0, 3)); 
       } else if (resItem.data && !Array.isArray(resItem.data)) {
-        // Fallback: Nếu Service chỉ trả về 1 object -> Vẫn giữ lại
         successfulPlatforms.push(resItem.platform);
         allNewPosts.push(resItem.data);
       }
     });
 
-    // Xóa cache cũ & Lưu cache mới (Chỉ áp dụng cho các platform cào thành công)
+    // ─── PHẦN QUAN TRỌNG NHẤT: ĐỒNG BỘ INDEX & LƯU DB ───
+
+    // 1. Ép MongoDB đồng bộ lại index. Nó sẽ tự động tìm và xóa cái luật unique: true 
+    // của platform cũ, giúp các bài viết thứ 2, thứ 3 được lưu bình thường.
+    await TopPost.syncIndexes();
+
     if (successfulPlatforms.length > 0) {
-      // 1. Xóa các bài posts cũ của những platform đã lấy được data mới
-      await TopPost.deleteMany({ platform: { $in: successfulPlatforms } });
+      // 2. Dọn rác: Xóa các bài posts cũ của những platform cào thành công, 
+      // và xóa luôn các bản ghi bị lỗi platform: null (như bạn thấy trong GET API)
+      await TopPost.deleteMany({ 
+        $or: [
+          { platform: { $in: successfulPlatforms } },
+          { platform: null }
+        ]
+      });
       
-      // 2. Chèn toàn bộ các bài posts mới vào DB
-      // Bỏ qua lỗi duplicate key (nếu có URL trùng nhau bị lọt vào)
+      // 3. Chèn toàn bộ 12 bài posts mới vào DB
       await TopPost.insertMany(allNewPosts, { ordered: false }).catch(err => {
-         console.warn('[TopPosts] Một số post bị trùng URL và bị bỏ qua:', err.message);
+         console.warn('[TopPosts] Cảnh báo khi lưu DB (Có thể do trùng URL):', err.message);
       });
     }
 
@@ -90,18 +95,19 @@ export const getCachedTopPosts = async (req, res) => {
     if (posts.length === 0) {
       return res.status(200).json({
         message: 'Chưa có dữ liệu cache. Gọi GET /api/v1/insights/top-posts/refresh trước để cào dữ liệu lần đầu.',
+        total: 0,
         posts: [],
       });
     }
 
-    // Tùy chọn: Nhóm dữ liệu theo platform cho Frontend dễ render
     const groupedPosts = posts.reduce((acc, post) => {
-      if (!acc[post.platform]) acc[post.platform] = [];
-      acc[post.platform].push(post);
+      if (post.platform) { // Bỏ qua nếu platform vô tình bị null
+        if (!acc[post.platform]) acc[post.platform] = [];
+        acc[post.platform].push(post);
+      }
       return acc;
     }, {});
 
-    // Trả về cả mảng phẳng và mảng đã nhóm
     res.status(200).json({
        total: posts.length,
        posts: posts,
