@@ -22,7 +22,7 @@ type Post = {
   url?: string;
 };
 
-// Shape thật trả về từ MongoDB (bảng TopPost) — có _id, createdAt, updatedAt...
+// Actual shape returned from MongoDB (TopPost collection) — includes _id, createdAt, updatedAt...
 type TopPostDoc = {
   _id: string;
   platform: string;
@@ -44,7 +44,7 @@ type DemographicRow = {
 
 const API_BASE_URL = 'https://thegivecollective-backend.vercel.app/api/v1';
 
-// ─── Mock data (fallback nếu backend/API lỗi hoặc cache rỗng) ──────────────────
+// ─── Mock data (fallback if backend/API fails or cache is empty) ──────────────
 
 const MOCK_TOP_POSTS: Post[] = [
   { id: 1, platform: 'Instagram', title: 'Behind the scenes: Give Collective team behind the scenes', views: 125000, likes: 14200, date: '2026-07-10' },
@@ -53,7 +53,7 @@ const MOCK_TOP_POSTS: Post[] = [
   { id: 4, platform: 'YouTube', title: 'The Give Collective — 2026 Impact Recap', views: 8600, likes: 410, date: '2026-06-28' },
 ];
 
-// Snapshot thật lấy từ Meta Graph API v25.0
+// Real snapshot from Meta Graph API v25.0
 // GET /17841422427064625/insights?metric=follower_demographics&period=lifetime&timeframe=this_month&breakdown=age,gender
 const REAL_DEMOGRAPHICS_SNAPSHOT: DemographicRow[] = [
   { age: '13-17', female: 8,  male: 6,  undisclosed: 10 },
@@ -74,10 +74,10 @@ function fmtNum(n: number): string {
 }
 
 /**
- * Backend /insights/top-posts trả về 2 dạng:
- *  - Mảng TopPostDoc[] thẳng, khi cache có data
- *  - { message, posts: [] } khi cache rỗng (chưa refresh lần nào)
- * Chuẩn hoá về Post[] (id số) dùng chung cho UI, dùng luôn cho cả 2 trường hợp.
+ * Backend /insights/top-posts returns 2 formats:
+ * - Flat array TopPostDoc[], when cache has data
+ * - { message, posts: [] } when cache is empty (never refreshed)
+ * Normalize to Post[] (numeric id) for shared UI usage in both cases.
  */
 function normalizeTopPosts(raw: unknown): Post[] {
   const docs: TopPostDoc[] = Array.isArray(raw)
@@ -168,19 +168,19 @@ export default function InsightsPage() {
   const [demographics, setDemographics] = useState<DemographicRow[]>(REAL_DEMOGRAPHICS_SNAPSHOT);
   const [demoLoading, setDemoLoading] = useState(false);
 
-  // Top posts: đọc cache từ /insights/top-posts (xem controllers/topPostController.js)
+  // Top posts: read cache from /insights/top-posts (see controllers/topPostController.js)
   useEffect(() => {
     const fetchTopPosts = async () => {
       setPostsLoading(true);
       try {
         const res = await fetch(`${API_BASE_URL}/insights/top-posts`);
-        if (!res.ok) return; // giữ mock nếu backend lỗi
+        if (!res.ok) return; // keep mock if backend fails
         const raw = await res.json();
         const posts = normalizeTopPosts(raw);
         if (posts.length > 0) setTopPosts(posts);
-        // Nếu posts.length === 0 (cache chưa có data) → giữ nguyên MOCK_TOP_POSTS
+        // If posts.length === 0 (no data in cache yet) → keep MOCK_TOP_POSTS
       } catch {
-        // giữ MOCK_TOP_POSTS nếu fetch lỗi
+        // keep MOCK_TOP_POSTS if fetch fails
       } finally {
         setPostsLoading(false);
       }
@@ -188,7 +188,7 @@ export default function InsightsPage() {
     fetchTopPosts();
   }, []);
 
-  // Demographics: xem routes/Insights.js ở backend
+  // Demographics: see routes/Insights.js on backend
   useEffect(() => {
     const fetchDemographics = async () => {
       setDemoLoading(true);
@@ -198,7 +198,7 @@ export default function InsightsPage() {
         const parsed: DemographicRow[] = await res.json();
         if (Array.isArray(parsed) && parsed.length > 0) setDemographics(parsed);
       } catch {
-        // giữ REAL_DEMOGRAPHICS_SNAPSHOT nếu fetch lỗi
+        // keep REAL_DEMOGRAPHICS_SNAPSHOT if fetch fails
       } finally {
         setDemoLoading(false);
       }
@@ -222,7 +222,7 @@ export default function InsightsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Insights &amp; Performance</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Phân tích chuyên sâu về khán giả và nội dung hoạt động tốt nhất.
+            In-depth analysis of our audience and top-performing content.
           </p>
         </div>
 
@@ -231,8 +231,8 @@ export default function InsightsPage() {
 
           {/* Stat cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard label="Total Views"      value={fmtNum(totalViews)}     sub={`Top post trên ${topPosts.length} nền tảng`}   colorKey="up"   />
-            <StatCard label="Total Likes"      value={fmtNum(totalLikes)}     sub={`Top post trên ${topPosts.length} nền tảng`}   colorKey="none" />
+            <StatCard label="Total Views"      value={fmtNum(totalViews)}     sub={`Top posts across ${topPosts.length} platforms`}   colorKey="up"   />
+            <StatCard label="Total Likes"      value={fmtNum(totalLikes)}     sub={`Top posts across ${topPosts.length} platforms`}   colorKey="none" />
             <StatCard label="Engagement Rate"  value={`${engagementRate}%`}   sub="Likes / views, top posts"                        colorKey="none" />
           </div>
 
@@ -243,7 +243,7 @@ export default function InsightsPage() {
               <div className="px-5 py-3 flex items-center justify-between bg-emerald-50/60 border-b border-emerald-200">
                 <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">Audience demographics</span>
                 <span className="text-xs font-mono text-emerald-600">
-                  {demoLoading ? 'Đang tải…' : `${fmtNum(totalKnownFollowers)} followers · IG`}
+                  {demoLoading ? 'Loading...' : `${fmtNum(totalKnownFollowers)} followers · IG`}
                 </span>
               </div>
               <div className="p-4 flex-1 flex flex-col">
@@ -259,9 +259,9 @@ export default function InsightsPage() {
                       <YAxis dataKey="age" type="category" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} width={40} />
                       <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f8fafc' }} />
                       <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                      <Bar dataKey="female" name="Nữ" stackId="a" fill="#ec4899" barSize={16} />
-                      <Bar dataKey="male" name="Nam" stackId="a" fill="#6366f1" barSize={16} />
-                      <Bar dataKey="undisclosed" name="Không xác định" stackId="a" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={16} />
+                      <Bar dataKey="female" name="Female" stackId="a" fill="#ec4899" barSize={16} />
+                      <Bar dataKey="male" name="Male" stackId="a" fill="#6366f1" barSize={16} />
+                      <Bar dataKey="undisclosed" name="Undisclosed" stackId="a" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={16} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -271,7 +271,7 @@ export default function InsightsPage() {
                   <div>
                     <p className="text-sm text-emerald-800 font-semibold mb-1">Quick Insight</p>
                     <p className="text-xs text-emerald-600 leading-relaxed">
-                      Nhóm tuổi 25-44 chiếm đông nhất trong followers có dữ liệu demographic (Meta chỉ tính followers mà họ xác định được tuổi/giới tính).
+                      The 25-44 age group makes up the majority of followers with available demographic data (Meta only includes followers with identifiable age/gender).
                     </p>
                   </div>
                 </div>
@@ -283,7 +283,7 @@ export default function InsightsPage() {
               <div className="px-5 py-3 flex items-center justify-between bg-slate-50 border-b border-slate-200">
                 <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Top performing posts</span>
                 <span className="text-xs font-mono text-slate-400">
-                  {postsLoading ? 'Đang tải…' : '1 bài / nền tảng'}
+                  {postsLoading ? 'Loading...' : '1 post / platform'}
                 </span>
               </div>
 
