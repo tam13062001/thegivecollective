@@ -1,11 +1,10 @@
-// controllers/topPostController.js
 import Metric from '../models/Metric.js';
-import TopPost from '../models/ToppostModels.js';
-import { fetchTopPostForPlatform } from '../services/ToppostsService.js';
+import AllPost from '../models/Allpost.js';
+import { fetchTopPostForPlatform } from '../services/allpostService.js';
 
 const SUPPORTED_PLATFORMS = ['Facebook', 'Instagram', 'Tiktok', 'Youtube'];
 
-export const refreshTopPostsFromDb = async (req, res) => {
+export const refreshAllPostsFromDb = async (req, res) => {
   try {
     const tokens = {
       metaAccessToken: process.env.META_ACCESS_TOKEN,
@@ -49,7 +48,8 @@ export const refreshTopPostsFromDb = async (req, res) => {
         // Casing khác nhau khiến deleteMany bên dưới không khớp được bản ghi cũ.
         const actualPlatform = resItem.data[0].platform;
         successfulPlatforms.push(actualPlatform);
-        allNewPosts.push(...resItem.data.slice(0, 3));
+        // Lấy hết toàn bộ bài viết, không giới hạn top 3 nữa
+        allNewPosts.push(...resItem.data);
       } else if (resItem.data && !Array.isArray(resItem.data)) {
         const actualPlatform = resItem.data.platform;
         successfulPlatforms.push(actualPlatform);
@@ -61,13 +61,13 @@ export const refreshTopPostsFromDb = async (req, res) => {
 
     // 1. Ép MongoDB đồng bộ lại index. Nó sẽ tự động tìm và xóa cái luật unique: true 
     // của platform cũ, giúp các bài viết thứ 2, thứ 3 được lưu bình thường.
-    await TopPost.syncIndexes();
+    await AllPost.syncIndexes();
 
     if (successfulPlatforms.length > 0) {
       // 2. Dọn rác: Xóa các bài posts cũ của những platform cào thành công
       // (dùng đúng casing thật sự lưu trong DB), và xóa luôn các bản ghi
       // bị lỗi platform: null (như bạn thấy trong GET API)
-      await TopPost.deleteMany({
+      await AllPost.deleteMany({
         $or: [
           { platform: { $in: successfulPlatforms } },
           { platform: null },
@@ -75,8 +75,8 @@ export const refreshTopPostsFromDb = async (req, res) => {
       });
 
       // 3. Chèn toàn bộ posts mới vào DB
-      const insertResult = await TopPost.insertMany(allNewPosts, { ordered: false }).catch(err => {
-        console.warn('[TopPosts] Cảnh báo khi lưu DB (Có thể do trùng URL):', err.message);
+      const insertResult = await AllPost.insertMany(allNewPosts, { ordered: false }).catch(err => {
+        console.warn('[AllPosts] Cảnh báo khi lưu DB (Có thể do trùng URL):', err.message);
         if (err.writeErrors) {
           err.writeErrors.forEach(e => {
             console.warn('  → Bài bị skip:', e.err?.op?.url || e.errmsg);
@@ -100,13 +100,13 @@ export const refreshTopPostsFromDb = async (req, res) => {
   }
 };
 
-export const getCachedTopPosts = async (req, res) => {
+export const getCachedAllPosts = async (req, res) => {
   try {
-    const posts = await TopPost.find().sort({ updatedAt: -1 });
+    const posts = await AllPost.find().sort({ updatedAt: -1 });
 
     if (posts.length === 0) {
       return res.status(200).json({
-        message: 'Chưa có dữ liệu cache. Gọi GET /api/v1/insights/top-posts/refresh trước để cào dữ liệu lần đầu.',
+        message: 'Chưa có dữ liệu cache. Gọi GET /api/v1/insights/all-posts/refresh trước để cào dữ liệu lần đầu.',
         total: 0,
         posts: [],
       });

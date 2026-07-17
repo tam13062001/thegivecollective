@@ -1,4 +1,3 @@
-// services/topPosts.js
 const GRAPH_API_VERSION = 'v21.0';
 // Thêm helper này ở đầu file
 const formatDateTime = (isoString) => {
@@ -8,11 +7,12 @@ const formatDateTime = (isoString) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
+
 // ─── Instagram ───────────────────────────────────────────────────────────────
 export const fetchInstagramTopPost = async (apiKey) => {
   try {
     const BASE = 'https://graph.facebook.com/v21.0';
-    const igAccountId = '17841422427064625'; 
+    const igAccountId = '17841422427064625';
 
     const allMedia = [];
     let fetchError = null;
@@ -52,17 +52,17 @@ export const fetchInstagramTopPost = async (apiKey) => {
       withViews.push(...results);
     }
 
-    // Lấy top 3
-    const top3 = withViews.sort((a, b) => b.views - a.views).slice(0, 3);
-
-    return top3.map(top => ({
-      platform: 'Instagram',
-      title: top.caption ? top.caption.slice(0, 120) : '(Không có caption)',
-      views: top.views || 0,
-      likes: top.like_count || 0,
-      date: formatDateTime(top.timestamp),
-      url: top.permalink,
-    }));
+    // Lấy hết, sắp xếp theo views giảm dần
+    return withViews
+      .sort((a, b) => b.views - a.views)
+      .map(top => ({
+        platform: 'Instagram',
+        title: top.caption ? top.caption.slice(0, 120) : '(Không có caption)',
+        views: top.views || 0,
+        likes: top.like_count || 0,
+        date: formatDateTime(top.timestamp),
+        url: top.permalink,
+      }));
   } catch (error) {
     console.error('[Instagram] Top post error:', error);
     return { platform: 'Instagram', error: 'Failed to fetch top Instagram posts' };
@@ -134,11 +134,11 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
     }
 
     if (allContent.length === 0) {
-        return { platform: 'Facebook', error: postsError || reelsError || 'No posts found' };
+      return { platform: 'Facebook', error: postsError || reelsError || 'No posts found' };
     }
 
-    // Lấy top 3
-    return allContent.sort((a, b) => b.views - a.views).slice(0, 3);
+    // Lấy hết, sắp xếp theo views giảm dần
+    return allContent.sort((a, b) => b.views - a.views);
   } catch (error) {
     console.error('[Facebook] Top post error:', error);
     return { platform: 'Facebook', error: 'Failed to fetch top Facebook posts' };
@@ -154,7 +154,8 @@ export const fetchTikTokTopPost = async (handle, apifyToken) => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profiles: [cleanHandle], maxPosts: 100 }),
+        // maxPosts: 0 = lấy hết toàn bộ video của profile (theo doc của actor này)
+        body: JSON.stringify({ profiles: [cleanHandle], maxPosts: 0 }),
       }
     );
 
@@ -165,25 +166,23 @@ export const fetchTikTokTopPost = async (handle, apifyToken) => {
 
     const items = await response.json();
     const validItems = Array.isArray(items) ? items.filter((item) => !item.errorCode && item.id) : [];
-    
+
     if (validItems.length === 0) {
       return { platform: 'TikTok', error: 'No valid data returned' };
     }
 
-    // Map thêm trường views cho dễ sort, sắp xếp, lấy top 3
-    const top3 = validItems
-        .map(item => ({ ...item, views: Number(item.playCount) || 0 }))
-        .sort((a, b) => b.views - a.views)
-        .slice(0, 3);
-
-    return top3.map(top => ({
-      platform: 'TikTok',
-      title: top.text ? top.text.slice(0, 120) : '(Không có caption)',
-      views: top.views,
-      likes: Number(top.diggCount) || 0,
-      date: formatDateTime(top.createTimeISO),
-      url: top.webVideoUrl,
-    }));
+    // Map thêm trường views cho dễ sort, lấy hết
+    return validItems
+      .map(item => ({ ...item, views: Number(item.playCount) || 0 }))
+      .sort((a, b) => b.views - a.views)
+      .map(top => ({
+        platform: 'TikTok',
+        title: top.text ? top.text.slice(0, 120) : '(Không có caption)',
+        views: top.views,
+        likes: Number(top.diggCount) || 0,
+        date: formatDateTime(top.createTimeISO),
+        url: top.webVideoUrl,
+      }));
   } catch (error) {
     console.error('[TikTok] Top post error:', error);
     return { platform: 'TikTok', error: 'Failed to fetch top TikTok posts' };
@@ -191,8 +190,12 @@ export const fetchTikTokTopPost = async (handle, apifyToken) => {
 };
 
 // ─── YouTube ─────────────────────────────────────────────────────────────────
+// Lưu ý: để lấy HẾT video (không chỉ top view), phải đổi cách lấy dữ liệu:
+// dùng channels.list để lấy uploads playlist, sau đó phân trang playlistItems.list,
+// rồi batch gọi videos.list để lấy statistics. Cách cũ (search order=viewCount) không lấy hết được.
 export const fetchYouTubeTopPost = async (channelHandle, apiKey) => {
   try {
+    // 1. Tìm channelId
     const channelResponse = await fetch(
       `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(channelHandle)}&key=${apiKey}`
     );
@@ -200,22 +203,44 @@ export const fetchYouTubeTopPost = async (channelHandle, apiKey) => {
     const channelId = channelData.items?.[0]?.id?.channelId;
     if (!channelId) return { platform: 'YouTube', error: 'Channel not found' };
 
-    // Đổi maxResults từ 1 sang 3
-    const searchRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=viewCount&maxResults=3&key=${apiKey}`
+    // 2. Lấy uploads playlist id của channel (rẻ hơn search rất nhiều về quota)
+    const channelDetailRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channelId}&key=${apiKey}`
     );
-    const searchData = await searchRes.json();
-    const videoIds = searchData.items?.map(item => item.id?.videoId).filter(Boolean) || [];
-    
+    const channelDetailData = await channelDetailRes.json();
+    const uploadsPlaylistId = channelDetailData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+    if (!uploadsPlaylistId) return { platform: 'YouTube', error: 'Uploads playlist not found' };
+
+    // 3. Phân trang lấy hết videoId trong uploads playlist
+    const videoIds = [];
+    let pageToken = '';
+    do {
+      const playlistRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploadsPlaylistId}&maxResults=50&pageToken=${pageToken}&key=${apiKey}`
+      );
+      const playlistData = await playlistRes.json();
+      for (const item of playlistData.items || []) {
+        const vid = item.contentDetails?.videoId;
+        if (vid) videoIds.push(vid);
+      }
+      pageToken = playlistData.nextPageToken || '';
+    } while (pageToken);
+
     if (videoIds.length === 0) return { platform: 'YouTube', error: 'No videos found' };
 
-    // Batch request: Lấy details của cả 3 video chỉ trong 1 call (tiết kiệm quota)
-    const videoRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds.join(',')}&key=${apiKey}`
-    );
-    const videoData = await videoRes.json();
-    
-    return (videoData.items || [])
+    // 4. Batch videos.list theo từng nhóm 50 id (giới hạn API)
+    const BATCH_SIZE = 50;
+    const allVideos = [];
+    for (let i = 0; i < videoIds.length; i += BATCH_SIZE) {
+      const batchIds = videoIds.slice(i, i + BATCH_SIZE);
+      const videoRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${batchIds.join(',')}&key=${apiKey}`
+      );
+      const videoData = await videoRes.json();
+      allVideos.push(...(videoData.items || []));
+    }
+
+    return allVideos
       .map(video => ({
         platform: 'YouTube',
         title: video.snippet.title,
@@ -224,7 +249,7 @@ export const fetchYouTubeTopPost = async (channelHandle, apiKey) => {
         date: formatDateTime(video.snippet.publishedAt),
         url: `https://www.youtube.com/watch?v=${video.id}`,
       }))
-      .sort((a, b) => b.views - a.views); // Đảm bảo đúng thứ tự
+      .sort((a, b) => b.views - a.views);
   } catch (error) {
     console.error('[YouTube] Top post error:', error);
     return { platform: 'YouTube', error: 'Failed to fetch top YouTube videos' };

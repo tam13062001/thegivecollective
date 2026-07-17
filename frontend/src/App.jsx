@@ -7,6 +7,7 @@ import NotFound from "./pages/404"
 import LockScreen from "./components/LockScreen"
 import { Navbar } from './components/Navbar'
 import InsightsPage from "./pages/InsightsPage" 
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(null)
 

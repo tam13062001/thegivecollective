@@ -52,6 +52,16 @@ function fmtNum(n: number): string {
 }
 
 /**
+ * Tách chuỗi "YYYY-MM-DD HH:mm" thành { date, time }.
+ * Nếu chuỗi chỉ có ngày (không có giờ) thì time sẽ rỗng.
+ */
+function splitDateTime(dateStr: string): { date: string; time: string } {
+  if (!dateStr) return { date: '—', time: '' };
+  const [datePart, timePart] = dateStr.split(' ');
+  return { date: datePart || '—', time: timePart || '' };
+}
+
+/**
  * Xử lý dữ liệu BE trả về: hỗ trợ cả Mảng 1D, Mảng 2D (Array of Arrays)
  * hoặc bọc trong object { posts: [...] }
  */
@@ -142,11 +152,222 @@ function PlatformIcon({ name }: { name: string }) {
   );
 }
 
+// ─── Post Schedule Table (giờ có tab theo platform) ────────────────────────────
+
+const PAGE_SIZE = 10;
+
+function PostScheduleTable({ posts, loading }: { posts: Post[]; loading: boolean }) {
+  // Danh sách platform xuất hiện trong data, giữ thứ tự xuất hiện đầu tiên
+  const platforms = useMemo(() => {
+    const seen: string[] = [];
+    for (const p of posts) {
+      if (!seen.includes(p.platform)) seen.push(p.platform);
+    }
+    return seen;
+  }, [posts]);
+
+  const [activeTab, setActiveTab] = useState<string>('All');
+  const [page, setPage] = useState(1);
+
+  // Nếu tab đang chọn không còn tồn tại trong data mới (vd sau khi refetch) thì reset về All
+  useEffect(() => {
+    if (activeTab !== 'All' && !platforms.includes(activeTab)) {
+      setActiveTab('All');
+    }
+  }, [platforms, activeTab]);
+
+  // Đổi tab thì quay lại trang 1
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab]);
+
+  const filteredPosts = useMemo(() => {
+    const base = activeTab === 'All' ? posts : posts.filter((p) => p.platform === activeTab);
+    return [...base].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [posts, activeTab]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE));
+
+  // Nếu data thay đổi khiến trang hiện tại vượt quá tổng số trang thì kéo về trang cuối
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const paginatedPosts = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredPosts.slice(start, start + PAGE_SIZE);
+  }, [filteredPosts, page]);
+
+  const tabs = ['All', ...platforms];
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+      <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-3">
+        <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
+          Post schedule
+        </span>
+        <span className="text-xs font-mono text-slate-400">
+          {loading ? 'Loading...' : `${filteredPosts.length} posts`}
+        </span>
+      </div>
+
+      {/* Tabs theo platform */}
+      <div className="px-5 pt-3 flex items-center gap-2 flex-wrap border-b border-slate-100 pb-3">
+        {tabs.map((tab) => {
+          const isActive = tab === activeTab;
+          const count = tab === 'All' ? posts.length : posts.filter((p) => p.platform === tab).length;
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                isActive
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              {tab !== 'All' && <PlatformIcon name={tab} />}
+              <span className="capitalize">{tab}</span>
+              <span className={`tabular-nums ${isActive ? 'text-slate-300' : 'text-slate-400'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 text-left">
+              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Platform</th>
+              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Title</th>
+              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Date</th>
+              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Time</th>
+              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Views</th>
+              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Likes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && paginatedPosts.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
+                  Loading posts...
+                </td>
+              </tr>
+            ) : paginatedPosts.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
+                  No posts available.
+                </td>
+              </tr>
+            ) : (
+              paginatedPosts.map((post) => {
+                const { date, time } = splitDateTime(post.date);
+                return (
+                  <tr
+                    key={post.id}
+                    className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors"
+                  >
+                    <td className="px-5 py-2.5">
+                      <PlatformIcon name={post.platform} />
+                    </td>
+                    <td className="px-5 py-2.5 max-w-[320px]">
+                      {post.url ? (
+                        <a
+                          href={post.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-slate-700 hover:text-slate-900 hover:underline line-clamp-1"
+                          title={post.title}
+                        >
+                          {post.title}
+                        </a>
+                      ) : (
+                        <span className="text-slate-700 line-clamp-1" title={post.title}>
+                          {post.title}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-2.5 text-slate-500 tabular-nums whitespace-nowrap">{date}</td>
+                    <td className="px-5 py-2.5 text-slate-500 tabular-nums whitespace-nowrap">{time || '—'}</td>
+                    <td className="px-5 py-2.5 text-right font-semibold text-slate-700 tabular-nums">{fmtNum(post.views)}</td>
+                    <td className="px-5 py-2.5 text-right font-semibold text-slate-700 tabular-nums">{fmtNum(post.likes)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Phân trang */}
+      {filteredPosts.length > 0 && (
+        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
+          <span className="text-xs text-slate-400">
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredPosts.length)} of {filteredPosts.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              // Giới hạn hiển thị số trang xung quanh trang hiện tại để tránh tràn khi có nhiều trang
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+              .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, idx) =>
+                p === 'ellipsis' ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 text-xs text-slate-300">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPage(p)}
+                    className={`rounded-lg w-8 h-8 text-xs font-semibold tabular-nums transition-colors ${
+                      p === page
+                        ? 'bg-slate-800 text-white'
+                        : 'text-slate-500 bg-slate-100 hover:bg-slate-200'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
+  // Top 3 posts / platform - dùng cho phần "Top performing posts" và các stat card
   const [topPosts, setTopPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
+
+  // Toàn bộ bài viết - dùng riêng cho bảng "Post schedule"
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
+  const [allPostsLoading, setAllPostsLoading] = useState(false);
 
   const [demographics, setDemographics] = useState<DemographicRow[]>(REAL_DEMOGRAPHICS_SNAPSHOT);
   const [demoLoading, setDemoLoading] = useState(false);
@@ -172,10 +393,27 @@ export default function InsightsPage() {
   }, []);
 
   useEffect(() => {
+    const fetchAllPosts = async () => {
+      setAllPostsLoading(true);
+      try {
+        const response = await fetch(`https://thegivecollective-backend.vercel.app/api/v1/insights/all-posts`);
+        const data = await response.json();
+        const normalizedPosts = normalizeTopPosts(data);
+        setAllPosts(normalizedPosts);
+      } catch (error) {
+        console.error("Lỗi khi tải all posts:", error);
+      } finally {
+        setAllPostsLoading(false);
+      }
+    };
+    fetchAllPosts();
+  }, []);
+
+  useEffect(() => {
     const fetchDemographics = async () => {
       setDemoLoading(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/insights/demographics`);
+        const res = await fetch(`https://thegivecollective-backend.vercel.app/api/v1/insights/demographics`);
         if (!res.ok) return;
         const parsed: DemographicRow[] = await res.json();
         if (Array.isArray(parsed) && parsed.length > 0) setDemographics(parsed);
@@ -196,7 +434,7 @@ export default function InsightsPage() {
     (s, d) => s + d.female + d.male + d.undisclosed, 0,
   );
 
-  // Gom nhóm bài viết theo platform 
+  // Gom nhóm bài viết theo platform (dùng cho phần "Top performing posts")
   const groupedPosts = useMemo(() => {
     return topPosts.reduce((acc, post) => {
       if (!acc[post.platform]) acc[post.platform] = [];
@@ -336,6 +574,11 @@ export default function InsightsPage() {
             </div>
 
           </div>
+        </section>
+
+        {/* ── SECTION 2: Post Schedule (full posts, chia tab theo platform) ── */}
+        <section>
+          <PostScheduleTable posts={allPosts} loading={allPostsLoading} />
         </section>
 
       </div>
