@@ -152,208 +152,138 @@ function PlatformIcon({ name }: { name: string }) {
   );
 }
 
-// ─── Post Schedule Table (giờ có tab theo platform) ────────────────────────────
+// ─── Best Time to Post Heatmap ─────────────────────────────────────────────────
+// Lưu ý: BE hiện chưa có endpoint riêng cho "audience online activity theo giờ"
+// (loại insight gốc của IG/TikTok Best Time to Post). Vì vậy heatmap này được
+// tính trực tiếp từ lịch sử bài đăng: màu càng đậm = views trung bình của các
+// bài đăng ở khung ngày/giờ đó càng cao; chấm vàng đánh dấu khung bạn đã đăng bài.
+// Nếu sau này BE có API riêng cho audience activity, chỉ cần đổi nguồn data
+// truyền vào component này.
 
-const PAGE_SIZE = 10;
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => i * 2); // 0,2,4,...,22
 
-function PostScheduleTable({ posts, loading }: { posts: Post[]; loading: boolean }) {
-  // Danh sách platform xuất hiện trong data, giữ thứ tự xuất hiện đầu tiên
-  const platforms = useMemo(() => {
-    const seen: string[] = [];
-    for (const p of posts) {
-      if (!seen.includes(p.platform)) seen.push(p.platform);
+type HeatCell = { count: number; totalViews: number };
+
+function BestTimeToPostHeatmap({ posts, loading }: { posts: Post[]; loading: boolean }) {
+  const { grid, minAvg, maxAvg, hasData } = useMemo(() => {
+    const g: HeatCell[][] = Array.from({ length: 7 }, () =>
+      Array.from({ length: 24 }, () => ({ count: 0, totalViews: 0 }))
+    );
+
+    for (const post of posts) {
+      if (!post.date) continue;
+      const { time } = splitDateTime(post.date);
+      if (!time) continue; // Bỏ qua nếu record chỉ có ngày, không có giờ cụ thể
+
+      const parsed = new Date(post.date.replace(' ', 'T'));
+      if (isNaN(parsed.getTime())) continue;
+
+      const dayIdx = (parsed.getDay() + 6) % 7; // getDay(): 0=CN -> quy về 0=Mon ... 6=Sun
+      const hourIdx = parsed.getHours();
+
+      g[dayIdx][hourIdx].count += 1;
+      g[dayIdx][hourIdx].totalViews += post.views || 0;
     }
-    return seen;
+
+    let min = Infinity;
+    let max = -Infinity;
+    let any = false;
+    for (const row of g) {
+      for (const cell of row) {
+        if (cell.count > 0) {
+          any = true;
+          const avg = cell.totalViews / cell.count;
+          if (avg < min) min = avg;
+          if (avg > max) max = avg;
+        }
+      }
+    }
+
+    return { grid: g, minAvg: any ? min : 0, maxAvg: any ? max : 0, hasData: any };
   }, [posts]);
 
-  const [activeTab, setActiveTab] = useState<string>('All');
-  const [page, setPage] = useState(1);
-
-  // Nếu tab đang chọn không còn tồn tại trong data mới (vd sau khi refetch) thì reset về All
-  useEffect(() => {
-    if (activeTab !== 'All' && !platforms.includes(activeTab)) {
-      setActiveTab('All');
-    }
-  }, [platforms, activeTab]);
-
-  // Đổi tab thì quay lại trang 1
-  useEffect(() => {
-    setPage(1);
-  }, [activeTab]);
-
-  const filteredPosts = useMemo(() => {
-    const base = activeTab === 'All' ? posts : posts.filter((p) => p.platform === activeTab);
-    return [...base].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  }, [posts, activeTab]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE));
-
-  // Nếu data thay đổi khiến trang hiện tại vượt quá tổng số trang thì kéo về trang cuối
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
-
-  const paginatedPosts = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredPosts.slice(start, start + PAGE_SIZE);
-  }, [filteredPosts, page]);
-
-  const tabs = ['All', ...platforms];
+  const cellColor = (cell: HeatCell) => {
+    if (cell.count === 0) return '#eef2f7';
+    if (maxAvg === minAvg) return 'hsl(205, 85%, 55%)';
+    const avg = cell.totalViews / cell.count;
+    const normalized = (avg - minAvg) / (maxAvg - minAvg); // 0..1
+    const lightness = 88 - normalized * 68; // 88% (nhạt) → 20% (đậm)
+    return `hsl(205, 85%, ${lightness}%)`;
+  };
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
       <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-3">
-        <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
-          Post schedule
-        </span>
+        <span className="text-sm font-bold text-slate-800">Best Time to Post</span>
         <span className="text-xs font-mono text-slate-400">
-          {loading ? 'Loading...' : `${filteredPosts.length} posts`}
+          {loading ? 'Loading...' : 'All time'}
         </span>
       </div>
 
-      {/* Tabs theo platform */}
-      <div className="px-5 pt-3 flex items-center gap-2 flex-wrap border-b border-slate-100 pb-3">
-        {tabs.map((tab) => {
-          const isActive = tab === activeTab;
-          const count = tab === 'All' ? posts.length : posts.filter((p) => p.platform === tab).length;
-          return (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                isActive
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
-            >
-              {tab !== 'All' && <PlatformIcon name={tab} />}
-              <span className="capitalize">{tab}</span>
-              <span className={`tabular-nums ${isActive ? 'text-slate-300' : 'text-slate-400'}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-left">
-              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Platform</th>
-              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Title</th>
-              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Date</th>
-              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Time</th>
-              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Views</th>
-              <th className="px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Likes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && paginatedPosts.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
-                  Loading posts...
-                </td>
-              </tr>
-            ) : paginatedPosts.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
-                  No posts available.
-                </td>
-              </tr>
-            ) : (
-              paginatedPosts.map((post) => {
-                const { date, time } = splitDateTime(post.date);
-                return (
-                  <tr
-                    key={post.id}
-                    className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors"
-                  >
-                    <td className="px-5 py-2.5">
-                      <PlatformIcon name={post.platform} />
-                    </td>
-                    <td className="px-5 py-2.5 max-w-[320px]">
-                      {post.url ? (
-                        <a
-                          href={post.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-slate-700 hover:text-slate-900 hover:underline line-clamp-1"
-                          title={post.title}
-                        >
-                          {post.title}
-                        </a>
-                      ) : (
-                        <span className="text-slate-700 line-clamp-1" title={post.title}>
-                          {post.title}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-2.5 text-slate-500 tabular-nums whitespace-nowrap">{date}</td>
-                    <td className="px-5 py-2.5 text-slate-500 tabular-nums whitespace-nowrap">{time || '—'}</td>
-                    <td className="px-5 py-2.5 text-right font-semibold text-slate-700 tabular-nums">{fmtNum(post.views)}</td>
-                    <td className="px-5 py-2.5 text-right font-semibold text-slate-700 tabular-nums">{fmtNum(post.likes)}</td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Phân trang */}
-      {filteredPosts.length > 0 && (
-        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
-          <span className="text-xs text-slate-400">
-            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredPosts.length)} of {filteredPosts.length}
+      <div className="p-5">
+        {/* Legend */}
+        <div className="flex items-center gap-3 mb-4 flex-wrap text-xs text-slate-500">
+          <span className="tabular-nums">{fmtNum(minAvg)}</span>
+          <span
+            className="h-2.5 w-32 rounded-full"
+            style={{ background: 'linear-gradient(to right, hsl(205,85%,88%), hsl(205,85%,20%))' }}
+          />
+          <span className="tabular-nums">{fmtNum(maxAvg)}</span>
+          <span className="flex items-center gap-1.5 ml-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+            Your posts
           </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Prev
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              // Giới hạn hiển thị số trang xung quanh trang hiện tại để tránh tràn khi có nhiều trang
-              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-              .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
-                acc.push(p);
-                return acc;
-              }, [])
-              .map((p, idx) =>
-                p === 'ellipsis' ? (
-                  <span key={`ellipsis-${idx}`} className="px-2 text-xs text-slate-300">…</span>
-                ) : (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPage(p)}
-                    className={`rounded-lg w-8 h-8 text-xs font-semibold tabular-nums transition-colors ${
-                      p === page
-                        ? 'bg-slate-800 text-white'
-                        : 'text-slate-500 bg-slate-100 hover:bg-slate-200'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                )
-              )}
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Next
-            </button>
-          </div>
         </div>
-      )}
+
+        {!hasData && !loading ? (
+          <div className="flex items-center justify-center h-32 text-sm text-slate-400">
+            Chưa có đủ dữ liệu giờ đăng bài để hiển thị.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
+              {WEEKDAY_LABELS.map((day, dayIdx) => (
+                <div key={day} className="flex items-center gap-1 mb-1">
+                  <span className="w-9 text-[11px] text-slate-400 text-right pr-2 shrink-0">{day}</span>
+                  <div className="flex gap-[3px] flex-1">
+                    {grid[dayIdx].map((cell, hourIdx) => (
+                      <div
+                        key={hourIdx}
+                        title={`${day} ${String(hourIdx).padStart(2, '0')}:00 — ${cell.count} bài, ${fmtNum(cell.totalViews)} views`}
+                        className="relative flex-1 aspect-square rounded-[3px]"
+                        style={{ backgroundColor: cellColor(cell) }}
+                      >
+                        {cell.count > 0 && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <span className="w-3 h-3 rounded-full bg-amber-400" />
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Nhãn giờ, cứ mỗi 2h */}
+              <div className="flex items-center gap-1 mt-2">
+                <span className="w-9 shrink-0" />
+                <div className="flex-1 relative h-4">
+                  {HOUR_LABELS.map((h) => (
+                    <span
+                      key={h}
+                      className="absolute text-[10px] text-slate-400 -translate-x-1/2"
+                      style={{ left: `${(h / 24) * 100}%` }}
+                    >
+                      {String(h).padStart(2, '0')}:00
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -396,7 +326,7 @@ export default function InsightsPage() {
     const fetchAllPosts = async () => {
       setAllPostsLoading(true);
       try {
-        const response = await fetch(`https://thegivecollective-backend.vercel.app/api/v1/insights/all-posts`);
+        const response = await fetch(`${API_BASE_URL}/insights/all-posts`);
         const data = await response.json();
         const normalizedPosts = normalizeTopPosts(data);
         setAllPosts(normalizedPosts);
@@ -413,7 +343,7 @@ export default function InsightsPage() {
     const fetchDemographics = async () => {
       setDemoLoading(true);
       try {
-        const res = await fetch(`https://thegivecollective-backend.vercel.app/api/v1/insights/demographics`);
+        const res = await fetch(`${API_BASE_URL}/insights/demographics`);
         if (!res.ok) return;
         const parsed: DemographicRow[] = await res.json();
         if (Array.isArray(parsed) && parsed.length > 0) setDemographics(parsed);
@@ -576,9 +506,9 @@ export default function InsightsPage() {
           </div>
         </section>
 
-        {/* ── SECTION 2: Post Schedule (full posts, chia tab theo platform) ── */}
+        {/* ── SECTION 2: Best Time to Post (heatmap ngày/giờ từ toàn bộ bài viết) ── */}
         <section>
-          <PostScheduleTable posts={allPosts} loading={allPostsLoading} />
+          <BestTimeToPostHeatmap posts={allPosts} loading={allPostsLoading} />
         </section>
 
       </div>
