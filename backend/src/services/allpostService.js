@@ -104,6 +104,7 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
           title: post.message ? post.message.slice(0, 120) : '(Không có nội dung)',
           views,
           likes: post.likes?.summary?.total_count || 0,
+          shares: post.shares?.count || 0,
           date: formatDateTime(post.created_time),
           url: post.permalink_url,
         });
@@ -126,6 +127,7 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
           title: reel.description ? reel.description.slice(0, 120) : '(Reel không có mô tả)',
           views,
           likes: reel.likes?.summary?.total_count || 0,
+          shares: reel.shares?.count || 0,
           date: formatDateTime(reel.created_time),
           url: reel.permalink_url,
         });
@@ -180,6 +182,7 @@ export const fetchTikTokTopPost = async (handle, apifyToken) => {
         title: top.text ? top.text.slice(0, 120) : '(Không có caption)',
         views: top.views,
         likes: Number(top.diggCount) || 0,
+        shares: Number(top.shareCount) || 0,
         date: formatDateTime(top.createTimeISO),
         url: top.webVideoUrl,
       }));
@@ -246,6 +249,7 @@ export const fetchYouTubeTopPost = async (channelHandle, apiKey) => {
         title: video.snippet.title,
         views: parseInt(video.statistics.viewCount) || 0,
         likes: parseInt(video.statistics.likeCount) || 0,
+        shares: parseInt(video.statistics.shareCount) || 0,
         date: formatDateTime(video.snippet.publishedAt),
         url: `https://www.youtube.com/watch?v=${video.id}`,
       }))

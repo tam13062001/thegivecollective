@@ -13,7 +13,7 @@ import {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Post = {
-  id: string | number; // Cập nhật để nhận _id từ MongoDB
+  id: string | number; // Nhận _id từ MongoDB
   platform: string;
   title: string;
   views: number;
@@ -29,6 +29,20 @@ type DemographicRow = {
   undisclosed: number;
 };
 
+type TimeEngagementHour = {
+  pt_hour: number;
+  vn_hour: number;
+  followers_online: number;
+};
+
+type TimeEngagementData = {
+  recommended_vn_times: string[];
+  top_hours_detail: TimeEngagementHour[];
+  full_day_stats: TimeEngagementHour[];
+};
+
+type PlatformKey = 'tiktok' | 'facebook' | 'instagram';
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const API_BASE_URL = 'https://thegivecollective-backend.vercel.app/api/v1';
@@ -41,6 +55,15 @@ const REAL_DEMOGRAPHICS_SNAPSHOT: DemographicRow[] = [
   { age: '45-54', female: 22, male: 11, undisclosed: 7  },
   { age: '55-64', female: 13, male: 4,  undisclosed: 1  },
   { age: '65+',   female: 1,  male: 2,  undisclosed: 1  },
+];
+
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => i * 2); // 0,2,4,...,22
+
+const PLATFORM_TABS: { key: PlatformKey; label: string }[] = [
+  { key: 'tiktok', label: 'TikTok' },
+  { key: 'facebook', label: 'Facebook' },
+  { key: 'instagram', label: 'Instagram' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -68,19 +91,16 @@ function splitDateTime(dateStr: string): { date: string; time: string } {
 function normalizeTopPosts(raw: any): Post[] {
   let rawArray: any[] = [];
 
-  // 1. Lấy ra mảng posts an toàn
   if (Array.isArray(raw)) {
     rawArray = raw;
   } else if (raw && typeof raw === 'object' && Array.isArray(raw.posts)) {
     rawArray = raw.posts;
   }
 
-  // 2. Dùng .flat() để trải phẳng nếu nó là mảng 2D
   const flatDocs = rawArray.flat();
 
-  // 3. Map thành chuẩn Post[] cho UI
   return flatDocs.map((doc, idx) => ({
-    id: doc._id || idx + 1, // Ưu tiên _id của MongoDB
+    id: doc._id || idx + 1,
     platform: doc.platform || 'Unknown',
     title: doc.title || '(Không có tiêu đề)',
     views: doc.views || 0,
@@ -152,21 +172,40 @@ function PlatformIcon({ name }: { name: string }) {
   );
 }
 
-// ─── Best Time to Post Heatmap ─────────────────────────────────────────────────
-// Lưu ý: BE hiện chưa có endpoint riêng cho "audience online activity theo giờ"
-// (loại insight gốc của IG/TikTok Best Time to Post). Vì vậy heatmap này được
-// tính trực tiếp từ lịch sử bài đăng: màu càng đậm = views trung bình của các
-// bài đăng ở khung ngày/giờ đó càng cao; chấm vàng đánh dấu khung bạn đã đăng bài.
-// Nếu sau này BE có API riêng cho audience activity, chỉ cần đổi nguồn data
-// truyền vào component này.
+// ─── Platform navbar switcher ───────────────────────────────────────────────────
 
-const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => i * 2); // 0,2,4,...,22
+function PlatformSwitcher({
+  active, onChange,
+}: { active: PlatformKey; onChange: (p: PlatformKey) => void }) {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+      {PLATFORM_TABS.map((p) => (
+        <button
+          key={p.key}
+          type="button"
+          onClick={() => onChange(p.key)}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            active === p.key
+              ? 'bg-slate-800 text-white'
+              : 'text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <PlatformIcon name={p.key} />
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Best Time to Post: shared post-history grid logic ─────────────────────────
+// Ước lượng từ lịch sử bài đăng: màu càng đậm = views trung bình của các bài
+// đăng ở khung ngày/giờ đó càng cao; chấm vàng đánh dấu khung bạn đã đăng bài.
 
 type HeatCell = { count: number; totalViews: number };
 
-function BestTimeToPostHeatmap({ posts, loading }: { posts: Post[]; loading: boolean }) {
-  const { grid, minAvg, maxAvg, hasData } = useMemo(() => {
+function usePostHistoryGrid(posts: Post[]) {
+  return useMemo(() => {
     const g: HeatCell[][] = Array.from({ length: 7 }, () =>
       Array.from({ length: 24 }, () => ({ count: 0, totalViews: 0 }))
     );
@@ -202,7 +241,13 @@ function BestTimeToPostHeatmap({ posts, loading }: { posts: Post[]; loading: boo
 
     return { grid: g, minAvg: any ? min : 0, maxAvg: any ? max : 0, hasData: any };
   }, [posts]);
+}
 
+function PostHistoryGridView({
+  grid, minAvg, maxAvg, hasData, loading,
+}: {
+  grid: HeatCell[][]; minAvg: number; maxAvg: number; hasData: boolean; loading: boolean;
+}) {
   const cellColor = (cell: HeatCell) => {
     if (cell.count === 0) return '#eef2f7';
     if (maxAvg === minAvg) return 'hsl(205, 85%, 55%)';
@@ -212,76 +257,275 @@ function BestTimeToPostHeatmap({ posts, loading }: { posts: Post[]; loading: boo
     return `hsl(205, 85%, ${lightness}%)`;
   };
 
+  if (!hasData && !loading) {
+    return (
+      <div className="flex items-center justify-center h-32 text-sm text-slate-400">
+        Chưa có đủ dữ liệu giờ đăng bài để hiển thị.
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-3 mb-4 flex-wrap text-xs text-slate-500">
+        <span className="tabular-nums">{fmtNum(minAvg)}</span>
+        <span
+          className="h-2.5 w-32 rounded-full"
+          style={{ background: 'linear-gradient(to right, hsl(205,85%,88%), hsl(205,85%,20%))' }}
+        />
+        <span className="tabular-nums">{fmtNum(maxAvg)}</span>
+        <span className="flex items-center gap-1.5 ml-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+          Your posts
+        </span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-[720px]">
+          {WEEKDAY_LABELS.map((day, dayIdx) => (
+            <div key={day} className="flex items-center gap-1.5 mb-1.5">
+              <span className="w-9 text-[11px] text-slate-400 text-right pr-2 shrink-0">{day}</span>
+              <div className="flex gap-[4px] flex-1">
+                {grid[dayIdx].map((cell, hourIdx) => (
+                  <div
+                    key={hourIdx}
+                    title={`${day} ${String(hourIdx).padStart(2, '0')}:00 — ${cell.count} bài, ${fmtNum(cell.totalViews)} views`}
+                    className="relative flex-1 aspect-square rounded-[4px]"
+                    style={{ backgroundColor: cellColor(cell) }}
+                  >
+                    {cell.count > 0 && (
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span className="w-3.5 h-3.5 rounded-full bg-amber-400" />
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Nhãn giờ, cứ mỗi 2h */}
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="w-9 shrink-0" />
+            <div className="flex-1 relative h-4">
+              {HOUR_LABELS.map((h) => (
+                <span
+                  key={h}
+                  className="absolute text-[10px] text-slate-400 -translate-x-1/2"
+                  style={{ left: `${(h / 24) * 100}%` }}
+                >
+                  {String(h).padStart(2, '0')}:00
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Big single-panel card: TikTok / Facebook (chỉ post history) ───────────────
+
+function BestTimeBigCard({
+  platform, posts, loading,
+}: { platform: 'tiktok' | 'facebook'; posts: Post[]; loading: boolean }) {
+  const { grid, minAvg, maxAvg, hasData } = usePostHistoryGrid(posts);
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-3">
-        <span className="text-sm font-bold text-slate-800">Best Time to Post</span>
+      <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <PlatformIcon name={platform} />
+          <span className="text-sm font-bold text-slate-800">Best Time to Post</span>
+        </div>
         <span className="text-xs font-mono text-slate-400">
           {loading ? 'Loading...' : 'All time'}
         </span>
       </div>
+      <div className="p-6">
+        <PostHistoryGridView grid={grid} minAvg={minAvg} maxAvg={maxAvg} hasData={hasData} loading={loading} />
+      </div>
+    </div>
+  );
+}
 
-      <div className="p-5">
-        {/* Legend */}
-        <div className="flex items-center gap-3 mb-4 flex-wrap text-xs text-slate-500">
-          <span className="tabular-nums">{fmtNum(minAvg)}</span>
-          <span
-            className="h-2.5 w-32 rounded-full"
-            style={{ background: 'linear-gradient(to right, hsl(205,85%,88%), hsl(205,85%,20%))' }}
-          />
-          <span className="tabular-nums">{fmtNum(maxAvg)}</span>
-          <span className="flex items-center gap-1.5 ml-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
-            Your posts
-          </span>
+// ─── Big single-panel card: Instagram (2 tab — post history + fan online) ──────
+
+function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean }) {
+  const [tab, setTab] = useState<'online' | 'history'>('online');
+
+  // Tab 1: ước lượng từ post history
+  const { grid, minAvg, maxAvg, hasData } = usePostHistoryGrid(posts);
+
+  // Tab 2: fan online thực tế từ /insights/time-engagement
+  const [feData, setFeData] = useState<TimeEngagementData | null>(null);
+  const [feLoading, setFeLoading] = useState(false);
+  const [feError, setFeError] = useState(false);
+
+  useEffect(() => {
+    const fetchTimeEngagement = async () => {
+      setFeLoading(true);
+      setFeError(false);
+      try {
+        // Có thể thêm tham số query vào đây nếu cần thiết (vd: ?account_id=...)
+        const res = await fetch(`${API_BASE_URL}/insights/time-engagement`);
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message || 'Fetch failed');
+        setFeData(json.data);
+      } catch (err) {
+        console.error('Lỗi khi tải time-engagement (IG):', err);
+        setFeError(true);
+      } finally {
+        setFeLoading(false);
+      }
+    };
+    fetchTimeEngagement();
+  }, []);
+
+  const { feHours, feMin, feMax, recommendedSet } = useMemo(() => {
+    const sorted = [...(feData?.full_day_stats || [])].sort((a, b) => a.vn_hour - b.vn_hour);
+    let min = Infinity;
+    let max = -Infinity;
+    for (const h of sorted) {
+      if (h.followers_online < min) min = h.followers_online;
+      if (h.followers_online > max) max = h.followers_online;
+    }
+    const recSet = new Set(
+      (feData?.recommended_vn_times || []).map((t) => Number(t.split(':')[0]))
+    );
+    return {
+      feHours: sorted,
+      feMin: sorted.length ? min : 0,
+      feMax: sorted.length ? max : 0,
+      recommendedSet: recSet,
+    };
+  }, [feData]);
+
+  const feCellColor = (followersOnline: number) => {
+    if (feHours.length === 0) return '#eef2f7';
+    if (feMax === feMin) return 'hsl(330, 75%, 55%)';
+    const normalized = (followersOnline - feMin) / (feMax - feMin);
+    const lightness = 88 - normalized * 68;
+    return `hsl(330, 75%, ${lightness}%)`;
+  };
+
+  return (
+    <div className="rounded-2xl border border-pink-200 bg-white overflow-hidden">
+      <div className="px-5 py-3 bg-pink-50/60 border-b border-pink-200 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <PlatformIcon name="instagram" />
+          <span className="text-sm font-bold text-slate-800">Best Time to Post</span>
         </div>
+      </div>
 
-        {!hasData && !loading ? (
-          <div className="flex items-center justify-center h-32 text-sm text-slate-400">
-            Chưa có đủ dữ liệu giờ đăng bài để hiển thị.
+      {/* Tab switcher */}
+      <div className="flex border-b border-pink-100">
+        <button
+          type="button"
+          onClick={() => setTab('online')}
+          className={`flex-1 text-xs font-semibold py-2.5 transition-colors ${
+            tab === 'online'
+              ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/40'
+              : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Fan online (thực tế)
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('history')}
+          className={`flex-1 text-xs font-semibold py-2.5 transition-colors ${
+            tab === 'history'
+              ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/40'
+              : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Ước lượng từ post history
+        </button>
+      </div>
+
+      <div className="p-6">
+        {tab === 'history' ? (
+          <PostHistoryGridView grid={grid} minAvg={minAvg} maxAvg={maxAvg} hasData={hasData} loading={loading} />
+        ) : feError ? (
+          <div className="flex items-center justify-center h-24 text-sm text-slate-400">
+            Không tải được dữ liệu. Thử lại sau.
+          </div>
+        ) : feHours.length === 0 && !feLoading ? (
+          <div className="flex items-center justify-center h-24 text-sm text-slate-400">
+            Chưa có đủ dữ liệu.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <div className="min-w-[640px]">
-              {WEEKDAY_LABELS.map((day, dayIdx) => (
-                <div key={day} className="flex items-center gap-1 mb-1">
-                  <span className="w-9 text-[11px] text-slate-400 text-right pr-2 shrink-0">{day}</span>
-                  <div className="flex gap-[3px] flex-1">
-                    {grid[dayIdx].map((cell, hourIdx) => (
-                      <div
-                        key={hourIdx}
-                        title={`${day} ${String(hourIdx).padStart(2, '0')}:00 — ${cell.count} bài, ${fmtNum(cell.totalViews)} views`}
-                        className="relative flex-1 aspect-square rounded-[3px]"
-                        style={{ backgroundColor: cellColor(cell) }}
+          <>
+            <div className="flex items-center gap-3 mb-4 flex-wrap text-xs text-slate-500">
+              <span className="tabular-nums">{fmtNum(feMin)}</span>
+              <span
+                className="h-2.5 w-32 rounded-full"
+                style={{ background: 'linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))' }}
+              />
+              <span className="tabular-nums">{fmtNum(feMax)}</span>
+              <span className="flex items-center gap-1.5 ml-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+                Recommended
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px]">
+                <div className="flex gap-[4px]">
+                  {feHours.map((h) => (
+                    <div
+                      key={h.vn_hour}
+                      title={`${String(h.vn_hour).padStart(2, '0')}:00 (VN) — ${fmtNum(h.followers_online)} followers online`}
+                      className="relative flex-1 aspect-square rounded-[4px]"
+                      style={{ backgroundColor: feCellColor(h.followers_online) }}
+                    >
+                      {recommendedSet.has(h.vn_hour) && (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <span className="w-3.5 h-3.5 rounded-full bg-amber-400" />
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 mt-2">
+                  <div className="flex-1 relative h-4">
+                    {HOUR_LABELS.map((h) => (
+                      <span
+                        key={h}
+                        className="absolute text-[10px] text-slate-400 -translate-x-1/2"
+                        style={{ left: `${(h / 24) * 100}%` }}
                       >
-                        {cell.count > 0 && (
-                          <span className="absolute inset-0 flex items-center justify-center">
-                            <span className="w-3 h-3 rounded-full bg-amber-400" />
-                          </span>
-                        )}
-                      </div>
+                        {String(h).padStart(2, '0')}:00
+                      </span>
                     ))}
                   </div>
                 </div>
-              ))}
+              </div>
+            </div>
 
-              {/* Nhãn giờ, cứ mỗi 2h */}
-              <div className="flex items-center gap-1 mt-2">
-                <span className="w-9 shrink-0" />
-                <div className="flex-1 relative h-4">
-                  {HOUR_LABELS.map((h) => (
+            {feData?.recommended_vn_times && feData.recommended_vn_times.length > 0 && (
+              <div className="mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
+                <p className="text-xs text-pink-700 font-semibold mb-1">Nên đăng bài lúc</p>
+                <div className="flex gap-2 flex-wrap">
+                  {feData.recommended_vn_times.map((t) => (
                     <span
-                      key={h}
-                      className="absolute text-[10px] text-slate-400 -translate-x-1/2"
-                      style={{ left: `${(h / 24) * 100}%` }}
+                      key={t}
+                      className="text-xs font-bold text-pink-600 bg-white border border-pink-200 rounded-full px-2.5 py-0.5"
                     >
-                      {String(h).padStart(2, '0')}:00
+                      {t}
                     </span>
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
+            )}
+
+            <p className="mt-3 text-[11px] text-slate-400 leading-relaxed">
+              Follower online thực tế (giờ VN) — chưa tách theo thứ trong tuần.
+            </p>
+          </>
         )}
       </div>
     </div>
@@ -295,28 +539,28 @@ export default function InsightsPage() {
   const [topPosts, setTopPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
 
-  // Toàn bộ bài viết - dùng riêng cho bảng "Post schedule"
+  // Toàn bộ bài viết - dùng cho "Best Time to Post"
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [allPostsLoading, setAllPostsLoading] = useState(false);
 
   const [demographics, setDemographics] = useState<DemographicRow[]>(REAL_DEMOGRAPHICS_SNAPSHOT);
   const [demoLoading, setDemoLoading] = useState(false);
 
+  // Platform đang chọn cho khối "Best Time to Post"
+  const [activePlatform, setActivePlatform] = useState<PlatformKey>('tiktok');
+
   useEffect(() => {
     const fetchTopPosts = async () => {
-      setPostsLoading(true); // Bật loading
+      setPostsLoading(true);
       try {
-        // Bạn có thể cân nhắc đổi url này thành `${API_BASE_URL}/insights/top-posts` cho đồng bộ
         const response = await fetch('https://thegivecollective-backend.vercel.app/api/v1/insights/top-posts');
         const data = await response.json();
-
-        // Sử dụng hàm normalize để trích xuất array an toàn
         const normalizedPosts = normalizeTopPosts(data);
         setTopPosts(normalizedPosts);
       } catch (error) {
         console.error("Lỗi khi tải top posts:", error);
       } finally {
-        setPostsLoading(false); // Tắt loading dù thành công hay thất bại
+        setPostsLoading(false);
       }
     };
     fetchTopPosts();
@@ -374,6 +618,20 @@ export default function InsightsPage() {
   }, [topPosts]);
 
   const platformCount = Object.keys(groupedPosts).length;
+
+  // Lọc allPosts theo platform cho phần Best Time to Post
+  const tiktokPosts = useMemo(
+    () => allPosts.filter((p) => p.platform?.toLowerCase() === 'tiktok'),
+    [allPosts]
+  );
+  const facebookPosts = useMemo(
+    () => allPosts.filter((p) => p.platform?.toLowerCase() === 'facebook'),
+    [allPosts]
+  );
+  const instagramPosts = useMemo(
+    () => allPosts.filter((p) => p.platform?.toLowerCase() === 'instagram'),
+    [allPosts]
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16 pb-12">
@@ -448,7 +706,6 @@ export default function InsightsPage() {
                 </span>
               </div>
 
-              {/* Khu vực cuộn hiển thị tất cả bài viết */}
               <div className="p-5 flex-1 overflow-y-auto max-h-[460px] space-y-8">
                 {postsLoading && topPosts.length === 0 ? (
                    <div className="flex items-center justify-center h-full text-sm text-slate-400 py-10">
@@ -461,13 +718,11 @@ export default function InsightsPage() {
                 ) : (
                   Object.entries(groupedPosts).map(([platform, posts]) => (
                     <div key={platform}>
-                      {/* Tên Nền Tảng */}
                       <div className="flex items-center gap-2 mb-4">
                         <PlatformIcon name={platform} />
                         <h3 className="text-sm font-bold text-slate-700 capitalize">{platform}</h3>
                       </div>
 
-                      {/* Lưới các bài viết */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                         {posts.map((post) => (
                           <a
@@ -483,7 +738,7 @@ export default function InsightsPage() {
                               </h4>
                               <p className="text-[11px] text-slate-400 mt-1.5">{post.date}</p>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2.5 text-center mt-auto">
                               <div>
                                 <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
@@ -506,9 +761,27 @@ export default function InsightsPage() {
           </div>
         </section>
 
-        {/* ── SECTION 2: Best Time to Post (heatmap ngày/giờ từ toàn bộ bài viết) ── */}
-        <section>
-          <BestTimeToPostHeatmap posts={allPosts} loading={allPostsLoading} />
+        {/* ── SECTION 2: Best Time to Post — navbar chọn platform, 1 bảng lớn ── */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Best Time to Post</h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Chọn nền tảng để xem chi tiết khung giờ đăng bài tốt nhất.
+              </p>
+            </div>
+            <PlatformSwitcher active={activePlatform} onChange={setActivePlatform} />
+          </div>
+
+          {activePlatform === 'tiktok' && (
+            <BestTimeBigCard platform="tiktok" posts={tiktokPosts} loading={allPostsLoading} />
+          )}
+          {activePlatform === 'facebook' && (
+            <BestTimeBigCard platform="facebook" posts={facebookPosts} loading={allPostsLoading} />
+          )}
+          {activePlatform === 'instagram' && (
+            <InstagramBigCard posts={instagramPosts} loading={allPostsLoading} />
+          )}
         </section>
 
       </div>
