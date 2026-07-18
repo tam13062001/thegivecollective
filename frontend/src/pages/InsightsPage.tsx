@@ -41,7 +41,8 @@ type TimeEngagementData = {
   full_day_stats: TimeEngagementHour[];
 };
 
-type PlatformKey = 'tiktok' | 'facebook' | 'instagram';
+// Đã bổ sung 'youtube'
+type PlatformKey = 'tiktok' | 'facebook' | 'instagram' | 'youtube';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -60,10 +61,12 @@ const REAL_DEMOGRAPHICS_SNAPSHOT: DemographicRow[] = [
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => i * 2); // 0,2,4,...,22
 
+// Đã bổ sung tab YouTube
 const PLATFORM_TABS: { key: PlatformKey; label: string }[] = [
   { key: 'tiktok', label: 'TikTok' },
   { key: 'facebook', label: 'Facebook' },
   { key: 'instagram', label: 'Instagram' },
+  { key: 'youtube', label: 'YouTube' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -199,8 +202,6 @@ function PlatformSwitcher({
 }
 
 // ─── Best Time to Post: shared post-history grid logic ─────────────────────────
-// Ước lượng từ lịch sử bài đăng: màu càng đậm = views trung bình của các bài
-// đăng ở khung ngày/giờ đó càng cao; chấm vàng đánh dấu khung bạn đã đăng bài.
 
 type HeatCell = { count: number; totalViews: number };
 
@@ -213,12 +214,12 @@ function usePostHistoryGrid(posts: Post[]) {
     for (const post of posts) {
       if (!post.date) continue;
       const { time } = splitDateTime(post.date);
-      if (!time) continue; // Bỏ qua nếu record chỉ có ngày, không có giờ cụ thể
+      if (!time) continue;
 
       const parsed = new Date(post.date.replace(' ', 'T'));
       if (isNaN(parsed.getTime())) continue;
 
-      const dayIdx = (parsed.getDay() + 6) % 7; // getDay(): 0=CN -> quy về 0=Mon ... 6=Sun
+      const dayIdx = (parsed.getDay() + 6) % 7; 
       const hourIdx = parsed.getHours();
 
       g[dayIdx][hourIdx].count += 1;
@@ -252,8 +253,8 @@ function PostHistoryGridView({
     if (cell.count === 0) return '#eef2f7';
     if (maxAvg === minAvg) return 'hsl(205, 85%, 55%)';
     const avg = cell.totalViews / cell.count;
-    const normalized = (avg - minAvg) / (maxAvg - minAvg); // 0..1
-    const lightness = 88 - normalized * 68; // 88% (nhạt) → 20% (đậm)
+    const normalized = (avg - minAvg) / (maxAvg - minAvg); 
+    const lightness = 88 - normalized * 68; 
     return `hsl(205, 85%, ${lightness}%)`;
   };
 
@@ -325,11 +326,11 @@ function PostHistoryGridView({
   );
 }
 
-// ─── Big single-panel card: TikTok / Facebook (chỉ post history) ───────────────
+// ─── Big single-panel card: TikTok / Facebook / YouTube (chỉ post history) ───────────────
 
 function BestTimeBigCard({
   platform, posts, loading,
-}: { platform: 'tiktok' | 'facebook'; posts: Post[]; loading: boolean }) {
+}: { platform: 'tiktok' | 'facebook' | 'youtube'; posts: Post[]; loading: boolean }) {
   const { grid, minAvg, maxAvg, hasData } = usePostHistoryGrid(posts);
 
   return (
@@ -355,10 +356,8 @@ function BestTimeBigCard({
 function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean }) {
   const [tab, setTab] = useState<'online' | 'history'>('online');
 
-  // Tab 1: ước lượng từ post history
   const { grid, minAvg, maxAvg, hasData } = usePostHistoryGrid(posts);
 
-  // Tab 2: fan online thực tế từ /insights/time-engagement
   const [feData, setFeData] = useState<TimeEngagementData | null>(null);
   const [feLoading, setFeLoading] = useState(false);
   const [feError, setFeError] = useState(false);
@@ -368,7 +367,6 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
       setFeLoading(true);
       setFeError(false);
       try {
-        // Có thể thêm tham số query vào đây nếu cần thiết (vd: ?account_id=...)
         const res = await fetch(`${API_BASE_URL}/insights/time-engagement`);
         const json = await res.json();
         if (!json.success) throw new Error(json.message || 'Fetch failed');
@@ -535,18 +533,15 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
-  // Top 3 posts / platform - dùng cho phần "Top performing posts" và các stat card
   const [topPosts, setTopPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
 
-  // Toàn bộ bài viết - dùng cho "Best Time to Post"
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [allPostsLoading, setAllPostsLoading] = useState(false);
 
   const [demographics, setDemographics] = useState<DemographicRow[]>(REAL_DEMOGRAPHICS_SNAPSHOT);
   const [demoLoading, setDemoLoading] = useState(false);
 
-  // Platform đang chọn cho khối "Best Time to Post"
   const [activePlatform, setActivePlatform] = useState<PlatformKey>('tiktok');
 
   useEffect(() => {
@@ -592,7 +587,6 @@ export default function InsightsPage() {
         const parsed: DemographicRow[] = await res.json();
         if (Array.isArray(parsed) && parsed.length > 0) setDemographics(parsed);
       } catch {
-        // Fallback giữ nguyên data mẫu nếu lỗi
       } finally {
         setDemoLoading(false);
       }
@@ -608,7 +602,6 @@ export default function InsightsPage() {
     (s, d) => s + d.female + d.male + d.undisclosed, 0,
   );
 
-  // Gom nhóm bài viết theo platform (dùng cho phần "Top performing posts")
   const groupedPosts = useMemo(() => {
     return topPosts.reduce((acc, post) => {
       if (!acc[post.platform]) acc[post.platform] = [];
@@ -619,19 +612,11 @@ export default function InsightsPage() {
 
   const platformCount = Object.keys(groupedPosts).length;
 
-  // Lọc allPosts theo platform cho phần Best Time to Post
-  const tiktokPosts = useMemo(
-    () => allPosts.filter((p) => p.platform?.toLowerCase() === 'tiktok'),
-    [allPosts]
-  );
-  const facebookPosts = useMemo(
-    () => allPosts.filter((p) => p.platform?.toLowerCase() === 'facebook'),
-    [allPosts]
-  );
-  const instagramPosts = useMemo(
-    () => allPosts.filter((p) => p.platform?.toLowerCase() === 'instagram'),
-    [allPosts]
-  );
+  // Lọc thêm mảng bài viết YouTube
+  const tiktokPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'tiktok'), [allPosts]);
+  const facebookPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'facebook'), [allPosts]);
+  const instagramPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'instagram'), [allPosts]);
+  const youtubePosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'youtube'), [allPosts]);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16 pb-12">
@@ -647,8 +632,6 @@ export default function InsightsPage() {
 
         {/* ── SECTION 1: Overview ── */}
         <section className="space-y-5">
-
-          {/* Stat cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard label="Total Views"      value={fmtNum(totalViews)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="up"   />
             <StatCard label="Total Likes"      value={fmtNum(totalLikes)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="none" />
@@ -656,7 +639,6 @@ export default function InsightsPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-
             {/* Demographics */}
             <div className="lg:col-span-5 rounded-2xl border border-emerald-200 bg-white overflow-hidden flex flex-col">
               <div className="px-5 py-3 flex items-center justify-between bg-emerald-50/60 border-b border-emerald-200">
@@ -781,6 +763,9 @@ export default function InsightsPage() {
           )}
           {activePlatform === 'instagram' && (
             <InstagramBigCard posts={instagramPosts} loading={allPostsLoading} />
+          )}
+          {activePlatform === 'youtube' && (
+            <BestTimeBigCard platform="youtube" posts={youtubePosts} loading={allPostsLoading} />
           )}
         </section>
 
