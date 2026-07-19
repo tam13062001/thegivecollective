@@ -2,7 +2,7 @@
 import express from 'express';
 import { getIgAudienceDemographics, getFanOnline } from '../services/igDemographics.js';
 import OnlineFollowersSnapshot from '../models/OnlineFollowersSnapshot.js';
-import TimeEngagementWeekly from '../models/TimeEngagementWeekly.js';
+import TimeEngagementWeekly from '../models/temp.js';
 const router = express.Router();
 const GRAPH_VERSION = 'v22.0';
 const IG_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN_INSTAGRAM;
