@@ -228,6 +228,9 @@ function usePostHistoryGrid(posts: Post[]) {
       const parsed = new Date(post.date.replace(' ', 'T'));
       if (isNaN(parsed.getTime())) continue;
 
+      // Cộng thêm 1 giờ để chuyển sang giờ SGT
+      parsed.setHours(parsed.getHours() + 1);
+
       const dayIdx = (parsed.getDay() + 6) % 7; 
       const hourIdx = parsed.getHours();
 
@@ -286,7 +289,7 @@ function PostHistoryGridView({
         <span className="tabular-nums">{fmtNum(maxAvg)}</span>
         <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
           <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
-          Your posts
+          Your posts (SGT)
         </span>
       </div>
 
@@ -299,7 +302,7 @@ function PostHistoryGridView({
                 {grid[dayIdx].map((cell, hourIdx) => (
                   <div
                     key={hourIdx}
-                    title={`${day} ${String(hourIdx).padStart(2, '0')}:00 — ${cell.count} posts, ${fmtNum(cell.totalViews)} views`}
+                    title={`${day} ${String(hourIdx).padStart(2, '0')}:00 SGT — ${cell.count} posts, ${fmtNum(cell.totalViews)} views`}
                     className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
                     style={{ backgroundColor: cellColor(cell) }}
                   >
@@ -347,7 +350,7 @@ function BestTimeBigCard({
       <div className="px-4 py-3 sm:px-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <PlatformIcon name={platform} />
-          <span className="text-[13px] sm:text-sm font-bold text-slate-800">Best Time to Post</span>
+          <span className="text-[13px] sm:text-sm font-bold text-slate-800">Best Time to Post (SGT)</span>
         </div>
         <span className="text-[11px] sm:text-xs font-mono text-slate-400">
           {loading ? 'Loading...' : 'All time'}
@@ -414,7 +417,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
     fetchDaily();
   }, []);
 
-  // Build 7 days x 24 hours grid from actual data by day of the week
+  // Build 7 days x 24 hours grid from actual data by day of the week, shift to SGT
   const { feGrid, feMin, feMax, feHasData, recommendedByDay, coveredDaysCount } = useMemo(() => {
     const g: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
     const recByDay: Set<number>[] = Array.from({ length: 7 }, () => new Set<number>());
@@ -433,7 +436,16 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
 
       for (const h of dayStat.full_day_stats || []) {
         if (h.vn_hour >= 0 && h.vn_hour < 24) {
-          g[dayIdx][h.vn_hour] = h.followers_online;
+          // Xử lý chuyển đổi sang SGT (+1 giờ)
+          const sgtHour = (h.vn_hour + 1) % 24;
+          let targetDayIdx = dayIdx;
+          
+          // Nhảy sang ngày tiếp theo nếu vn_hour là 23
+          if (h.vn_hour === 23) {
+            targetDayIdx = (dayIdx + 1) % 7;
+          }
+
+          g[targetDayIdx][sgtHour] = h.followers_online;
           any = true;
           if (h.followers_online < min) min = h.followers_online;
           if (h.followers_online > max) max = h.followers_online;
@@ -441,8 +453,14 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
       }
 
       for (const t of dayStat.top3_vn_times || []) {
-        const hour = Number(t.split(':')[0]);
-        if (!Number.isNaN(hour)) recByDay[dayIdx].add(hour);
+        const vnHour = Number(t.split(':')[0]);
+        if (!Number.isNaN(vnHour)) {
+          const sgtHour = (vnHour + 1) % 24;
+          let targetDayIdx = dayIdx;
+          if (vnHour === 23) targetDayIdx = (dayIdx + 1) % 7;
+          
+          recByDay[targetDayIdx].add(sgtHour);
+        }
       }
     });
 
@@ -456,8 +474,8 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
     };
   }, [feData]);
 
-  // Top 3 hours aggregated across all available days (weekly)
-  const overallTop3VnTimes = useMemo(() => {
+  // Top 3 hours aggregated across all available days (weekly) - Now automatically in SGT because feGrid is in SGT
+  const overallTop3SgtTimes = useMemo(() => {
     if (!feHasData) return [];
     const hourTotals = new Array(24).fill(0);
     feGrid.forEach((day) => day.forEach((v, h) => { hourTotals[h] += v; }));
@@ -465,17 +483,18 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
       .map((total, hour) => ({ hour, total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 3)
-      .map((t) => `${t.hour}:00`);
+      .map((t) => `${String(t.hour).padStart(2, '0')}:00`);
   }, [feGrid, feHasData]);
 
-  // Build a single 24-hour row from daily API
-  const { dailyRow, dailyMin, dailyMax, dailyHasData, dailyRecSet } = useMemo(() => {
+  // Build a single 24-hour row from daily API, shift to SGT
+  const { dailyRow, dailyMin, dailyMax, dailyHasData, dailyRecSet, recommendedSgtTimes } = useMemo(() => {
     const hourly = new Array(24).fill(0);
     let any = false;
 
     for (const h of feDailyData?.full_day_stats || []) {
       if (h.vn_hour >= 0 && h.vn_hour < 24) {
-        hourly[h.vn_hour] = h.followers_online;
+        const sgtHour = (h.vn_hour + 1) % 24;
+        hourly[sgtHour] = h.followers_online;
         any = true;
       }
     }
@@ -488,8 +507,19 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
     }
 
     const recSet = new Set(
-      (feDailyData?.recommended_vn_times || []).map((t) => Number(t.split(':')[0]))
+      (feDailyData?.recommended_vn_times || []).map((t) => {
+        const vnHour = Number(t.split(':')[0]);
+        return (vnHour + 1) % 24;
+      })
     );
+
+    // Chuẩn bị chuỗi SGT time để hiển thị dạng text "21:00"
+    const recSgtTimes = (feDailyData?.recommended_vn_times || []).map((t) => {
+      const vnHour = Number(t.split(':')[0]);
+      if (isNaN(vnHour)) return t;
+      const sgtHour = (vnHour + 1) % 24;
+      return `${String(sgtHour).padStart(2, '0')}:00`;
+    });
 
     return {
       dailyRow: hourly,
@@ -497,6 +527,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
       dailyMax: any ? max : 0,
       dailyHasData: any,
       dailyRecSet: recSet,
+      recommendedSgtTimes: recSgtTimes
     };
   }, [feDailyData]);
 
@@ -516,7 +547,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
       <div className="px-4 py-3 sm:px-5 bg-pink-50/60 border-b border-pink-200 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <PlatformIcon name="instagram" />
-          <span className="text-[13px] sm:text-sm font-bold text-slate-800">Best Time to Post</span>
+          <span className="text-[13px] sm:text-sm font-bold text-slate-800">Best Time to Post (SGT)</span>
         </div>
       </div>
 
@@ -594,7 +625,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
                           {feGrid[dayIdx].map((value, hourIdx) => (
                             <div
                               key={hourIdx}
-                              title={`${day} ${String(hourIdx).padStart(2, '0')}:00 — ${fmtNum(value)} followers online`}
+                              title={`${day} ${String(hourIdx).padStart(2, '0')}:00 SGT — ${fmtNum(value)} followers online`}
                               className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
                               style={{ backgroundColor: cellColor(value, feHasData, feMin, feMax) }}
                             >
@@ -627,13 +658,13 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
                   </div>
                 </div>
 
-                {overallTop3VnTimes.length > 0 && (
+                {overallTop3SgtTimes.length > 0 && (
                   <div className="mt-4 sm:mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
                     <p className="text-[11px] sm:text-xs text-pink-700 font-semibold mb-1.5">
                       Recommended posting times (aggregated over {coveredDaysCount} days)
                     </p>
                     <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-                      {overallTop3VnTimes.map((t) => (
+                      {overallTop3SgtTimes.map((t) => (
                         <span
                           key={t}
                           className="text-[10px] sm:text-xs font-bold text-pink-600 bg-white border border-pink-200 rounded-full px-2 py-0.5 sm:px-2.5"
@@ -646,7 +677,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
                 )}
 
                 <p className="mt-3 text-[10px] sm:text-[11px] text-slate-400 leading-relaxed">
-                  Actual data based on the last {coveredDaysCount}/7 days (VN time). Yellow dots indicate the top 3 hours with the most fans online for that specific day.
+                  Actual data based on the last {coveredDaysCount}/7 days (SGT time). Yellow dots indicate the top 3 hours with the most fans online for that specific day.
                 </p>
               </div>
             )}
@@ -683,7 +714,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
                       {dailyRow.map((value, hourIdx) => (
                         <div
                           key={hourIdx}
-                          title={`${String(hourIdx).padStart(2, '0')}:00 — ${fmtNum(value)} followers online`}
+                          title={`${String(hourIdx).padStart(2, '0')}:00 SGT — ${fmtNum(value)} followers online`}
                           className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
                           style={{ backgroundColor: cellColor(value, dailyHasData, dailyMin, dailyMax) }}
                         >
@@ -711,11 +742,11 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
                   </div>
                 </div>
 
-                {feDailyData?.recommended_vn_times && feDailyData.recommended_vn_times.length > 0 && (
+                {recommendedSgtTimes.length > 0 && (
                   <div className="mt-4 sm:mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
                     <p className="text-[11px] sm:text-xs text-pink-700 font-semibold mb-1.5">Best times to post:</p>
                     <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-                      {feDailyData.recommended_vn_times.map((t) => (
+                      {recommendedSgtTimes.map((t) => (
                         <span
                           key={t}
                           className="text-[10px] sm:text-xs font-bold text-pink-600 bg-white border border-pink-200 rounded-full px-2 py-0.5 sm:px-2.5"
@@ -728,7 +759,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
                 )}
 
                 <p className="mt-3 text-[10px] sm:text-[11px] text-slate-400 leading-relaxed">
-                  Actual online followers (VN time) — not separated by day of the week.
+                  Actual online followers (SGT time) — not separated by day of the week.
                 </p>
               </div>
             )}
