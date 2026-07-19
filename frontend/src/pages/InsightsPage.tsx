@@ -13,7 +13,7 @@ import {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Post = {
-  id: string | number; // Receives _id from MongoDB
+  id: string | number;
   platform: string;
   title: string;
   views: number;
@@ -41,8 +41,26 @@ type TimeEngagementData = {
   full_day_stats: TimeEngagementHour[];
 };
 
-// Added 'youtube'
 type PlatformKey = 'tiktok' | 'facebook' | 'instagram' | 'youtube';
+
+type TimeEngagementDayStat = {
+  end_time: string;
+  top3_vn_times: string[];
+  full_day_stats: { vn_hour: number; followers_online: number }[];
+};
+
+type TimeEngagementWeeklyData = Record<string, TimeEngagementDayStat>;
+
+// Map display day labels (EN, shared with post-history grid) -> backend response keys (VN)
+const VN_WEEKDAY_MAP: Record<string, string> = {
+  Mon: 'Thứ 2',
+  Tue: 'Thứ 3',
+  Wed: 'Thứ 4',
+  Thu: 'Thứ 5',
+  Fri: 'Thứ 6',
+  Sat: 'Thứ 7',
+  Sun: 'Chủ Nhật',
+};
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -59,9 +77,8 @@ const REAL_DEMOGRAPHICS_SNAPSHOT: DemographicRow[] = [
 ];
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => i * 2); // 0,2,4,...,22
+const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => i * 2);
 
-// Added YouTube tab
 const PLATFORM_TABS: { key: PlatformKey; label: string }[] = [
   { key: 'tiktok', label: 'TikTok' },
   { key: 'facebook', label: 'Facebook' },
@@ -77,29 +94,19 @@ function fmtNum(n: number): string {
   return n.toLocaleString();
 }
 
-/**
- * Splits the string "YYYY-MM-DD HH:mm" into { date, time }.
- * If the string only has a date (no time), time will be empty.
- */
 function splitDateTime(dateStr: string): { date: string; time: string } {
   if (!dateStr) return { date: '—', time: '' };
   const [datePart, timePart] = dateStr.split(' ');
   return { date: datePart || '—', time: timePart || '' };
 }
 
-/**
- * Processes data returned from BE: supports 1D Array, 2D Array (Array of Arrays)
- * or wrapped in an object { posts: [...] }
- */
 function normalizeTopPosts(raw: any): Post[] {
   let rawArray: any[] = [];
-
   if (Array.isArray(raw)) {
     rawArray = raw;
   } else if (raw && typeof raw === 'object' && Array.isArray(raw.posts)) {
     rawArray = raw.posts;
   }
-
   const flatDocs = rawArray.flat();
 
   return flatDocs.map((doc, idx) => ({
@@ -130,11 +137,11 @@ function StatCard({
 }) {
   const s = TREND[colorKey];
   return (
-    <div className={`relative rounded-2xl border p-5 ${s.border} ${s.bg}`}>
+    <div className={`relative rounded-2xl border p-4 sm:p-5 ${s.border} ${s.bg}`}>
       <span className={`absolute top-4 right-4 w-2 h-2 rounded-full ${s.dot}`} />
-      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">{label}</p>
-      <p className="text-3xl font-bold tabular-nums text-slate-800">{value}</p>
-      <p className="mt-2 text-xs text-slate-400">{sub}</p>
+      <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 sm:mb-3">{label}</p>
+      <p className="text-2xl sm:text-3xl font-bold tabular-nums text-slate-800">{value}</p>
+      <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs text-slate-400">{sub}</p>
     </div>
   );
 }
@@ -144,10 +151,10 @@ function StatCard({
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-gray-100 bg-white/95 backdrop-blur shadow-xl px-4 py-3 min-w-[130px]">
-      <p className="text-xs text-slate-400 mb-1 font-medium">{label}</p>
+    <div className="rounded-xl border border-gray-100 bg-white/95 backdrop-blur shadow-xl px-3 py-2 sm:px-4 sm:py-3 min-w-[120px] sm:min-w-[130px]">
+      <p className="text-[10px] sm:text-xs text-slate-400 mb-1 font-medium">{label}</p>
       {payload.map((p: any) => (
-        <p key={p.dataKey} className="text-sm font-bold tabular-nums" style={{ color: p.fill }}>
+        <p key={p.dataKey} className="text-xs sm:text-sm font-bold tabular-nums" style={{ color: p.fill }}>
           {fmtNum(p.value)} <span className="font-normal text-slate-400">{p.name ?? p.dataKey}</span>
         </p>
       ))}
@@ -169,7 +176,7 @@ function PlatformIcon({ name }: { name: string }) {
   };
   const p = map[name.toLowerCase()] ?? { bg: 'bg-slate-500', label: name.slice(0, 2).toUpperCase() };
   return (
-    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-white text-xs font-bold ${p.bg}`}>
+    <span className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-md text-white text-[10px] sm:text-xs font-bold ${p.bg}`}>
       {p.label}
     </span>
   );
@@ -181,22 +188,24 @@ function PlatformSwitcher({
   active, onChange,
 }: { active: PlatformKey; onChange: (p: PlatformKey) => void }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-      {PLATFORM_TABS.map((p) => (
-        <button
-          key={p.key}
-          type="button"
-          onClick={() => onChange(p.key)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-            active === p.key
-              ? 'bg-slate-800 text-white'
-              : 'text-slate-500 hover:bg-slate-50'
-          }`}
-        >
-          <PlatformIcon name={p.key} />
-          {p.label}
-        </button>
-      ))}
+    <div className="w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 hide-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm min-w-max">
+        {PLATFORM_TABS.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => onChange(p.key)}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors ${
+              active === p.key
+                ? 'bg-slate-800 text-white'
+                : 'text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <PlatformIcon name={p.key} />
+            {p.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -260,7 +269,7 @@ function PostHistoryGridView({
 
   if (!hasData && !loading) {
     return (
-      <div className="flex items-center justify-center h-32 text-sm text-slate-400">
+      <div className="flex items-center justify-center h-32 text-[13px] sm:text-sm text-slate-400">
         Not enough post time data to display.
       </div>
     );
@@ -268,35 +277,35 @@ function PostHistoryGridView({
 
   return (
     <>
-      <div className="flex items-center gap-3 mb-4 flex-wrap text-xs text-slate-500">
+      <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap text-[11px] sm:text-xs text-slate-500">
         <span className="tabular-nums">{fmtNum(minAvg)}</span>
         <span
-          className="h-2.5 w-32 rounded-full"
+          className="h-2 sm:h-2.5 w-24 sm:w-32 rounded-full"
           style={{ background: 'linear-gradient(to right, hsl(205,85%,88%), hsl(205,85%,20%))' }}
         />
         <span className="tabular-nums">{fmtNum(maxAvg)}</span>
-        <span className="flex items-center gap-1.5 ml-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+        <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
+          <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
           Your posts
         </span>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="min-w-[720px]">
+      <div className="overflow-x-auto pb-2">
+        <div className="min-w-[650px] sm:min-w-[720px]">
           {WEEKDAY_LABELS.map((day, dayIdx) => (
-            <div key={day} className="flex items-center gap-1.5 mb-1.5">
-              <span className="w-9 text-[11px] text-slate-400 text-right pr-2 shrink-0">{day}</span>
-              <div className="flex gap-[4px] flex-1">
+            <div key={day} className="flex items-center gap-1 sm:gap-1.5 mb-1.5">
+              <span className="w-8 sm:w-9 text-[10px] sm:text-[11px] text-slate-400 text-right pr-1 sm:pr-2 shrink-0">{day}</span>
+              <div className="flex gap-[3px] sm:gap-[4px] flex-1">
                 {grid[dayIdx].map((cell, hourIdx) => (
                   <div
                     key={hourIdx}
                     title={`${day} ${String(hourIdx).padStart(2, '0')}:00 — ${cell.count} posts, ${fmtNum(cell.totalViews)} views`}
-                    className="relative flex-1 aspect-square rounded-[4px]"
+                    className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
                     style={{ backgroundColor: cellColor(cell) }}
                   >
                     {cell.count > 0 && (
                       <span className="absolute inset-0 flex items-center justify-center">
-                        <span className="w-3.5 h-3.5 rounded-full bg-amber-400" />
+                        <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-amber-400" />
                       </span>
                     )}
                   </div>
@@ -305,14 +314,14 @@ function PostHistoryGridView({
             </div>
           ))}
 
-          {/* Hour labels, every 2 hours */}
-          <div className="flex items-center gap-1.5 mt-2">
-            <span className="w-9 shrink-0" />
+          {/* Hour labels */}
+          <div className="flex items-center gap-1 sm:gap-1.5 mt-2">
+            <span className="w-8 sm:w-9 shrink-0" />
             <div className="flex-1 relative h-4">
               {HOUR_LABELS.map((h) => (
                 <span
                   key={h}
-                  className="absolute text-[10px] text-slate-400 -translate-x-1/2"
+                  className="absolute text-[9px] sm:text-[10px] text-slate-400 -translate-x-1/2"
                   style={{ left: `${(h / 24) * 100}%` }}
                 >
                   {String(h).padStart(2, '0')}:00
@@ -326,7 +335,7 @@ function PostHistoryGridView({
   );
 }
 
-// ─── Big single-panel card: TikTok / Facebook / YouTube (post history only) ───────────────
+// ─── Big single-panel card: TikTok / Facebook / YouTube ───────────────
 
 function BestTimeBigCard({
   platform, posts, loading,
@@ -335,85 +344,179 @@ function BestTimeBigCard({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
+      <div className="px-4 py-3 sm:px-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <PlatformIcon name={platform} />
-          <span className="text-sm font-bold text-slate-800">Best Time to Post</span>
+          <span className="text-[13px] sm:text-sm font-bold text-slate-800">Best Time to Post</span>
         </div>
-        <span className="text-xs font-mono text-slate-400">
+        <span className="text-[11px] sm:text-xs font-mono text-slate-400">
           {loading ? 'Loading...' : 'All time'}
         </span>
       </div>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <PostHistoryGridView grid={grid} minAvg={minAvg} maxAvg={maxAvg} hasData={hasData} loading={loading} />
       </div>
     </div>
   );
 }
 
-// ─── Big single-panel card: Instagram (2 tabs — post history + fans online) ──────
+// ─── Big single-panel card: Instagram (2 tabs) ──────
 
 function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean }) {
   const [tab, setTab] = useState<'online' | 'history'>('online');
 
   const { grid, minAvg, maxAvg, hasData } = usePostHistoryGrid(posts);
 
-  const [feData, setFeData] = useState<TimeEngagementData | null>(null);
+  // --- Data source 1: by day of the week (7 days x 24 hours) ---
+  const [feData, setFeData] = useState<TimeEngagementWeeklyData | null>(null);
   const [feLoading, setFeLoading] = useState(false);
   const [feError, setFeError] = useState(false);
 
+  // --- Data source 2: aggregated by hour, not separated by day ---
+  const [feDailyData, setFeDailyData] = useState<TimeEngagementData | null>(null);
+  const [feDailyLoading, setFeDailyLoading] = useState(false);
+  const [feDailyError, setFeDailyError] = useState(false);
+
   useEffect(() => {
-    const fetchTimeEngagement = async () => {
+    const fetchWeekly = async () => {
       setFeLoading(true);
       setFeError(false);
       try {
-        const res = await fetch(`${API_BASE_URL}/insights/time-engagement`);
+        const res = await fetch(`${API_BASE_URL}/insights/time-engagement-weekly`);
         const json = await res.json();
         if (!json.success) throw new Error(json.message || 'Fetch failed');
         setFeData(json.data);
       } catch (err) {
-        console.error('Error loading time-engagement (IG):', err);
+        console.error('Error loading time-engagement-weekly (IG):', err);
         setFeError(true);
       } finally {
         setFeLoading(false);
       }
     };
-    fetchTimeEngagement();
+
+    const fetchDaily = async () => {
+      setFeDailyLoading(true);
+      setFeDailyError(false);
+      try {
+        const res = await fetch(`${API_BASE_URL}/insights/time-engagement`);
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message || 'Fetch failed');
+        setFeDailyData(json.data);
+      } catch (err) {
+        console.error('Error loading time-engagement (IG):', err);
+        setFeDailyError(true);
+      } finally {
+        setFeDailyLoading(false);
+      }
+    };
+
+    fetchWeekly();
+    fetchDaily();
   }, []);
 
-  const { feHours, feMin, feMax, recommendedSet } = useMemo(() => {
-    const sorted = [...(feData?.full_day_stats || [])].sort((a, b) => a.vn_hour - b.vn_hour);
+  // Build 7 days x 24 hours grid from actual data by day of the week
+  const { feGrid, feMin, feMax, feHasData, recommendedByDay, coveredDaysCount } = useMemo(() => {
+    const g: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    const recByDay: Set<number>[] = Array.from({ length: 7 }, () => new Set<number>());
+
     let min = Infinity;
     let max = -Infinity;
-    for (const h of sorted) {
-      if (h.followers_online < min) min = h.followers_online;
-      if (h.followers_online > max) max = h.followers_online;
-    }
-    const recSet = new Set(
-      (feData?.recommended_vn_times || []).map((t) => Number(t.split(':')[0]))
-    );
+    let any = false;
+    let covered = 0;
+
+    WEEKDAY_LABELS.forEach((label, dayIdx) => {
+      const vnKey = VN_WEEKDAY_MAP[label];
+      const dayStat = feData?.[vnKey];
+      if (!dayStat) return;
+
+      covered += 1;
+
+      for (const h of dayStat.full_day_stats || []) {
+        if (h.vn_hour >= 0 && h.vn_hour < 24) {
+          g[dayIdx][h.vn_hour] = h.followers_online;
+          any = true;
+          if (h.followers_online < min) min = h.followers_online;
+          if (h.followers_online > max) max = h.followers_online;
+        }
+      }
+
+      for (const t of dayStat.top3_vn_times || []) {
+        const hour = Number(t.split(':')[0]);
+        if (!Number.isNaN(hour)) recByDay[dayIdx].add(hour);
+      }
+    });
+
     return {
-      feHours: sorted,
-      feMin: sorted.length ? min : 0,
-      feMax: sorted.length ? max : 0,
-      recommendedSet: recSet,
+      feGrid: g,
+      feMin: any ? min : 0,
+      feMax: any ? max : 0,
+      feHasData: any,
+      recommendedByDay: recByDay,
+      coveredDaysCount: covered,
     };
   }, [feData]);
 
-  const feCellColor = (followersOnline: number) => {
-    if (feHours.length === 0) return '#eef2f7';
-    if (feMax === feMin) return 'hsl(330, 75%, 55%)';
-    const normalized = (followersOnline - feMin) / (feMax - feMin);
+  // Top 3 hours aggregated across all available days (weekly)
+  const overallTop3VnTimes = useMemo(() => {
+    if (!feHasData) return [];
+    const hourTotals = new Array(24).fill(0);
+    feGrid.forEach((day) => day.forEach((v, h) => { hourTotals[h] += v; }));
+    return hourTotals
+      .map((total, hour) => ({ hour, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 3)
+      .map((t) => `${t.hour}:00`);
+  }, [feGrid, feHasData]);
+
+  // Build a single 24-hour row from daily API
+  const { dailyRow, dailyMin, dailyMax, dailyHasData, dailyRecSet } = useMemo(() => {
+    const hourly = new Array(24).fill(0);
+    let any = false;
+
+    for (const h of feDailyData?.full_day_stats || []) {
+      if (h.vn_hour >= 0 && h.vn_hour < 24) {
+        hourly[h.vn_hour] = h.followers_online;
+        any = true;
+      }
+    }
+
+    let min = Infinity;
+    let max = -Infinity;
+    for (const v of hourly) {
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+
+    const recSet = new Set(
+      (feDailyData?.recommended_vn_times || []).map((t) => Number(t.split(':')[0]))
+    );
+
+    return {
+      dailyRow: hourly,
+      dailyMin: any ? min : 0,
+      dailyMax: any ? max : 0,
+      dailyHasData: any,
+      dailyRecSet: recSet,
+    };
+  }, [feDailyData]);
+
+  const cellColor = (value: number, hasData: boolean, min: number, max: number) => {
+    if (!hasData) return '#eef2f7';
+    if (max === min) return 'hsl(330, 75%, 55%)';
+    const normalized = (value - min) / (max - min);
     const lightness = 88 - normalized * 68;
     return `hsl(330, 75%, ${lightness}%)`;
   };
 
+  const bothLoading = feLoading && feDailyLoading;
+  const bothError = feError && feDailyError;
+
   return (
     <div className="rounded-2xl border border-pink-200 bg-white overflow-hidden">
-      <div className="px-5 py-3 bg-pink-50/60 border-b border-pink-200 flex items-center justify-between flex-wrap gap-2">
+      <div className="px-4 py-3 sm:px-5 bg-pink-50/60 border-b border-pink-200 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <PlatformIcon name="instagram" />
-          <span className="text-sm font-bold text-slate-800">Best Time to Post</span>
+          <span className="text-[13px] sm:text-sm font-bold text-slate-800">Best Time to Post</span>
         </div>
       </div>
 
@@ -422,108 +525,214 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
         <button
           type="button"
           onClick={() => setTab('online')}
-          className={`flex-1 text-xs font-semibold py-2.5 transition-colors ${
+          className={`flex-1 text-[11px] sm:text-xs font-semibold py-2 sm:py-2.5 transition-colors ${
             tab === 'online'
               ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/40'
               : 'text-slate-400 hover:text-slate-600'
           }`}
         >
-          Fans online (actual)
+          <span className="hidden sm:inline">Fans online (actual)</span>
+          <span className="sm:hidden">Fans Online</span>
         </button>
         <button
           type="button"
           onClick={() => setTab('history')}
-          className={`flex-1 text-xs font-semibold py-2.5 transition-colors ${
+          className={`flex-1 text-[11px] sm:text-xs font-semibold py-2 sm:py-2.5 transition-colors ${
             tab === 'history'
               ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/40'
               : 'text-slate-400 hover:text-slate-600'
           }`}
         >
-          Estimated from post history
+          <span className="hidden sm:inline">Estimated from post history</span>
+          <span className="sm:hidden">History</span>
         </button>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {tab === 'history' ? (
           <PostHistoryGridView grid={grid} minAvg={minAvg} maxAvg={maxAvg} hasData={hasData} loading={loading} />
-        ) : feError ? (
-          <div className="flex items-center justify-center h-24 text-sm text-slate-400">
+        ) : bothError ? (
+          <div className="flex items-center justify-center h-24 text-[13px] sm:text-sm text-slate-400">
             Failed to load data. Please try again later.
           </div>
-        ) : feHours.length === 0 && !feLoading ? (
-          <div className="flex items-center justify-center h-24 text-sm text-slate-400">
+        ) : !feHasData && !dailyHasData && !bothLoading ? (
+          <div className="flex items-center justify-center h-24 text-[13px] sm:text-sm text-slate-400">
             Not enough data.
           </div>
         ) : (
-          <>
-            <div className="flex items-center gap-3 mb-4 flex-wrap text-xs text-slate-500">
-              <span className="tabular-nums">{fmtNum(feMin)}</span>
-              <span
-                className="h-2.5 w-32 rounded-full"
-                style={{ background: 'linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))' }}
-              />
-              <span className="tabular-nums">{fmtNum(feMax)}</span>
-              <span className="flex items-center gap-1.5 ml-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
-                Recommended
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <div className="min-w-[720px]">
-                <div className="flex gap-[4px]">
-                  {feHours.map((h) => (
-                    <div
-                      key={h.vn_hour}
-                      title={`${String(h.vn_hour).padStart(2, '0')}:00 (VN) — ${fmtNum(h.followers_online)} followers online`}
-                      className="relative flex-1 aspect-square rounded-[4px]"
-                      style={{ backgroundColor: feCellColor(h.followers_online) }}
-                    >
-                      {recommendedSet.has(h.vn_hour) && (
-                        <span className="absolute inset-0 flex items-center justify-center">
-                          <span className="w-3.5 h-3.5 rounded-full bg-amber-400" />
-                        </span>
-                      )}
-                    </div>
-                  ))}
+          <div className="space-y-6 sm:space-y-8">
+            {/* ===== Table 1: by day of the week (7 days x 24 hours) ===== */}
+            {feError ? (
+              <div className="flex items-center justify-center h-20 text-[13px] sm:text-sm text-slate-400">
+                Failed to load weekly data.
+              </div>
+            ) : !feHasData && !feLoading ? (
+              <div className="flex items-center justify-center h-20 text-[13px] sm:text-sm text-slate-400">
+                Not enough weekly data.
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap text-[11px] sm:text-xs text-slate-500">
+                  <span className="tabular-nums">{fmtNum(feMin)}</span>
+                  <span
+                    className="h-2 sm:h-2.5 w-24 sm:w-32 rounded-full"
+                    style={{ background: 'linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))' }}
+                  />
+                  <span className="tabular-nums">{fmtNum(feMax)}</span>
+                  <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
+                    <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
+                    Top 3 hours per day
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-1.5 mt-2">
-                  <div className="flex-1 relative h-4">
-                    {HOUR_LABELS.map((h) => (
-                      <span
-                        key={h}
-                        className="absolute text-[10px] text-slate-400 -translate-x-1/2"
-                        style={{ left: `${(h / 24) * 100}%` }}
-                      >
-                        {String(h).padStart(2, '0')}:00
-                      </span>
+                <div className="overflow-x-auto pb-2">
+                  <div className="min-w-[650px] sm:min-w-[720px]">
+                    {WEEKDAY_LABELS.map((day, dayIdx) => (
+                      <div key={day} className="flex items-center gap-1 sm:gap-1.5 mb-1.5">
+                        <span className="w-8 sm:w-9 text-[10px] sm:text-[11px] text-slate-400 text-right pr-1 sm:pr-2 shrink-0">{day}</span>
+                        <div className="flex gap-[3px] sm:gap-[4px] flex-1">
+                          {feGrid[dayIdx].map((value, hourIdx) => (
+                            <div
+                              key={hourIdx}
+                              title={`${day} ${String(hourIdx).padStart(2, '0')}:00 — ${fmtNum(value)} followers online`}
+                              className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
+                              style={{ backgroundColor: cellColor(value, feHasData, feMin, feMax) }}
+                            >
+                              {recommendedByDay[dayIdx].has(hourIdx) && (
+                                <span className="absolute inset-0 flex items-center justify-center">
+                                  <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-amber-400" />
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     ))}
+
+                    {/* Hour labels */}
+                    <div className="flex items-center gap-1 sm:gap-1.5 mt-2">
+                      <span className="w-8 sm:w-9 shrink-0" />
+                      <div className="flex-1 relative h-4">
+                        {HOUR_LABELS.map((h) => (
+                          <span
+                            key={h}
+                            className="absolute text-[9px] sm:text-[10px] text-slate-400 -translate-x-1/2"
+                            style={{ left: `${(h / 24) * 100}%` }}
+                          >
+                            {String(h).padStart(2, '0')}:00
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {feData?.recommended_vn_times && feData.recommended_vn_times.length > 0 && (
-              <div className="mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
-                <p className="text-xs text-pink-700 font-semibold mb-1">Recommended posting times</p>
-                <div className="flex gap-2 flex-wrap">
-                  {feData.recommended_vn_times.map((t) => (
-                    <span
-                      key={t}
-                      className="text-xs font-bold text-pink-600 bg-white border border-pink-200 rounded-full px-2.5 py-0.5"
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
+                {overallTop3VnTimes.length > 0 && (
+                  <div className="mt-4 sm:mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
+                    <p className="text-[11px] sm:text-xs text-pink-700 font-semibold mb-1.5">
+                      Recommended posting times (aggregated over {coveredDaysCount} days)
+                    </p>
+                    <div className="flex gap-1.5 sm:gap-2 flex-wrap">
+                      {overallTop3VnTimes.map((t) => (
+                        <span
+                          key={t}
+                          className="text-[10px] sm:text-xs font-bold text-pink-600 bg-white border border-pink-200 rounded-full px-2 py-0.5 sm:px-2.5"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <p className="mt-3 text-[10px] sm:text-[11px] text-slate-400 leading-relaxed">
+                  Actual data based on the last {coveredDaysCount}/7 days (VN time). Yellow dots indicate the top 3 hours with the most fans online for that specific day.
+                </p>
               </div>
             )}
 
-            <p className="mt-3 text-[11px] text-slate-400 leading-relaxed">
-              Actual followers online (VN time) — not separated by day of the week.
-            </p>
-          </>
+            <div className="border-t border-pink-100" />
+
+            {/* ===== Table 2: aggregated by hour, not separated by day ===== */}
+            {feDailyError ? (
+              <div className="flex items-center justify-center h-20 text-[13px] sm:text-sm text-slate-400">
+                Failed to load hourly aggregated data.
+              </div>
+            ) : !dailyHasData && !feDailyLoading ? (
+              <div className="flex items-center justify-center h-20 text-[13px] sm:text-sm text-slate-400">
+                Not enough hourly aggregated data.
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap text-[11px] sm:text-xs text-slate-500">
+                  <span className="tabular-nums">{fmtNum(dailyMin)}</span>
+                  <span
+                    className="h-2 sm:h-2.5 w-24 sm:w-32 rounded-full"
+                    style={{ background: 'linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))' }}
+                  />
+                  <span className="tabular-nums">{fmtNum(dailyMax)}</span>
+                  <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
+                    <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
+                    Recommended
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto pb-2">
+                  <div className="min-w-[650px] sm:min-w-[720px]">
+                    <div className="flex gap-[3px] sm:gap-[4px]">
+                      {dailyRow.map((value, hourIdx) => (
+                        <div
+                          key={hourIdx}
+                          title={`${String(hourIdx).padStart(2, '0')}:00 — ${fmtNum(value)} followers online`}
+                          className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
+                          style={{ backgroundColor: cellColor(value, dailyHasData, dailyMin, dailyMax) }}
+                        >
+                          {dailyRecSet.has(hourIdx) && (
+                            <span className="absolute inset-0 flex items-center justify-center">
+                              <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-amber-400" />
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Hour labels */}
+                    <div className="relative h-4 mt-2">
+                      {HOUR_LABELS.map((h) => (
+                        <span
+                          key={h}
+                          className="absolute text-[9px] sm:text-[10px] text-slate-400 -translate-x-1/2"
+                          style={{ left: `${(h / 24) * 100}%` }}
+                        >
+                          {String(h).padStart(2, '0')}:00
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {feDailyData?.recommended_vn_times && feDailyData.recommended_vn_times.length > 0 && (
+                  <div className="mt-4 sm:mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
+                    <p className="text-[11px] sm:text-xs text-pink-700 font-semibold mb-1.5">Best times to post:</p>
+                    <div className="flex gap-1.5 sm:gap-2 flex-wrap">
+                      {feDailyData.recommended_vn_times.map((t) => (
+                        <span
+                          key={t}
+                          className="text-[10px] sm:text-xs font-bold text-pink-600 bg-white border border-pink-200 rounded-full px-2 py-0.5 sm:px-2.5"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <p className="mt-3 text-[10px] sm:text-[11px] text-slate-400 leading-relaxed">
+                  Actual online followers (VN time) — not separated by day of the week.
+                </p>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -548,7 +757,7 @@ export default function InsightsPage() {
     const fetchTopPosts = async () => {
       setPostsLoading(true);
       try {
-        const response = await fetch('https://thegivecollective-backend.vercel.app/api/v1/insights/top-posts');
+        const response = await fetch(`${API_BASE_URL}/insights/top-posts`);
         const data = await response.json();
         const normalizedPosts = normalizeTopPosts(data);
         setTopPosts(normalizedPosts);
@@ -612,7 +821,6 @@ export default function InsightsPage() {
 
   const platformCount = Object.keys(groupedPosts).length;
 
-  // Added YouTube posts filter
   const tiktokPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'tiktok'), [allPosts]);
   const facebookPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'facebook'), [allPosts]);
   const instagramPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'instagram'), [allPosts]);
@@ -620,19 +828,23 @@ export default function InsightsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16 pb-12">
-      <div className="mx-auto max-w-7xl px-6 py-8 space-y-10">
+      {/* 
+        Container changes px-4 (mobile) and sm:px-6 (tablet/desktop) 
+        Spacing adjusted for consistency: space-y-8 sm:space-y-10
+      */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8 space-y-8 sm:space-y-10">
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Insights &amp; Performance</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Insights &amp; Performance</h1>
+          <p className="text-[13px] sm:text-sm text-slate-500 mt-1">
             In-depth analysis of our audience and top-performing content.
           </p>
         </div>
 
         {/* ── SECTION 1: Overview ── */}
-        <section className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <section className="space-y-4 sm:space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <StatCard label="Total Views"      value={fmtNum(totalViews)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="up"   />
             <StatCard label="Total Likes"      value={fmtNum(totalLikes)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="none" />
             <StatCard label="Engagement Rate"  value={`${engagementRate}%`}   sub="Likes / views, top posts"                        colorKey="none" />
@@ -641,14 +853,14 @@ export default function InsightsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Demographics */}
             <div className="lg:col-span-5 rounded-2xl border border-emerald-200 bg-white overflow-hidden flex flex-col">
-              <div className="px-5 py-3 flex items-center justify-between bg-emerald-50/60 border-b border-emerald-200">
-                <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">Audience demographics</span>
-                <span className="text-xs font-mono text-emerald-600">
-                  {demoLoading ? 'Loading...' : `${fmtNum(totalKnownFollowers)} followers · IG`}
+              <div className="px-4 py-3 sm:px-5 flex items-center justify-between bg-emerald-50/60 border-b border-emerald-200">
+                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-emerald-600">Audience</span>
+                <span className="text-[10px] sm:text-xs font-mono text-emerald-600">
+                  {demoLoading ? 'Loading...' : `${fmtNum(totalKnownFollowers)} followers`}
                 </span>
               </div>
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="h-[260px] w-full">
+              <div className="p-3 sm:p-4 flex-1 flex flex-col">
+                <div className="h-[240px] sm:h-[260px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={demographics}
@@ -657,9 +869,9 @@ export default function InsightsPage() {
                     >
                       <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="#e2e8f0" />
                       <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                      <YAxis dataKey="age" type="category" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} width={40} />
+                      <YAxis dataKey="age" type="category" tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} width={45} />
                       <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f8fafc' }} />
-                      <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                      <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} />
                       <Bar dataKey="female" name="Female" stackId="a" fill="#ec4899" barSize={16} />
                       <Bar dataKey="male" name="Male" stackId="a" fill="#6366f1" barSize={16} />
                       <Bar dataKey="undisclosed" name="Undisclosed" stackId="a" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={16} />
@@ -667,11 +879,11 @@ export default function InsightsPage() {
                   </ResponsiveContainer>
                 </div>
 
-                <div className="mt-4 p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl flex gap-3">
-                  <span className="text-xl">💡</span>
+                <div className="mt-4 p-3 sm:p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl flex gap-2 sm:gap-3">
+                  <span className="text-lg sm:text-xl">💡</span>
                   <div>
-                    <p className="text-sm text-emerald-800 font-semibold mb-1">Quick Insight</p>
-                    <p className="text-xs text-emerald-600 leading-relaxed">
+                    <p className="text-[13px] sm:text-sm text-emerald-800 font-semibold mb-1">Quick Insight</p>
+                    <p className="text-[11px] sm:text-xs text-emerald-600 leading-relaxed">
                       The 25-44 age group makes up the majority of followers with available demographic data.
                     </p>
                   </div>
@@ -681,54 +893,54 @@ export default function InsightsPage() {
 
             {/* Top Posts */}
             <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white overflow-hidden flex flex-col">
-              <div className="px-5 py-3 flex items-center justify-between bg-slate-50 border-b border-slate-200">
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Top performing posts</span>
-                <span className="text-xs font-mono text-slate-400">
-                  {postsLoading ? 'Loading...' : 'Top 3 posts / platform'}
+              <div className="px-4 py-3 sm:px-5 flex items-center justify-between bg-slate-50 border-b border-slate-200">
+                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">Top posts</span>
+                <span className="text-[10px] sm:text-xs font-mono text-slate-400">
+                  {postsLoading ? 'Loading...' : 'Top 3 / platform'}
                 </span>
               </div>
 
-              <div className="p-5 flex-1 overflow-y-auto max-h-[460px] space-y-8">
+              <div className="p-4 sm:p-5 flex-1 overflow-y-auto max-h-[500px] space-y-6 sm:space-y-8">
                 {postsLoading && topPosts.length === 0 ? (
-                   <div className="flex items-center justify-center h-full text-sm text-slate-400 py-10">
+                   <div className="flex items-center justify-center h-full text-[13px] sm:text-sm text-slate-400 py-10">
                      Loading posts...
                    </div>
                 ) : Object.keys(groupedPosts).length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-sm text-slate-400 py-10">
+                  <div className="flex items-center justify-center h-full text-[13px] sm:text-sm text-slate-400 py-10">
                     No posts available.
                   </div>
                 ) : (
                   Object.entries(groupedPosts).map(([platform, posts]) => (
                     <div key={platform}>
-                      <div className="flex items-center gap-2 mb-4">
+                      <div className="flex items-center gap-2 mb-3 sm:mb-4">
                         <PlatformIcon name={platform} />
-                        <h3 className="text-sm font-bold text-slate-700 capitalize">{platform}</h3>
+                        <h3 className="text-[13px] sm:text-sm font-bold text-slate-700 capitalize">{platform}</h3>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                         {posts.map((post) => (
                           <a
                             key={post.id}
                             href={post.url}
                             target="_blank"
                             rel="noreferrer"
-                            className={`relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between ${!post.url ? 'pointer-events-none' : ''}`}
+                            className={`relative rounded-xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between ${!post.url ? 'pointer-events-none' : ''}`}
                           >
-                            <div className="mb-4">
-                              <h4 className="text-[13px] font-semibold text-slate-800 leading-snug line-clamp-3" title={post.title}>
+                            <div className="mb-3 sm:mb-4">
+                              <h4 className="text-xs sm:text-[13px] font-semibold text-slate-800 leading-snug line-clamp-2 sm:line-clamp-3" title={post.title}>
                                 {post.title}
                               </h4>
-                              <p className="text-[11px] text-slate-400 mt-1.5">{post.date}</p>
+                              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 sm:mt-1.5">{post.date}</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2.5 text-center mt-auto">
+                            <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2 sm:p-2.5 text-center mt-auto">
                               <div>
-                                <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
-                                <p className="mt-0.5 text-[13px] font-bold text-slate-700">{fmtNum(post.views)}</p>
+                                <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
+                                <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.views)}</p>
                               </div>
                               <div className="border-l border-slate-200">
-                                <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
-                                <p className="mt-0.5 text-[13px] font-bold text-slate-700">{fmtNum(post.likes)}</p>
+                                <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
+                                <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.likes)}</p>
                               </div>
                             </div>
                           </a>
@@ -743,15 +955,16 @@ export default function InsightsPage() {
           </div>
         </section>
 
-        {/* ── SECTION 2: Best Time to Post — navbar platform selector, 1 big table ── */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
+        {/* ── SECTION 2: Best Time to Post ── */}
+        <section className="space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between flex-col sm:flex-row gap-3 sm:gap-0">
+            <div className="w-full sm:w-auto">
               <h2 className="text-lg font-bold text-slate-800">Best Time to Post</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
                 Select a platform to view detailed best posting times.
               </p>
             </div>
+            {/* Display Platform Switcher full width on mobile if needed */}
             <PlatformSwitcher active={activePlatform} onChange={setActivePlatform} />
           </div>
 
