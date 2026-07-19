@@ -12,14 +12,20 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+// Loại nội dung của bài post
+type ContentType = 'video' | 'image' | 'carousel' | 'text' | 'story' | 'unknown';
+
 type Post = {
   id: string | number;
   platform: string;
   title: string;
   views: number;
   likes: number;
+  shares: number;
   date: string;
   url?: string;
+  contentType: ContentType;
+  rawMediaType?: string;
 };
 
 type DemographicRow = {
@@ -86,6 +92,18 @@ const PLATFORM_TABS: { key: PlatformKey; label: string }[] = [
   { key: 'youtube', label: 'YouTube' },
 ];
 
+// Metadata hiển thị cho từng content type: nhãn, icon, màu sắc
+const CONTENT_TYPE_META: Record<ContentType, { label: string; icon: string; className: string }> = {
+  video:     { label: 'Video',     icon: '▶',  className: 'bg-violet-100 text-violet-700 border-violet-200' },
+  image:     { label: 'Image',     icon: '🖼',  className: 'bg-sky-100 text-sky-700 border-sky-200' },
+  carousel:  { label: 'Carousel',  icon: '▦',  className: 'bg-amber-100 text-amber-700 border-amber-200' },
+  story:     { label: 'Story',     icon: '◐',  className: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' },
+  text:      { label: 'Text',      icon: '✎',  className: 'bg-slate-100 text-slate-600 border-slate-200' },
+  unknown:   { label: 'Other',     icon: '•',  className: 'bg-slate-100 text-slate-500 border-slate-200' },
+};
+
+const CONTENT_TYPE_ORDER: ContentType[] = ['video', 'image', 'carousel', 'story', 'text', 'unknown'];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtNum(n: number): string {
@@ -98,6 +116,28 @@ function splitDateTime(dateStr: string): { date: string; time: string } {
   if (!dateStr) return { date: '—', time: '' };
   const [datePart, timePart] = dateStr.split(' ');
   return { date: datePart || '—', time: timePart || '' };
+}
+
+// Chuẩn hoá content type từ nhiều nguồn field/giá trị khác nhau của backend
+function normalizeContentType(raw: any): ContentType {
+  const val = String(
+    raw?.contentType ??
+    raw?.content_type ??
+    raw?.mediaType ??
+    raw?.media_type ??
+    raw?.type ??
+    ''
+  ).toLowerCase().trim();
+
+  if (!val) return 'unknown';
+
+  if (['video', 'reel', 'reels', 'short', 'shorts'].includes(val)) return 'video';
+  if (['image', 'photo', 'picture', 'img'].includes(val)) return 'image';
+  if (['carousel', 'album', 'sidecar', 'gallery'].includes(val)) return 'carousel';
+  if (['story', 'stories'].includes(val)) return 'story';
+  if (['text', 'status', 'note'].includes(val)) return 'text';
+
+  return 'unknown';
 }
 
 function normalizeTopPosts(raw: any): Post[] {
@@ -115,8 +155,11 @@ function normalizeTopPosts(raw: any): Post[] {
     title: doc.title || '(No title)',
     views: doc.views || 0,
     likes: doc.likes || 0,
+    shares: doc.shares || 0,
     date: doc.date || '',
     url: doc.url || '',
+    contentType: normalizeContentType(doc),
+    rawMediaType: doc.rawMediaType || doc.mediaType || doc.media_type || '',
   }));
 }
 
@@ -179,6 +222,253 @@ function PlatformIcon({ name }: { name: string }) {
     <span className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-md text-white text-[10px] sm:text-xs font-bold ${p.bg}`}>
       {p.label}
     </span>
+  );
+}
+
+// ─── Content Type Badge ─────────────────────────────────────────────────────────
+
+function ContentTypeBadge({ type }: { type: ContentType }) {
+  const meta = CONTENT_TYPE_META[type];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold ${meta.className}`}
+      title={meta.label}
+    >
+      <span aria-hidden>{meta.icon}</span>
+      {meta.label}
+    </span>
+  );
+}
+
+// ─── Content Type Filter Chips ──────────────────────────────────────────────────
+
+function ContentTypeFilterChips({
+  availableTypes, active, onChange,
+}: { availableTypes: ContentType[]; active: ContentType | 'all'; onChange: (t: ContentType | 'all') => void }) {
+  if (availableTypes.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <button
+        type="button"
+        onClick={() => onChange('all')}
+        className={`text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${
+          active === 'all'
+            ? 'bg-slate-800 text-white border-slate-800'
+            : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+        }`}
+      >
+        All types
+      </button>
+      {availableTypes.map((t) => {
+        const meta = CONTENT_TYPE_META[t];
+        const isActive = active === t;
+        return (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onChange(t)}
+            className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${
+              isActive
+                ? 'bg-slate-800 text-white border-slate-800'
+                : `${meta.className} hover:opacity-80`
+            }`}
+          >
+            <span aria-hidden>{meta.icon}</span>
+            {meta.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Content Type Performance Chart ─────────────────────────────────────────────
+
+function ContentTypePerformanceCard({ posts }: { posts: Post[] }) {
+  const chartData = useMemo(() => {
+    const buckets: Record<string, { views: number; likes: number; shares: number; count: number }> = {};
+
+    for (const p of posts) {
+      const key = p.contentType;
+      if (!buckets[key]) buckets[key] = { views: 0, likes: 0, shares: 0, count: 0 };
+      buckets[key].views += p.views;
+      buckets[key].likes += p.likes;
+      buckets[key].shares += p.shares;
+      buckets[key].count += 1;
+    }
+
+    return CONTENT_TYPE_ORDER
+      .filter((t) => buckets[t] && buckets[t].count > 0)
+      .map((t) => {
+        const b = buckets[t];
+        return {
+          type: CONTENT_TYPE_META[t].label,
+          avgViews: Math.round(b.views / b.count),
+          avgLikes: Math.round(b.likes / b.count),
+          count: b.count,
+        };
+      });
+  }, [posts]);
+
+  if (chartData.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="lg:col-span-12 rounded-2xl border border-indigo-200 bg-white overflow-hidden">
+      <div className="px-4 py-3 sm:px-5 flex items-center justify-between bg-indigo-50/60 border-b border-indigo-200">
+        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-indigo-600">
+          Performance by Content Type
+        </span>
+        <span className="text-[10px] sm:text-xs font-mono text-indigo-400">
+          Avg per post
+        </span>
+      </div>
+      <div className="p-3 sm:p-4">
+        <div className="h-[240px] sm:h-[280px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="type" tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f8fafc' }} />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} />
+              <Bar dataKey="avgViews" name="Avg Views" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={28} />
+              <Bar dataKey="avgLikes" name="Avg Likes" fill="#a5b4fc" radius={[4, 4, 0, 0]} barSize={28} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {chartData.map((d) => (
+            <span key={d.type} className="text-[10px] sm:text-[11px] text-slate-400">
+              {d.type}: <span className="font-semibold text-slate-600">{d.count} posts</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Content Type Breakdown Table (dynamic — hiển thị đúng những gì đang có trong data) ───
+
+type ContentTypeRow = {
+  key: string;
+  label: string;
+  count: number;
+  totalViews: number;
+  avgViews: number;
+  avgLikes: number;
+  avgShares: number;
+  platforms: string[];
+};
+
+// Chuyển raw value (vd: "CAROUSEL_ALBUM", "photo", "blog_post") thành nhãn dễ đọc,
+// không cần phải khớp với 1 danh sách cố định — cứ có giá trị gì thì hiển thị giá trị đó.
+function formatTypeLabel(raw: string): string {
+  if (!raw) return 'Unknown';
+  return raw
+    .replace(/[_-]/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function useContentTypeBreakdown(posts: Post[]): ContentTypeRow[] {
+  return useMemo(() => {
+    const groups: Record<string, { count: number; views: number; likes: number; shares: number; platforms: Set<string> }> = {};
+
+    for (const p of posts) {
+      // Ưu tiên contentType đã chuẩn hoá, fallback về rawMediaType nếu có,
+      // cuối cùng mới rơi về 'unknown' — không giới hạn theo 1 danh sách cố định.
+      const raw = (p.contentType && p.contentType !== 'unknown' ? p.contentType : p.rawMediaType) || 'unknown';
+      const key = String(raw).trim() || 'unknown';
+
+      if (!groups[key]) {
+        groups[key] = { count: 0, views: 0, likes: 0, shares: 0, platforms: new Set() };
+      }
+      groups[key].count += 1;
+      groups[key].views += p.views || 0;
+      groups[key].likes += p.likes || 0;
+      groups[key].shares += p.shares || 0;
+      if (p.platform) groups[key].platforms.add(p.platform);
+    }
+
+    return Object.entries(groups)
+      .map(([key, g]) => ({
+        key,
+        label: formatTypeLabel(key),
+        count: g.count,
+        totalViews: g.views,
+        avgViews: Math.round(g.views / g.count),
+        avgLikes: Math.round(g.likes / g.count),
+        avgShares: Math.round(g.shares / g.count),
+        platforms: Array.from(g.platforms),
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [posts]);
+}
+
+function ContentTypeBreakdownTable({ posts, loading }: { posts: Post[]; loading: boolean }) {
+  const rows = useContentTypeBreakdown(posts);
+
+  return (
+    <div className="lg:col-span-12 rounded-2xl border border-indigo-200 bg-white overflow-hidden">
+      <div className="px-4 py-3 sm:px-5 flex items-center justify-between bg-indigo-50/60 border-b border-indigo-200">
+        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-indigo-600">
+          Content Type Breakdown
+        </span>
+        <span className="text-[10px] sm:text-xs font-mono text-indigo-400">
+          {loading ? 'Loading...' : `${rows.length} type${rows.length === 1 ? '' : 's'} found`}
+        </span>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="flex items-center justify-center h-24 text-[13px] sm:text-sm text-slate-400">
+          {loading ? 'Loading...' : 'No content type data available yet.'}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[620px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400">Type</th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400">Platforms</th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Posts</th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Total Views</th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Avg Views</th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Avg Likes</th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Avg Shares</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, idx) => (
+                <tr
+                  key={r.key}
+                  className={`border-b border-slate-100 last:border-0 ${idx % 2 === 1 ? 'bg-slate-50/40' : ''}`}
+                >
+                  <td className="px-4 py-2.5">
+                    <span className="text-xs sm:text-[13px] font-semibold text-slate-700">{r.label}</span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {r.platforms.map((pl) => (
+                        <PlatformIcon key={pl} name={pl} />
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] font-bold tabular-nums text-slate-700">{r.count}</td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.totalViews)}</td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.avgViews)}</td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.avgLikes)}</td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.avgShares)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -790,6 +1080,9 @@ export default function InsightsPage() {
 
   const [activePlatform, setActivePlatform] = useState<PlatformKey>('tiktok');
 
+  // Bộ lọc content type áp dụng cho khu vực Top Posts
+  const [activeContentType, setActiveContentType] = useState<ContentType | 'all'>('all');
+
   useEffect(() => {
     const fetchTopPosts = async () => {
       setPostsLoading(true);
@@ -811,7 +1104,7 @@ export default function InsightsPage() {
     const fetchAllPosts = async () => {
       setAllPostsLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/insights/all-posts`);
+        const response = await fetch(`http://localhost:5001/api/v1/insights/all-posts`);
         const data = await response.json();
         const normalizedPosts = normalizeTopPosts(data);
         setAllPosts(normalizedPosts);
@@ -848,13 +1141,26 @@ export default function InsightsPage() {
     (s, d) => s + d.female + d.male + d.undisclosed, 0,
   );
 
+  // Danh sách content type thực sự xuất hiện trong topPosts, để render chip filter
+  const availableContentTypes = useMemo(() => {
+    const set = new Set<ContentType>();
+    topPosts.forEach((p) => set.add(p.contentType));
+    return CONTENT_TYPE_ORDER.filter((t) => set.has(t));
+  }, [topPosts]);
+
+  // Áp dụng filter content type trước khi group theo platform
+  const filteredTopPosts = useMemo(() => {
+    if (activeContentType === 'all') return topPosts;
+    return topPosts.filter((p) => p.contentType === activeContentType);
+  }, [topPosts, activeContentType]);
+
   const groupedPosts = useMemo(() => {
-    return topPosts.reduce((acc, post) => {
+    return filteredTopPosts.reduce((acc, post) => {
       if (!acc[post.platform]) acc[post.platform] = [];
       acc[post.platform].push(post);
       return acc;
     }, {} as Record<string, Post[]>);
-  }, [topPosts]);
+  }, [filteredTopPosts]);
 
   const platformCount = Object.keys(groupedPosts).length;
 
@@ -926,11 +1232,19 @@ export default function InsightsPage() {
 
             {/* Top Posts */}
             <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white overflow-hidden flex flex-col">
-              <div className="px-4 py-3 sm:px-5 flex items-center justify-between bg-slate-50 border-b border-slate-200">
-                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">Top posts</span>
-                <span className="text-[10px] sm:text-xs font-mono text-slate-400">
-                  {postsLoading ? 'Loading...' : 'Top 3 / platform'}
-                </span>
+              <div className="px-4 py-3 sm:px-5 flex flex-col gap-2 sm:gap-3 bg-slate-50 border-b border-slate-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">Top posts</span>
+                  <span className="text-[10px] sm:text-xs font-mono text-slate-400">
+                    {postsLoading ? 'Loading...' : 'Top 3 / platform'}
+                  </span>
+                </div>
+                {/* Filter theo content type */}
+                <ContentTypeFilterChips
+                  availableTypes={availableContentTypes}
+                  active={activeContentType}
+                  onChange={setActiveContentType}
+                />
               </div>
 
               <div className="p-4 sm:p-5 flex-1 overflow-y-auto max-h-[500px] space-y-6 sm:space-y-8">
@@ -960,13 +1274,16 @@ export default function InsightsPage() {
                             className={`relative rounded-xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between ${!post.url ? 'pointer-events-none' : ''}`}
                           >
                             <div className="mb-3 sm:mb-4">
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <ContentTypeBadge type={post.contentType} />
+                              </div>
                               <h4 className="text-xs sm:text-[13px] font-semibold text-slate-800 leading-snug line-clamp-2 sm:line-clamp-3" title={post.title}>
                                 {post.title}
                               </h4>
                               <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 sm:mt-1.5">{post.date}</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2 sm:p-2.5 text-center mt-auto">
+                            <div className="grid grid-cols-3 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2 sm:p-2.5 text-center mt-auto">
                               <div>
                                 <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
                                 <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.views)}</p>
@@ -974,6 +1291,10 @@ export default function InsightsPage() {
                               <div className="border-l border-slate-200">
                                 <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
                                 <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.likes)}</p>
+                              </div>
+                              <div className="border-l border-slate-200">
+                                <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Shares</p>
+                                <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.shares)}</p>
                               </div>
                             </div>
                           </a>
@@ -984,6 +1305,12 @@ export default function InsightsPage() {
                 )}
               </div>
             </div>
+
+            {/* Content Type Performance — dùng allPosts vì đây là nguồn data có contentType/rawMediaType đầy đủ */}
+            <ContentTypePerformanceCard posts={allPosts} />
+
+            {/* Content Type Breakdown Table — hiển thị động theo dữ liệu thực tế đang có */}
+            <ContentTypeBreakdownTable posts={allPosts} loading={allPostsLoading} />
 
           </div>
         </section>
