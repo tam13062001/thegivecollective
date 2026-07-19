@@ -366,9 +366,6 @@ function BestTimeBigCard({
 // ─── Big single-panel card: Instagram ──────
 
 function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
-  // Lấy grid chứa lịch sử bài post từ hook (để dùng chấm vàng)
-  const { grid } = usePostHistoryGrid(posts);
-
   // --- Data source 1: by day of the week (7 days x 24 hours) ---
   const [feData, setFeData] = useState<TimeEngagementWeeklyData | null>(null);
   const [feLoading, setFeLoading] = useState(false);
@@ -416,9 +413,39 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
     fetchDaily();
   }, []);
 
-  // Build 7 days x 24 hours grid from actual data by day of the week, shift to SGT
-  const { feGrid, feMin, feMax, feHasData, coveredDaysCount } = useMemo(() => {
+  // Xử lý tạo Set chứa thời gian chính xác của các bài post (đã quy đổi sang giờ SGT)
+  // Format: "YYYY-MM-DD HH"
+  const postSgtSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of posts) {
+      if (!p.date) continue; // VD: "2026-06-23 10:00"
+      const parts = p.date.trim().split(/\s+/);
+      if (parts.length < 2) continue;
+      
+      const dPart = parts[0]; 
+      const tPart = parts[1].length === 5 ? parts[1] : parts[1].padStart(5, '0');
+      
+      // Xử lý an toàn tránh sai múi giờ của trình duyệt (ép về logic UTC)
+      const vnLogicalDate = new Date(`${dPart}T${tPart}:00Z`);
+      if (isNaN(vnLogicalDate.getTime())) continue;
+      
+      // Cộng thêm 1 giờ từ VN sang SGT
+      const sgtLogicalDate = new Date(vnLogicalDate.getTime() + 1 * 3600 * 1000);
+      
+      const sY = sgtLogicalDate.getUTCFullYear();
+      const sM = String(sgtLogicalDate.getUTCMonth() + 1).padStart(2, '0');
+      const sD = String(sgtLogicalDate.getUTCDate()).padStart(2, '0');
+      const sH = String(sgtLogicalDate.getUTCHours()).padStart(2, '0');
+      
+      set.add(`${sY}-${sM}-${sD} ${sH}`);
+    }
+    return set;
+  }, [posts]);
+
+  // Build 7 days x 24 hours grid from actual data by day of the week, shift to SGT, and match EXACT dates for yellow dots
+  const { feGrid, feMin, feMax, feHasData, coveredDaysCount, actualPostGrid } = useMemo(() => {
     const g: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    const pGrid: boolean[][] = Array.from({ length: 7 }, () => new Array(24).fill(false));
 
     let min = Infinity;
     let max = -Infinity;
@@ -428,9 +455,17 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
     WEEKDAY_LABELS.forEach((label, dayIdx) => {
       const vnKey = VN_WEEKDAY_MAP[label];
       const dayStat = feData?.[vnKey];
-      if (!dayStat) return;
+      if (!dayStat || !dayStat.end_time) return;
 
       covered += 1;
+
+      // Backend trích xuất vnDate từ end_time: utcDate + 7 hours
+      const utcDate = new Date(dayStat.end_time);
+      const vnDate = new Date(utcDate.getTime() + 7 * 3600 * 1000);
+      
+      const yyyy = vnDate.getUTCFullYear();
+      const mm = String(vnDate.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(vnDate.getUTCDate()).padStart(2, '0');
 
       for (const h of dayStat.full_day_stats || []) {
         if (h.vn_hour >= 0 && h.vn_hour < 24) {
@@ -438,15 +473,27 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
           const sgtHour = (h.vn_hour + 1) % 24;
           let targetDayIdx = dayIdx;
           
-          // Nhảy sang ngày tiếp theo nếu vn_hour là 23
+          let sgt_yyyy = yyyy, sgt_mm = mm, sgt_dd = dd;
+
+          // Nếu vn_hour là 23, giờ SGT sẽ là 00:00 của ngày HÔM SAU
           if (h.vn_hour === 23) {
             targetDayIdx = (dayIdx + 1) % 7;
+            const nextDay = new Date(vnDate.getTime() + 24 * 3600 * 1000);
+            sgt_yyyy = nextDay.getUTCFullYear();
+            sgt_mm = String(nextDay.getUTCMonth() + 1).padStart(2, '0');
+            sgt_dd = String(nextDay.getUTCDate()).padStart(2, '0');
           }
 
           g[targetDayIdx][sgtHour] = h.followers_online;
           any = true;
           if (h.followers_online < min) min = h.followers_online;
           if (h.followers_online > max) max = h.followers_online;
+
+          // Kiểm tra xem có bài post nào rơi vào ĐÚNG ngày tháng năm + giờ này không
+          const sgtMatchStr = `${sgt_yyyy}-${sgt_mm}-${sgt_dd} ${String(sgtHour).padStart(2, '0')}`;
+          if (postSgtSet.has(sgtMatchStr)) {
+            pGrid[targetDayIdx][sgtHour] = true;
+          }
         }
       }
     });
@@ -457,10 +504,11 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
       feMax: any ? max : 0,
       feHasData: any,
       coveredDaysCount: covered,
+      actualPostGrid: pGrid
     };
-  }, [feData]);
+  }, [feData, postSgtSet]);
 
-  // Top 3 hours aggregated across all available days (weekly) - Now automatically in SGT because feGrid is in SGT
+  // Top 3 hours aggregated across all available days (weekly) - Automatically in SGT because feGrid is in SGT
   const overallTop3SgtTimes = useMemo(() => {
     if (!feHasData) return [];
     const hourTotals = new Array(24).fill(0);
@@ -569,7 +617,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                   {/* Legend updated */}
                   <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
                     <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
-                    Your posts (SGT)
+                    Your posts (matched by exact date)
                   </span>
                 </div>
 
@@ -586,8 +634,8 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                               className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
                               style={{ backgroundColor: cellColor(value, feHasData, feMin, feMax) }}
                             >
-                              {/* Hiển thị chấm vàng trực tiếp từ lịch sử post */}
-                              {grid[dayIdx][hourIdx].count > 0 && (
+                              {/* Hiển thị chấm vàng chỉ khi có bài đăng đúng ngày đó */}
+                              {actualPostGrid[dayIdx][hourIdx] && (
                                 <span className="absolute inset-0 flex items-center justify-center">
                                   <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-amber-400" />
                                 </span>
@@ -635,7 +683,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                 )}
 
                 <p className="mt-3 text-[10px] sm:text-[11px] text-slate-400 leading-relaxed">
-                  Actual data based on the last {coveredDaysCount}/7 days (SGT time). Yellow dots indicate times you have posted based on your history on that specific day.
+                  Actual data based on the last {coveredDaysCount}/7 days (SGT time). Yellow dots indicate that a post was published on that specific date and hour within this window.
                 </p>
               </div>
             )}
