@@ -13,7 +13,7 @@ import {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Post = {
-  id: string | number; // Nhận _id từ MongoDB
+  id: string | number; // Receives _id from MongoDB
   platform: string;
   title: string;
   views: number;
@@ -41,7 +41,7 @@ type TimeEngagementData = {
   full_day_stats: TimeEngagementHour[];
 };
 
-// Đã bổ sung 'youtube'
+// Added 'youtube'
 type PlatformKey = 'tiktok' | 'facebook' | 'instagram' | 'youtube';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ const REAL_DEMOGRAPHICS_SNAPSHOT: DemographicRow[] = [
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => i * 2); // 0,2,4,...,22
 
-// Đã bổ sung tab YouTube
+// Added YouTube tab
 const PLATFORM_TABS: { key: PlatformKey; label: string }[] = [
   { key: 'tiktok', label: 'TikTok' },
   { key: 'facebook', label: 'Facebook' },
@@ -78,8 +78,8 @@ function fmtNum(n: number): string {
 }
 
 /**
- * Tách chuỗi "YYYY-MM-DD HH:mm" thành { date, time }.
- * Nếu chuỗi chỉ có ngày (không có giờ) thì time sẽ rỗng.
+ * Splits the string "YYYY-MM-DD HH:mm" into { date, time }.
+ * If the string only has a date (no time), time will be empty.
  */
 function splitDateTime(dateStr: string): { date: string; time: string } {
   if (!dateStr) return { date: '—', time: '' };
@@ -88,8 +88,8 @@ function splitDateTime(dateStr: string): { date: string; time: string } {
 }
 
 /**
- * Xử lý dữ liệu BE trả về: hỗ trợ cả Mảng 1D, Mảng 2D (Array of Arrays)
- * hoặc bọc trong object { posts: [...] }
+ * Processes data returned from BE: supports 1D Array, 2D Array (Array of Arrays)
+ * or wrapped in an object { posts: [...] }
  */
 function normalizeTopPosts(raw: any): Post[] {
   let rawArray: any[] = [];
@@ -105,7 +105,7 @@ function normalizeTopPosts(raw: any): Post[] {
   return flatDocs.map((doc, idx) => ({
     id: doc._id || idx + 1,
     platform: doc.platform || 'Unknown',
-    title: doc.title || '(Không có tiêu đề)',
+    title: doc.title || '(No title)',
     views: doc.views || 0,
     likes: doc.likes || 0,
     date: doc.date || '',
@@ -261,7 +261,7 @@ function PostHistoryGridView({
   if (!hasData && !loading) {
     return (
       <div className="flex items-center justify-center h-32 text-sm text-slate-400">
-        Chưa có đủ dữ liệu giờ đăng bài để hiển thị.
+        Not enough post time data to display.
       </div>
     );
   }
@@ -290,7 +290,7 @@ function PostHistoryGridView({
                 {grid[dayIdx].map((cell, hourIdx) => (
                   <div
                     key={hourIdx}
-                    title={`${day} ${String(hourIdx).padStart(2, '0')}:00 — ${cell.count} bài, ${fmtNum(cell.totalViews)} views`}
+                    title={`${day} ${String(hourIdx).padStart(2, '0')}:00 — ${cell.count} posts, ${fmtNum(cell.totalViews)} views`}
                     className="relative flex-1 aspect-square rounded-[4px]"
                     style={{ backgroundColor: cellColor(cell) }}
                   >
@@ -305,7 +305,7 @@ function PostHistoryGridView({
             </div>
           ))}
 
-          {/* Nhãn giờ, cứ mỗi 2h */}
+          {/* Hour labels, every 2 hours */}
           <div className="flex items-center gap-1.5 mt-2">
             <span className="w-9 shrink-0" />
             <div className="flex-1 relative h-4">
@@ -326,7 +326,7 @@ function PostHistoryGridView({
   );
 }
 
-// ─── Big single-panel card: TikTok / Facebook / YouTube (chỉ post history) ───────────────
+// ─── Big single-panel card: TikTok / Facebook / YouTube (post history only) ───────────────
 
 function BestTimeBigCard({
   platform, posts, loading,
@@ -351,7 +351,7 @@ function BestTimeBigCard({
   );
 }
 
-// ─── Big single-panel card: Instagram (2 tab — post history + fan online) ──────
+// ─── Big single-panel card: Instagram (2 tabs — post history + fans online) ──────
 
 function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean }) {
   const [tab, setTab] = useState<'online' | 'history'>('online');
@@ -372,7 +372,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
         if (!json.success) throw new Error(json.message || 'Fetch failed');
         setFeData(json.data);
       } catch (err) {
-        console.error('Lỗi khi tải time-engagement (IG):', err);
+        console.error('Error loading time-engagement (IG):', err);
         setFeError(true);
       } finally {
         setFeLoading(false);
@@ -428,7 +428,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
               : 'text-slate-400 hover:text-slate-600'
           }`}
         >
-          Fan online (thực tế)
+          Fans online (actual)
         </button>
         <button
           type="button"
@@ -439,7 +439,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
               : 'text-slate-400 hover:text-slate-600'
           }`}
         >
-          Ước lượng từ post history
+          Estimated from post history
         </button>
       </div>
 
@@ -448,11 +448,11 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
           <PostHistoryGridView grid={grid} minAvg={minAvg} maxAvg={maxAvg} hasData={hasData} loading={loading} />
         ) : feError ? (
           <div className="flex items-center justify-center h-24 text-sm text-slate-400">
-            Không tải được dữ liệu. Thử lại sau.
+            Failed to load data. Please try again later.
           </div>
         ) : feHours.length === 0 && !feLoading ? (
           <div className="flex items-center justify-center h-24 text-sm text-slate-400">
-            Chưa có đủ dữ liệu.
+            Not enough data.
           </div>
         ) : (
           <>
@@ -506,7 +506,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
 
             {feData?.recommended_vn_times && feData.recommended_vn_times.length > 0 && (
               <div className="mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
-                <p className="text-xs text-pink-700 font-semibold mb-1">Nên đăng bài lúc</p>
+                <p className="text-xs text-pink-700 font-semibold mb-1">Recommended posting times</p>
                 <div className="flex gap-2 flex-wrap">
                   {feData.recommended_vn_times.map((t) => (
                     <span
@@ -521,7 +521,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
             )}
 
             <p className="mt-3 text-[11px] text-slate-400 leading-relaxed">
-              Follower online thực tế (giờ VN) — chưa tách theo thứ trong tuần.
+              Actual followers online (VN time) — not separated by day of the week.
             </p>
           </>
         )}
@@ -553,7 +553,7 @@ export default function InsightsPage() {
         const normalizedPosts = normalizeTopPosts(data);
         setTopPosts(normalizedPosts);
       } catch (error) {
-        console.error("Lỗi khi tải top posts:", error);
+        console.error("Error loading top posts:", error);
       } finally {
         setPostsLoading(false);
       }
@@ -570,7 +570,7 @@ export default function InsightsPage() {
         const normalizedPosts = normalizeTopPosts(data);
         setAllPosts(normalizedPosts);
       } catch (error) {
-        console.error("Lỗi khi tải all posts:", error);
+        console.error("Error loading all posts:", error);
       } finally {
         setAllPostsLoading(false);
       }
@@ -612,7 +612,7 @@ export default function InsightsPage() {
 
   const platformCount = Object.keys(groupedPosts).length;
 
-  // Lọc thêm mảng bài viết YouTube
+  // Added YouTube posts filter
   const tiktokPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'tiktok'), [allPosts]);
   const facebookPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'facebook'), [allPosts]);
   const instagramPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'instagram'), [allPosts]);
@@ -743,13 +743,13 @@ export default function InsightsPage() {
           </div>
         </section>
 
-        {/* ── SECTION 2: Best Time to Post — navbar chọn platform, 1 bảng lớn ── */}
+        {/* ── SECTION 2: Best Time to Post — navbar platform selector, 1 big table ── */}
         <section className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-800">Best Time to Post</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Chọn nền tảng để xem chi tiết khung giờ đăng bài tốt nhất.
+                Select a platform to view detailed best posting times.
               </p>
             </div>
             <PlatformSwitcher active={activePlatform} onChange={setActivePlatform} />
