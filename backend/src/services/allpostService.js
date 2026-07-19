@@ -1,3 +1,10 @@
+import {
+  mapFacebookContentType,
+  mapInstagramContentType,
+  mapTikTokContentType,
+  mapYouTubeContentType,
+} from '../utils/contentType.js';
+
 const GRAPH_API_VERSION = 'v21.0';
 // Thêm helper này ở đầu file
 const formatDateTime = (isoString) => {
@@ -16,7 +23,8 @@ export const fetchInstagramTopPost = async (apiKey) => {
 
     const allMedia = [];
     let fetchError = null;
-    let nextUrl = `${BASE}/${igAccountId}/media?fields=id,caption,timestamp,media_type,like_count,permalink&limit=100&access_token=${apiKey}`;
+    // Thêm media_type + media_product_type để xác định Image/Video/Carousel/Story/Reels
+    let nextUrl = `${BASE}/${igAccountId}/media?fields=id,caption,timestamp,media_type,media_product_type,like_count,permalink&limit=100&access_token=${apiKey}`;
 
     while (nextUrl) {
       const res = await fetch(nextUrl);
@@ -62,6 +70,9 @@ export const fetchInstagramTopPost = async (apiKey) => {
         likes: top.like_count || 0,
         date: formatDateTime(top.timestamp),
         url: top.permalink,
+        contentType: mapInstagramContentType(top.media_type, top.media_product_type),
+        rawMediaType: top.media_type || '',
+        rawMediaProductType: top.media_product_type || '',
       }));
   } catch (error) {
     console.error('[Instagram] Top post error:', error);
@@ -75,10 +86,10 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
     const BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
     const allContent = []; // Gom chung cả Posts và Reels vào đây
 
-    // Posts thường
+    // Posts thường — thêm attachments{media_type,type} để xác định Photo/Video/Album/Link
     const posts = [];
     let postsError = null;
-    let postsUrl = `${BASE}/${pageId}/posts?fields=id,message,created_time,permalink_url,likes.summary(true)&limit=100&access_token=${accessToken}`;
+    let postsUrl = `${BASE}/${pageId}/posts?fields=id,message,created_time,permalink_url,likes.summary(true),attachments{media_type,type}&limit=100&access_token=${accessToken}`;
     while (postsUrl) {
       const res = await fetch(postsUrl);
       const data = await res.json();
@@ -99,6 +110,7 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
         )
       );
       for (const { post, views } of results) {
+        const attachmentFirst = post.attachments?.data?.[0];
         allContent.push({
           platform: 'Facebook',
           title: post.message ? post.message.slice(0, 120) : '(Không có nội dung)',
@@ -107,11 +119,13 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
           shares: post.shares?.count || 0,
           date: formatDateTime(post.created_time),
           url: post.permalink_url,
+          contentType: mapFacebookContentType(post.attachments),
+          rawMediaType: attachmentFirst?.media_type || attachmentFirst?.type || '',
         });
       }
     }
 
-    // Reels
+    // Reels — luôn là video, không cần gọi thêm field attachments
     let reelsError = null;
     let reelsUrl = `${BASE}/${pageId}/video_reels?fields=id,description,created_time,permalink_url,likes.summary(true),video_insights.metric(plays,blue_reels_play_count)&limit=100&access_token=${accessToken}`;
     while (reelsUrl) {
@@ -130,6 +144,8 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
           shares: reel.shares?.count || 0,
           date: formatDateTime(reel.created_time),
           url: reel.permalink_url,
+          contentType: 'video',
+          rawMediaType: 'video',
         });
       }
       reelsUrl = data.paging?.next || null;
@@ -185,6 +201,8 @@ export const fetchTikTokTopPost = async (handle, apifyToken) => {
         shares: Number(top.shareCount) || 0,
         date: formatDateTime(top.createTimeISO),
         url: top.webVideoUrl,
+        contentType: mapTikTokContentType(top),
+        rawMediaType: Array.isArray(top.images) && top.images.length > 0 ? 'carousel' : 'video',
       }));
   } catch (error) {
     console.error('[TikTok] Top post error:', error);
@@ -252,6 +270,8 @@ export const fetchYouTubeTopPost = async (channelHandle, apiKey) => {
         shares: parseInt(video.statistics.shareCount) || 0,
         date: formatDateTime(video.snippet.publishedAt),
         url: `https://www.youtube.com/watch?v=${video.id}`,
+        contentType: mapYouTubeContentType(),
+        rawMediaType: 'video',
       }))
       .sort((a, b) => b.views - a.views);
   } catch (error) {
