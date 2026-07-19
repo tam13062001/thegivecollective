@@ -23,21 +23,53 @@ router.get('/time-engagement', async (req, res) => {
     const ig_user_id = '17841422427064625'; 
     const access_token = process.env.META_ACCESS_TOKEN_INSTAGRAM;
 
-    // Gọi API của Meta
-    const url = `https://graph.facebook.com/v19.0/${ig_user_id}/insights?metric=online_followers&period=lifetime&access_token=${access_token}`;
-    const fbResponse = await fetch(url);
-    const fbData = await fbResponse.json();
+    // Khởi tạo URL ban đầu
+    let currentUrl = `https://graph.facebook.com/v19.0/${ig_user_id}/insights?metric=online_followers&period=lifetime&access_token=${access_token}`;
+    
+    let fbData = null;
+    let rawValues = null;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3; // Giới hạn lội ngược dòng tối đa 3 ngày để tránh loop vô hạn nếu tài khoản chết hẳn
 
-    if (fbData.error) {
-      return res.status(400).json({ success: false, message: fbData.error.message });
+    // Vòng lặp tự động tìm kiếm lội ngược dòng nếu gặp dữ liệu rỗng
+    while (attempts < MAX_ATTEMPTS && currentUrl) {
+      console.log(`Đang gọi API (Lần thử ${attempts + 1}): ${currentUrl}`);
+      
+      const fbResponse = await fetch(currentUrl);
+      fbData = await fbResponse.json();
+
+      if (fbData.error) {
+        return res.status(400).json({ success: false, message: fbData.error.message });
+      }
+
+      if (!fbData.data || fbData.data.length === 0) {
+        return res.status(404).json({ success: false, message: "Không có dữ liệu insight từ Meta" });
+      }
+
+      // Tìm phần tử có chứa value và value đó KHÔNG ĐƯỢC RỖNG ({})
+      rawValues = fbData.data[0].values?.find(v => v.value && Object.keys(v.value).length > 0);
+
+      if (rawValues) {
+        // Đã tìm thấy ngày có dữ liệu hợp lệ! Thoát vòng lặp ngay.
+        console.log(`Thành công! Tìm thấy dữ liệu hợp lệ tại ngày: ${rawValues.end_time}`);
+        break;
+      }
+
+      // Nếu chạy đến đây tức là ngày này bị rỗng ({}) -> Chuẩn bị lội về ngày trước
+      console.warn(`Ngày hiện tại bị rỗng data. Tiến hành lội ngược dòng bằng link 'previous'...`);
+      currentUrl = fbData.paging?.previous || null;
+      attempts++;
     }
 
-    const rawValues = fbData.data[0].values.find(v => Object.keys(v.value).length > 0);
+    // Sau khi kết thúc vòng lặp mà vẫn không tìm thấy gì (quá 3 ngày đều rỗng)
     if (!rawValues) {
-      return res.status(404).json({ success: false, message: 'Chưa có dữ liệu' });
+      return res.status(404).json({ 
+        success: false, 
+        message: `Đã thử lội ngược dòng ${MAX_ATTEMPTS} ngày nhưng toàn bộ dữ liệu giờ online đều rỗng.` 
+      });
     }
 
-    // Xử lý thuật toán giờ
+    // --- TIẾP TỤC THỰC THI THUẬT TOÁN (Vì đã chắc chắn có rawValues) ---
     const TIMEZONE_OFFSET_VN = 14; 
     const processedHours = Object.entries(rawValues.value)
       .map(([hour, count]) => {
@@ -54,11 +86,11 @@ router.get('/time-engagement', async (req, res) => {
     const top3BestTimes = processedHours.slice(0, 3);
     const recommended_vn_times = top3BestTimes.map(t => `${t.vn_hour}:00`);
 
-    // Gói dữ liệu
     const dataToSave = {
       recommended_vn_times,
       top_hours_detail: top3BestTimes,
-      full_day_stats: processedHours
+      full_day_stats: processedHours,
+      data_fetched_at: rawValues.end_time // Lưu thêm mốc thời gian thực tế lấy được để dễ check
     };
 
     // Lưu hoặc cập nhật vào MongoDB
@@ -68,15 +100,14 @@ router.get('/time-engagement', async (req, res) => {
       { new: true, upsert: true }
     );
 
-    // Trả về cho client
     return res.status(200).json({
       success: true,
-      message: "Lấy và lưu dữ liệu time engagement thành công",
+      message: `Lấy và lưu dữ liệu thành công (Dữ liệu thực tế của ngày ${rawValues.end_time})`,
       data: dataToSave
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Lỗi tại /time-engagement:", error);
     return res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });
