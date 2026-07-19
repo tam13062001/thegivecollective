@@ -1104,7 +1104,7 @@ export default function InsightsPage() {
     const fetchAllPosts = async () => {
       setAllPostsLoading(true);
       try {
-        const response = await fetch(`http://localhost:5001/api/v1/insights/all-posts`);
+        const response = await fetch(`${API_BASE_URL}/insights/all-posts`);
         const data = await response.json();
         const normalizedPosts = normalizeTopPosts(data);
         setAllPosts(normalizedPosts);
