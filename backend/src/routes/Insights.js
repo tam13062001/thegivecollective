@@ -1,7 +1,7 @@
 // routes/insights.js
 import express from 'express';
 import { getIgAudienceDemographics, getFanOnline } from '../services/igDemographics.js';
-import TimeEngagement from '../models/OnlineFollowersSnapshot.js';
+import OnlineFollowersSnapshot from '../models/OnlineFollowersSnapshot.js';
 import TimeEngagementWeekly from '../models/TimeEngagementWeekly.js';
 const router = express.Router();
 const GRAPH_VERSION = 'v22.0';
@@ -62,7 +62,7 @@ router.get('/time-engagement', async (req, res) => {
     };
 
     // Lưu hoặc cập nhật vào MongoDB
-    await TimeEngagement.findOneAndUpdate(
+    await OnlineFollowersSnapshot.findOneAndUpdate(
       { ig_user_id: ig_user_id },
       { $set: dataToSave },
       { new: true, upsert: true }
