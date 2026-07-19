@@ -363,12 +363,11 @@ function BestTimeBigCard({
   );
 }
 
-// ─── Big single-panel card: Instagram (2 tabs) ──────
+// ─── Big single-panel card: Instagram ──────
 
-function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean }) {
-  const [tab, setTab] = useState<'online' | 'history'>('online');
-
-  const { grid, minAvg, maxAvg, hasData } = usePostHistoryGrid(posts);
+function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
+  // Lấy grid chứa lịch sử bài post từ hook (để dùng chấm vàng)
+  const { grid } = usePostHistoryGrid(posts);
 
   // --- Data source 1: by day of the week (7 days x 24 hours) ---
   const [feData, setFeData] = useState<TimeEngagementWeeklyData | null>(null);
@@ -418,9 +417,8 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
   }, []);
 
   // Build 7 days x 24 hours grid from actual data by day of the week, shift to SGT
-  const { feGrid, feMin, feMax, feHasData, recommendedByDay, coveredDaysCount } = useMemo(() => {
+  const { feGrid, feMin, feMax, feHasData, coveredDaysCount } = useMemo(() => {
     const g: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
-    const recByDay: Set<number>[] = Array.from({ length: 7 }, () => new Set<number>());
 
     let min = Infinity;
     let max = -Infinity;
@@ -451,17 +449,6 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
           if (h.followers_online > max) max = h.followers_online;
         }
       }
-
-      for (const t of dayStat.top3_vn_times || []) {
-        const vnHour = Number(t.split(':')[0]);
-        if (!Number.isNaN(vnHour)) {
-          const sgtHour = (vnHour + 1) % 24;
-          let targetDayIdx = dayIdx;
-          if (vnHour === 23) targetDayIdx = (dayIdx + 1) % 7;
-          
-          recByDay[targetDayIdx].add(sgtHour);
-        }
-      }
     });
 
     return {
@@ -469,7 +456,6 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
       feMin: any ? min : 0,
       feMax: any ? max : 0,
       feHasData: any,
-      recommendedByDay: recByDay,
       coveredDaysCount: covered,
     };
   }, [feData]);
@@ -551,38 +537,8 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
         </div>
       </div>
 
-      {/* Tab switcher */}
-      <div className="flex border-b border-pink-100">
-        <button
-          type="button"
-          onClick={() => setTab('online')}
-          className={`flex-1 text-[11px] sm:text-xs font-semibold py-2 sm:py-2.5 transition-colors ${
-            tab === 'online'
-              ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/40'
-              : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <span className="hidden sm:inline">Fans online (actual)</span>
-          <span className="sm:hidden">Fans Online</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('history')}
-          className={`flex-1 text-[11px] sm:text-xs font-semibold py-2 sm:py-2.5 transition-colors ${
-            tab === 'history'
-              ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/40'
-              : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <span className="hidden sm:inline">Estimated from post history</span>
-          <span className="sm:hidden">History</span>
-        </button>
-      </div>
-
       <div className="p-4 sm:p-6">
-        {tab === 'history' ? (
-          <PostHistoryGridView grid={grid} minAvg={minAvg} maxAvg={maxAvg} hasData={hasData} loading={loading} />
-        ) : bothError ? (
+        {bothError ? (
           <div className="flex items-center justify-center h-24 text-[13px] sm:text-sm text-slate-400">
             Failed to load data. Please try again later.
           </div>
@@ -610,9 +566,10 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
                     style={{ background: 'linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))' }}
                   />
                   <span className="tabular-nums">{fmtNum(feMax)}</span>
+                  {/* Legend updated */}
                   <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
                     <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
-                    Top 3 hours per day
+                    Your posts (SGT)
                   </span>
                 </div>
 
@@ -629,7 +586,8 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
                               className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
                               style={{ backgroundColor: cellColor(value, feHasData, feMin, feMax) }}
                             >
-                              {recommendedByDay[dayIdx].has(hourIdx) && (
+                              {/* Hiển thị chấm vàng trực tiếp từ lịch sử post */}
+                              {grid[dayIdx][hourIdx].count > 0 && (
                                 <span className="absolute inset-0 flex items-center justify-center">
                                   <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-amber-400" />
                                 </span>
@@ -677,7 +635,7 @@ function InstagramBigCard({ posts, loading }: { posts: Post[]; loading: boolean 
                 )}
 
                 <p className="mt-3 text-[10px] sm:text-[11px] text-slate-400 leading-relaxed">
-                  Actual data based on the last {coveredDaysCount}/7 days (SGT time). Yellow dots indicate the top 3 hours with the most fans online for that specific day.
+                  Actual data based on the last {coveredDaysCount}/7 days (SGT time). Yellow dots indicate times you have posted based on your history on that specific day.
                 </p>
               </div>
             )}
@@ -859,10 +817,6 @@ export default function InsightsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16 pb-12">
-      {/* 
-        Container changes px-4 (mobile) and sm:px-6 (tablet/desktop) 
-        Spacing adjusted for consistency: space-y-8 sm:space-y-10
-      */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8 space-y-8 sm:space-y-10">
 
         {/* Header */}
