@@ -209,13 +209,13 @@ function ChartTooltip({ active, payload, label }: any) {
 
 function PlatformIcon({ name }: { name: string }) {
   const map: Record<string, { bg: string; label: string }> = {
-    tiktok:    { bg: 'bg-black',       label: 'TK' },
-    facebook:  { bg: 'bg-blue-600',    label: 'FB' },
-    instagram: { bg: 'bg-pink-500',    label: 'IG' },
-    twitter:   { bg: 'bg-sky-500',     label: 'TW' },
-    youtube:   { bg: 'bg-red-600',     label: 'YT' },
-    linkedin:  { bg: 'bg-blue-700',    label: 'LI' },
-    threads:   { bg: 'bg-gray-800',    label: 'TH' },
+    tiktok:    { bg: 'bg-black',        label: 'TK' },
+    facebook:  { bg: 'bg-blue-600',     label: 'FB' },
+    instagram: { bg: 'bg-pink-500',     label: 'IG' },
+    twitter:   { bg: 'bg-sky-500',      label: 'TW' },
+    youtube:   { bg: 'bg-red-600',      label: 'YT' },
+    linkedin:  { bg: 'bg-blue-700',     label: 'LI' },
+    threads:   { bg: 'bg-gray-800',     label: 'TH' },
   };
   const p = map[name.toLowerCase()] ?? { bg: 'bg-slate-500', label: name.slice(0, 2).toUpperCase() };
   return (
@@ -360,6 +360,7 @@ type ContentTypeRow = {
   avgViews: number;
   avgLikes: number;
   avgShares: number;
+  engagementRate: string;
   platforms: string[];
 };
 
@@ -403,6 +404,7 @@ function useContentTypeBreakdown(posts: Post[]): ContentTypeRow[] {
         avgViews: Math.round(g.views / g.count),
         avgLikes: Math.round(g.likes / g.count),
         avgShares: Math.round(g.shares / g.count),
+        engagementRate: g.views > 0 ? (((g.likes + g.shares) / g.views) * 100).toFixed(1) : '0.0',
         platforms: Array.from(g.platforms),
       }))
       .sort((a, b) => b.count - a.count);
@@ -429,7 +431,7 @@ function ContentTypeBreakdownTable({ posts, loading }: { posts: Post[]; loading:
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[620px]">
+          <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400">Type</th>
@@ -439,6 +441,7 @@ function ContentTypeBreakdownTable({ posts, loading }: { posts: Post[]; loading:
                 <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Avg Views</th>
                 <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Avg Likes</th>
                 <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Avg Shares</th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-indigo-500 text-right">Eng. Rate</th>
               </tr>
             </thead>
             <tbody>
@@ -462,6 +465,7 @@ function ContentTypeBreakdownTable({ posts, loading }: { posts: Post[]; loading:
                   <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.avgViews)}</td>
                   <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.avgLikes)}</td>
                   <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.avgShares)}</td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] font-bold tabular-nums text-indigo-600">{r.engagementRate}%</td>
                 </tr>
               ))}
             </tbody>
@@ -1135,7 +1139,8 @@ export default function InsightsPage() {
 
   const totalViews = topPosts.reduce((s, p) => s + p.views, 0);
   const totalLikes = topPosts.reduce((s, p) => s + p.likes, 0);
-  const engagementRate = totalViews > 0 ? ((totalLikes / totalViews) * 100).toFixed(1) : '0.0';
+  const totalShares = topPosts.reduce((s, p) => s + p.shares, 0);
+  const engagementRate = totalViews > 0 ? (((totalLikes + totalShares) / totalViews) * 100).toFixed(1) : '0.0';
 
   const totalKnownFollowers = demographics.reduce(
     (s, d) => s + d.female + d.male + d.undisclosed, 0,
@@ -1186,7 +1191,7 @@ export default function InsightsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <StatCard label="Total Views"      value={fmtNum(totalViews)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="up"   />
             <StatCard label="Total Likes"      value={fmtNum(totalLikes)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="none" />
-            <StatCard label="Engagement Rate"  value={`${engagementRate}%`}   sub="Likes / views, top posts"                        colorKey="none" />
+            <StatCard label="Engagement Rate"  value={`${engagementRate}%`}   sub="Likes + shares / views, top posts"               colorKey="none" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -1283,7 +1288,7 @@ export default function InsightsPage() {
                               <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 sm:mt-1.5">{post.date}</p>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2 sm:p-2.5 text-center mt-auto">
+                            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2 sm:p-2.5 text-center mt-auto">
                               <div>
                                 <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
                                 <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.views)}</p>
@@ -1295,6 +1300,12 @@ export default function InsightsPage() {
                               <div className="border-l border-slate-200">
                                 <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Shares</p>
                                 <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.shares)}</p>
+                              </div>
+                              <div className="border-l border-slate-200">
+                                <p className="text-[8px] sm:text-[9px] font-medium text-indigo-400 uppercase tracking-wide">Eng. Rate</p>
+                                <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-indigo-600">
+                                  {post.views > 0 ? (((post.likes + post.shares) / post.views) * 100).toFixed(1) : '0.0'}%
+                                </p>
                               </div>
                             </div>
                           </a>
