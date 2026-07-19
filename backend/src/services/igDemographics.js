@@ -1,15 +1,15 @@
 import OnlineFollowersSnapshot from '../models/OnlineFollowersSnapshot.js';
 
 const GRAPH_VERSION = 'v25.0';
-const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
-
+const PAGE_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN_INSTAGRAM;
+const IG_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN_INSTAGRAM;
 
 /**
  * Bước 1: lấy Instagram Business Account ID từ Page ID
  */
 export async function getIgBusinessAccountId(pageId) {
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${pageId}` +
-    `?fields=instagram_business_account&access_token=${PAGE_ACCESS_TOKEN}`;
+    `?fields=instagram_business_account&access_token=${IG_ACCESS_TOKEN}`;
 
   const res = await fetch(url);
   const data = await res.json();
@@ -35,7 +35,7 @@ export async function getIgAudienceDemographics(igBusinessAccountId) {
     `&timeframe=this_month` +
     `&breakdown=age,gender` +
     `&metric_type=total_value` +
-    `&access_token=${PAGE_ACCESS_TOKEN}`;
+    `&access_token=${IG_ACCESS_TOKEN}`;
 
   const res = await fetch(url);
   const data = await res.json();
@@ -69,7 +69,7 @@ export async function getIgAudienceDemographics(igBusinessAccountId) {
 
 // services/igDemographics.js
 
-const IG_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN_INSTAGRAM;
+
 const IG_BUSINESS_ACCOUNT_ID = process.env.IG_BUSINESS_ACCOUNT_ID || '17841422427064625';
 
 function getWeekdayIndex(date) {

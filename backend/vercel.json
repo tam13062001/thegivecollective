@@ -19,7 +19,11 @@
     },
     {
       "path": "/api/v1/insights/time-engagement",
-      "schedule": "5 0 * * *"
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/v1/insights/time-engagement-weekly",
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/v1/insights/top-posts/refresh",
