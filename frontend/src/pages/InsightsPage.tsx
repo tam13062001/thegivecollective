@@ -57,6 +57,15 @@ type TimeEngagementDayStat = {
 
 type TimeEngagementWeeklyData = Record<string, TimeEngagementDayStat>;
 
+
+type TimeEngagementMonthlyDayStat = {
+  top3_vn_times: string[];
+  full_day_stats: { vn_hour: number; followers_online: number }[];
+};
+
+// monthKey (vd "Jan-2022") -> weekdayLabel VN (vd "Thứ 2") -> stat
+type TimeEngagementMonthlyData = Record<string, Record<string, TimeEngagementMonthlyDayStat>>;
+
 // Map display day labels (EN, shared with post-history grid) -> backend response keys (VN)
 const VN_WEEKDAY_MAP: Record<string, string> = {
   Mon: 'Thứ 2',
@@ -660,27 +669,37 @@ function BestTimeBigCard({
 // ─── Big single-panel card: Instagram ──────
 
 function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
-  // --- Data source 1: by day of the week (7 days x 24 hours) ---
-  const [feData, setFeData] = useState<TimeEngagementWeeklyData | null>(null);
+  // --- Data source 1: theo tháng, mỗi tháng có 7 ngày x 24 giờ ---
+  const [feMonthlyData, setFeMonthlyData] = useState<TimeEngagementMonthlyData | null>(null);
   const [feLoading, setFeLoading] = useState(false);
   const [feError, setFeError] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  // --- Data source 2: aggregated by hour, not separated by day ---
+  // --- Data source 2: gộp theo giờ, không tách theo ngày ---
   const [feDailyData, setFeDailyData] = useState<TimeEngagementData | null>(null);
   const [feDailyLoading, setFeDailyLoading] = useState(false);
   const [feDailyError, setFeDailyError] = useState(false);
 
   useEffect(() => {
-    const fetchWeekly = async () => {
+    const fetchMonthly = async () => {
       setFeLoading(true);
       setFeError(false);
       try {
-        const res = await fetch(`${API_BASE_URL}/insights/time-engagement-weekly`);
+        const res = await fetch(`${API_BASE_URL}/insights/time-engagement-monthly`);
         const json = await res.json();
         if (!json.success) throw new Error(json.message || 'Fetch failed');
-        setFeData(json.data);
+        setFeMonthlyData(json.data);
+
+        // Tự chọn tháng gần nhất (sort theo thời gian thực, không theo alphabet)
+        const monthKeys = Object.keys(json.data || {});
+        if (monthKeys.length > 0) {
+          const sorted = [...monthKeys].sort(
+            (a, b) => new Date(`1 ${a}`).getTime() - new Date(`1 ${b}`).getTime()
+          );
+          setSelectedMonth(sorted[sorted.length - 1]);
+        }
       } catch (err) {
-        console.error('Error loading time-engagement-weekly (IG):', err);
+        console.error('Error loading time-engagement-monthly (IG):', err);
         setFeError(true);
       } finally {
         setFeLoading(false);
@@ -703,106 +722,121 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
       }
     };
 
-    fetchWeekly();
+    fetchMonthly();
     fetchDaily();
   }, []);
 
-  // Xử lý tạo Set chứa thời gian chính xác của các bài post (đã quy đổi sang giờ SGT)
-  // Format: "YYYY-MM-DD HH"
-  const postSgtSet = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of posts) {
-      if (!p.date) continue; // VD: "2026-06-23 10:00"
-      const parts = p.date.trim().split(/\s+/);
-      if (parts.length < 2) continue;
-      
-      const dPart = parts[0]; 
-      const tPart = parts[1].length === 5 ? parts[1] : parts[1].padStart(5, '0');
-      
-      // Xử lý an toàn tránh sai múi giờ của trình duyệt (ép về logic UTC)
-      const vnLogicalDate = new Date(`${dPart}T${tPart}:00Z`);
-      if (isNaN(vnLogicalDate.getTime())) continue;
-      
-      // Cộng thêm 1 giờ từ VN sang SGT
-      const sgtLogicalDate = new Date(vnLogicalDate.getTime() + 1 * 3600 * 1000);
-      
-      const sY = sgtLogicalDate.getUTCFullYear();
-      const sM = String(sgtLogicalDate.getUTCMonth() + 1).padStart(2, '0');
-      const sD = String(sgtLogicalDate.getUTCDate()).padStart(2, '0');
-      const sH = String(sgtLogicalDate.getUTCHours()).padStart(2, '0');
-      
-      set.add(`${sY}-${sM}-${sD} ${sH}`);
+  // Danh sách tháng có data, sort mới nhất trước, dùng để render tag chọn tháng
+  const availableMonths = useMemo(() => {
+    const keys = Object.keys(feMonthlyData || {});
+    return keys.sort(
+      (a, b) => new Date(`1 ${b}`).getTime() - new Date(`1 ${a}`).getTime()
+    );
+  }, [feMonthlyData]);
+
+  const feData = selectedMonth ? feMonthlyData?.[selectedMonth] : undefined;
+
+  // Set (dayIdx-hourIdx) các bài post rơi vào đúng Thứ + Giờ (SGT) trong tháng đang chọn
+// Map "dayIdx-hourIdx" -> số bài post rơi vào đúng Thứ + Giờ (SGT) trong tháng đang chọn
+const postCountByCell = useMemo(() => {
+  const map = new Map<string, number>();
+  if (!selectedMonth) return map;
+
+  const [monShort, yearStr] = selectedMonth.split('-');
+  const refDate = new Date(`1 ${monShort} ${yearStr}`);
+  const targetMonth = refDate.getMonth();
+  const targetYear = refDate.getFullYear();
+
+  console.log('%c[IG monthly] selectedMonth:', 'color:#ec4899;font-weight:bold', selectedMonth, '-> targetMonth:', targetMonth, 'targetYear:', targetYear);
+
+  for (const p of posts) {
+    if (!p.date) continue;
+    const parts = p.date.trim().split(/\s+/);
+    if (parts.length < 2) continue;
+
+    const dPart = parts[0];
+    const tPart = parts[1].length === 5 ? parts[1] : parts[1].padStart(5, '0');
+
+    const vnLogicalDate = new Date(`${dPart}T${tPart}:00Z`);
+    if (isNaN(vnLogicalDate.getTime())) {
+      console.warn('[IG monthly] Không parse được date:', p.date);
+      continue;
     }
-    return set;
-  }, [posts]);
 
-  // Build 7 days x 24 hours grid from actual data by day of the week, shift to SGT, and match EXACT dates for yellow dots
-  const { feGrid, feMin, feMax, feHasData, coveredDaysCount, actualPostGrid } = useMemo(() => {
-    const g: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
-    const pGrid: boolean[][] = Array.from({ length: 7 }, () => new Array(24).fill(false));
+    if (vnLogicalDate.getUTCMonth() !== targetMonth || vnLogicalDate.getUTCFullYear() !== targetYear) {
+      continue; // không thuộc tháng đang chọn, bỏ qua log cho đỡ rối
+    }
 
-    let min = Infinity;
-    let max = -Infinity;
-    let any = false;
-    let covered = 0;
+    const sgtLogicalDate = new Date(vnLogicalDate.getTime() + 1 * 3600 * 1000);
+    const dayIdx = (sgtLogicalDate.getUTCDay() + 6) % 7;
+    const hourIdx = sgtLogicalDate.getUTCHours();
 
-    WEEKDAY_LABELS.forEach((label, dayIdx) => {
-      const vnKey = VN_WEEKDAY_MAP[label];
-      const dayStat = feData?.[vnKey];
-      if (!dayStat || !dayStat.end_time) return;
+    const key = `${dayIdx}-${hourIdx}`;
+    map.set(key, (map.get(key) || 0) + 1);
 
-      covered += 1;
+    console.log(
+      `[IG monthly] raw date="${p.date}" (VN)` +
+      ` -> SGT hour=${String(hourIdx).padStart(2,'0')}:00` +
+      ` | weekday=${WEEKDAY_LABELS[dayIdx]} (dayIdx=${dayIdx})` +
+      ` | title="${String(p.title).slice(0, 30)}..."`
+    );
+  }
 
-      // Backend trích xuất vnDate từ end_time: utcDate + 7 hours
-      const utcDate = new Date(dayStat.end_time);
-      const vnDate = new Date(utcDate.getTime() + 7 * 3600 * 1000);
-      
-      const yyyy = vnDate.getUTCFullYear();
-      const mm = String(vnDate.getUTCMonth() + 1).padStart(2, '0');
-      const dd = String(vnDate.getUTCDate()).padStart(2, '0');
+  console.log('[IG monthly] Tổng kết postCountByCell:', Object.fromEntries(map));
 
-      for (const h of dayStat.full_day_stats || []) {
-        if (h.vn_hour >= 0 && h.vn_hour < 24) {
-          // Xử lý chuyển đổi sang SGT (+1 giờ)
-          const sgtHour = (h.vn_hour + 1) % 24;
-          let targetDayIdx = dayIdx;
-          
-          let sgt_yyyy = yyyy, sgt_mm = mm, sgt_dd = dd;
+  return map;
+}, [posts, selectedMonth]);
 
-          // Nếu vn_hour là 23, giờ SGT sẽ là 00:00 của ngày HÔM SAU
-          if (h.vn_hour === 23) {
-            targetDayIdx = (dayIdx + 1) % 7;
-            const nextDay = new Date(vnDate.getTime() + 24 * 3600 * 1000);
-            sgt_yyyy = nextDay.getUTCFullYear();
-            sgt_mm = String(nextDay.getUTCMonth() + 1).padStart(2, '0');
-            sgt_dd = String(nextDay.getUTCDate()).padStart(2, '0');
-          }
+  // Build lưới 7 ngày x 24 giờ từ data của tháng đang chọn, quy đổi VN -> SGT
+// Build lưới 7 ngày x 24 giờ từ data của tháng đang chọn, quy đổi VN -> SGT
+const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMonth } = useMemo(() => {
+  const g: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
+  const pCountGrid: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
 
-          g[targetDayIdx][sgtHour] = h.followers_online;
-          any = true;
-          if (h.followers_online < min) min = h.followers_online;
-          if (h.followers_online > max) max = h.followers_online;
+  let min = Infinity;
+  let max = -Infinity;
+  let any = false;
 
-          // Kiểm tra xem có bài post nào rơi vào ĐÚNG ngày tháng năm + giờ này không
-          const sgtMatchStr = `${sgt_yyyy}-${sgt_mm}-${sgt_dd} ${String(sgtHour).padStart(2, '0')}`;
-          if (postSgtSet.has(sgtMatchStr)) {
-            pGrid[targetDayIdx][sgtHour] = true;
-          }
-        }
-      }
-    });
+  WEEKDAY_LABELS.forEach((label, dayIdx) => {
+    const vnKey = VN_WEEKDAY_MAP[label];
+    const dayStat = feData?.[vnKey];
+    if (!dayStat) return;
 
-    return {
-      feGrid: g,
-      feMin: any ? min : 0,
-      feMax: any ? max : 0,
-      feHasData: any,
-      coveredDaysCount: covered,
-      actualPostGrid: pGrid
-    };
-  }, [feData, postSgtSet]);
+    for (const h of dayStat.full_day_stats || []) {
+      if (h.vn_hour < 0 || h.vn_hour >= 24) continue;
 
-  // Top 3 hours aggregated across all available days (weekly) - Automatically in SGT because feGrid is in SGT
+      const sgtHour = (h.vn_hour + 1) % 24;
+      const targetDayIdx = h.vn_hour === 23 ? (dayIdx + 1) % 7 : dayIdx;
+
+      g[targetDayIdx][sgtHour] = h.followers_online;
+      any = true;
+      if (h.followers_online < min) min = h.followers_online;
+      if (h.followers_online > max) max = h.followers_online;
+    }
+  });
+
+  // Điền số lượng bài post thực tế vào TẤT CẢ các ô có trong postCountByCell
+  // (không chỉ những ô có data followers_online, vì bài post có thể rơi vào giờ chưa có data online_followers)
+  let totalPosts = 0;
+  postCountByCell.forEach((count, key) => {
+    const [dStr, hStr] = key.split('-');
+    const d = Number(dStr);
+    const h = Number(hStr);
+    pCountGrid[d][h] = count;
+    totalPosts += count;
+  });
+
+  return {
+    feGrid: g,
+    feMin: any ? min : 0,
+    feMax: any ? max : 0,
+    feHasData: any,
+    actualPostCountGrid: pCountGrid,
+    totalPostsThisMonth: totalPosts,
+  };
+}, [feData, postCountByCell]);
+
+  // Top 3 khung giờ tổng hợp trong tháng đang chọn (đã ở SGT vì feGrid đã quy đổi)
   const overallTop3SgtTimes = useMemo(() => {
     if (!feHasData) return [];
     const hourTotals = new Array(24).fill(0);
@@ -814,7 +848,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
       .map((t) => `${String(t.hour).padStart(2, '0')}:00`);
   }, [feGrid, feHasData]);
 
-  // Build a single 24-hour row from daily API, shift to SGT
+  // Build 1 hàng 24 giờ từ API daily, quy đổi sang SGT (giữ nguyên logic cũ)
   const { dailyRow, dailyMin, dailyMax, dailyHasData, dailyRecSet, recommendedSgtTimes } = useMemo(() => {
     const hourly = new Array(24).fill(0);
     let any = false;
@@ -841,7 +875,6 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
       })
     );
 
-    // Chuẩn bị chuỗi SGT time để hiển thị dạng text "21:00"
     const recSgtTimes = (feDailyData?.recommended_vn_times || []).map((t) => {
       const vnHour = Number(t.split(':')[0]);
       if (isNaN(vnHour)) return t;
@@ -855,7 +888,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
       dailyMax: any ? max : 0,
       dailyHasData: any,
       dailyRecSet: recSet,
-      recommendedSgtTimes: recSgtTimes
+      recommendedSgtTimes: recSgtTimes,
     };
   }, [feDailyData]);
 
@@ -890,17 +923,37 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
           </div>
         ) : (
           <div className="space-y-6 sm:space-y-8">
-            {/* ===== Table 1: by day of the week (7 days x 24 hours) ===== */}
+            {/* ===== Table 1: theo Tháng (7 ngày x 24 giờ) ===== */}
             {feError ? (
               <div className="flex items-center justify-center h-20 text-[13px] sm:text-sm text-slate-400">
-                Failed to load weekly data.
+                Failed to load monthly data.
               </div>
-            ) : !feHasData && !feLoading ? (
+            ) : availableMonths.length === 0 && !feLoading ? (
               <div className="flex items-center justify-center h-20 text-[13px] sm:text-sm text-slate-400">
-                Not enough weekly data.
+                Not enough monthly data.
               </div>
             ) : (
               <div>
+                {/* Month selector */}
+                {availableMonths.length > 0 && (
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-3 sm:mb-4">
+                    {availableMonths.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setSelectedMonth(m)}
+                        className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                          selectedMonth === m
+                            ? 'bg-pink-600 text-white border-pink-600'
+                            : 'bg-white text-pink-600 border-pink-200 hover:bg-pink-50'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap text-[11px] sm:text-xs text-slate-500">
                   <span className="tabular-nums">{fmtNum(feMin)}</span>
                   <span
@@ -908,10 +961,9 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                     style={{ background: 'linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))' }}
                   />
                   <span className="tabular-nums">{fmtNum(feMax)}</span>
-                  {/* Legend updated */}
                   <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
                     <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
-                    Your posts (matched by exact date)
+                    Your posts 
                   </span>
                 </div>
 
@@ -921,26 +973,29 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                       <div key={day} className="flex items-center gap-1 sm:gap-1.5 mb-1.5">
                         <span className="w-8 sm:w-9 text-[10px] sm:text-[11px] text-slate-400 text-right pr-1 sm:pr-2 shrink-0">{day}</span>
                         <div className="flex gap-[3px] sm:gap-[4px] flex-1">
-                          {feGrid[dayIdx].map((value, hourIdx) => (
-                            <div
-                              key={hourIdx}
-                              title={`${day} ${String(hourIdx).padStart(2, '0')}:00 SGT — ${fmtNum(value)} followers online`}
-                              className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
-                              style={{ backgroundColor: cellColor(value, feHasData, feMin, feMax) }}
-                            >
-                              {/* Hiển thị chấm vàng chỉ khi có bài đăng đúng ngày đó */}
-                              {actualPostGrid[dayIdx][hourIdx] && (
-                                <span className="absolute inset-0 flex items-center justify-center">
-                                  <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-amber-400" />
-                                </span>
-                              )}
-                            </div>
-                          ))}
+{feGrid[dayIdx].map((value, hourIdx) => {
+  const postCount = actualPostCountGrid[dayIdx][hourIdx];
+  return (
+    <div
+      key={hourIdx}
+      title={`${day} ${String(hourIdx).padStart(2, '0')}:00 SGT — ${fmtNum(value)} followers online, ${postCount} post${postCount === 1 ? '' : 's'} (${selectedMonth})`}
+      className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
+      style={{ backgroundColor: cellColor(value, feHasData, feMin, feMax) }}
+    >
+      {postCount > 0 && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 rounded-full bg-amber-400 text-white text-[8px] sm:text-[9px] font-bold leading-none shadow-sm">
+            {postCount}
+          </span>
+        </span>
+      )}
+    </div>
+  );
+})}
                         </div>
                       </div>
                     ))}
 
-                    {/* Hour labels */}
                     <div className="flex items-center gap-1 sm:gap-1.5 mt-2">
                       <span className="w-8 sm:w-9 shrink-0" />
                       <div className="flex-1 relative h-4">
@@ -958,33 +1013,13 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                   </div>
                 </div>
 
-                {overallTop3SgtTimes.length > 0 && (
-                  <div className="mt-4 sm:mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
-                    <p className="text-[11px] sm:text-xs text-pink-700 font-semibold mb-1.5">
-                      Recommended posting times (aggregated over {coveredDaysCount} days)
-                    </p>
-                    <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-                      {overallTop3SgtTimes.map((t) => (
-                        <span
-                          key={t}
-                          className="text-[10px] sm:text-xs font-bold text-pink-600 bg-white border border-pink-200 rounded-full px-2 py-0.5 sm:px-2.5"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-                <p className="mt-3 text-[10px] sm:text-[11px] text-slate-400 leading-relaxed">
-                  Actual data based on the last {coveredDaysCount}/7 days (SGT time). Yellow dots indicate that a post was published on that specific date and hour within this window.
-                </p>
               </div>
             )}
 
             <div className="border-t border-pink-100" />
 
-            {/* ===== Table 2: aggregated by hour, not separated by day ===== */}
+            {/* ===== Table 2: gộp theo giờ, không tách theo Thứ (giữ nguyên) ===== */}
             {feDailyError ? (
               <div className="flex items-center justify-center h-20 text-[13px] sm:text-sm text-slate-400">
                 Failed to load hourly aggregated data.
@@ -1027,7 +1062,6 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                       ))}
                     </div>
 
-                    {/* Hour labels */}
                     <div className="relative h-4 mt-2">
                       {HOUR_LABELS.map((h) => (
                         <span

@@ -10,9 +10,18 @@ const GRAPH_API_VERSION = 'v21.0';
 const formatDateTime = (isoString) => {
   if (!isoString) return '';
   const d = new Date(isoString);
-  if (isNaN(d.getTime())) return isoString.slice(0, 10); // fallback nếu parse lỗi
+  if (isNaN(d.getTime())) return isoString.slice(0, 10);
+
+  const vnDate = new Date(d.getTime() + 7 * 60 * 60 * 1000); // ← dòng này phải có
+
   const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const yyyy = vnDate.getUTCFullYear();
+  const mm = pad(vnDate.getUTCMonth() + 1);
+  const dd = pad(vnDate.getUTCDate());
+  const hh = pad(vnDate.getUTCHours());
+  const mi = pad(vnDate.getUTCMinutes());
+
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
 };
 
 // ─── Instagram ───────────────────────────────────────────────────────────────
