@@ -173,11 +173,11 @@ function splitDateTime(dateStr: string): { date: string; time: string } {
 function normalizeContentType(raw: any): ContentType {
   const val = String(
     raw?.contentType ??
-      raw?.content_type ??
-      raw?.mediaType ??
-      raw?.media_type ??
-      raw?.type ??
-      "",
+    raw?.content_type ??
+    raw?.mediaType ??
+    raw?.media_type ??
+    raw?.type ??
+    "",
   )
     .toLowerCase()
     .trim();
@@ -346,11 +346,10 @@ function ContentTypeFilterChips({
       <button
         type="button"
         onClick={() => onChange("all")}
-        className={`text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${
-          active === "all"
-            ? "bg-slate-800 text-white border-slate-800"
-            : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-        }`}
+        className={`text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${active === "all"
+          ? "bg-slate-800 text-white border-slate-800"
+          : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+          }`}
       >
         All types
       </button>
@@ -362,11 +361,10 @@ function ContentTypeFilterChips({
             key={t}
             type="button"
             onClick={() => onChange(t)}
-            className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${
-              isActive
-                ? "bg-slate-800 text-white border-slate-800"
-                : `${meta.className} hover:opacity-80`
-            }`}
+            className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${isActive
+              ? "bg-slate-800 text-white border-slate-800"
+              : `${meta.className} hover:opacity-80`
+              }`}
           >
             <span aria-hidden>{meta.icon}</span>
             {meta.label}
@@ -694,11 +692,10 @@ function PlatformSwitcher({
             key={p.key}
             type="button"
             onClick={() => onChange(p.key)}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors ${
-              active === p.key
-                ? "bg-slate-800 text-white"
-                : "text-slate-500 hover:bg-slate-50"
-            }`}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors ${active === p.key
+              ? "bg-slate-800 text-white"
+              : "text-slate-500 hover:bg-slate-50"
+              }`}
           >
             <PlatformIcon name={p.key} />
             {p.label}
@@ -1027,9 +1024,9 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
 
       console.log(
         `[IG monthly] raw date="${p.date}" (VN)` +
-          ` -> SGT hour=${String(hourIdx).padStart(2, "0")}:00` +
-          ` | weekday=${WEEKDAY_LABELS[dayIdx]} (dayIdx=${dayIdx})` +
-          ` | title="${String(p.title).slice(0, 30)}..."`,
+        ` -> SGT hour=${String(hourIdx).padStart(2, "0")}:00` +
+        ` | weekday=${WEEKDAY_LABELS[dayIdx]} (dayIdx=${dayIdx})` +
+        ` | title="${String(p.title).slice(0, 30)}..."`,
       );
     }
 
@@ -1225,11 +1222,10 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                         key={m}
                         type="button"
                         onClick={() => setSelectedMonth(m)}
-                        className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
-                          selectedMonth === m
-                            ? "bg-pink-600 text-white border-pink-600"
-                            : "bg-white text-pink-600 border-pink-200 hover:bg-pink-50"
-                        }`}
+                        className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${selectedMonth === m
+                          ? "bg-pink-600 text-white border-pink-600"
+                          : "bg-white text-pink-600 border-pink-200 hover:bg-pink-50"
+                          }`}
                       >
                         {m}
                       </button>
@@ -1446,11 +1442,10 @@ function MonthFilterChips({
       <button
         type="button"
         onClick={() => onChange("all")}
-        className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
-          active === "all"
-            ? "bg-slate-800 text-white border-slate-800"
-            : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-        }`}
+        className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${active === "all"
+          ? "bg-slate-800 text-white border-slate-800"
+          : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+          }`}
       >
         All months
       </button>
@@ -1459,11 +1454,10 @@ function MonthFilterChips({
           key={m}
           type="button"
           onClick={() => onChange(m)}
-          className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
-            active === m
-              ? "bg-slate-800 text-white border-slate-800"
-              : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-          }`}
+          className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${active === m
+            ? "bg-slate-800 text-white border-slate-800"
+            : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+            }`}
         >
           {m}
         </button>
@@ -1510,6 +1504,40 @@ function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
   );
 }
 
+// ─── Platform Filter Chips (dùng riêng cho Engagement Rate Breakdown) ──────────
+
+function PlatformFilterChips({
+  platforms,
+  active,
+  onChange,
+}: {
+  platforms: string[];
+  active: string;
+  onChange: (p: string) => void;
+}) {
+  if (platforms.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {platforms.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onChange(p)}
+          className={`inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${active === p
+              ? "bg-slate-800 text-white border-slate-800"
+              : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+            }`}
+        >
+          <PlatformIcon name={p} />
+          <span className="capitalize">{p}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Engagement Rate Breakdown: below / above average, filterable by platform + month ─────
+
 function EngagementRateTables({
   posts,
   loading,
@@ -1517,6 +1545,7 @@ function EngagementRateTables({
   posts: Post[];
   loading: boolean;
 }) {
+  const [selectedPlatform, setSelectedPlatform] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
   // Chỉ tính trên các bài có views > 0 để không làm lệch ER trung bình
@@ -1525,24 +1554,57 @@ function EngagementRateTables({
     [posts],
   );
 
-  const availableMonths = useMemo(() => {
+  // Danh sách platform thực sự có trong data
+  const availablePlatforms = useMemo(() => {
     const set = new Set<string>();
     postsWithViews.forEach((p) => {
+      if (p.platform) set.add(p.platform);
+    });
+    return Array.from(set).sort();
+  }, [postsWithViews]);
+
+  // Không còn nút "All platforms" nên cần tự chọn platform mặc định
+  // (platform đầu tiên có data) khi danh sách thay đổi hoặc lựa chọn hiện tại không còn hợp lệ.
+  useEffect(() => {
+    if (availablePlatforms.length === 0) {
+      if (selectedPlatform !== "") setSelectedPlatform("");
+      return;
+    }
+    if (!availablePlatforms.includes(selectedPlatform)) {
+      setSelectedPlatform(availablePlatforms[0]);
+    }
+  }, [availablePlatforms, selectedPlatform]);
+
+  const platformFilteredPosts = useMemo(() => {
+    if (!selectedPlatform) return [];
+    return postsWithViews.filter((p) => p.platform === selectedPlatform);
+  }, [postsWithViews, selectedPlatform]);
+
+  // Danh sách tháng chỉ tính trong phạm vi platform đang chọn
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    platformFilteredPosts.forEach((p) => {
       const m = getMonthLabel(p.date);
       if (m) set.add(m);
     });
     return Array.from(set).sort(
       (a, b) => monthLabelSortKey(b) - monthLabelSortKey(a),
     );
-  }, [postsWithViews]);
+  }, [platformFilteredPosts]);
+
+  // Đổi platform thì reset lại bộ lọc tháng, tránh rơi vào tháng không tồn tại ở platform mới
+  useEffect(() => {
+    setSelectedMonth("all");
+  }, [selectedPlatform]);
 
   const monthFilteredPosts = useMemo(() => {
-    if (selectedMonth === "all") return postsWithViews;
-    return postsWithViews.filter((p) => getMonthLabel(p.date) === selectedMonth);
-  }, [postsWithViews, selectedMonth]);
+    if (selectedMonth === "all") return platformFilteredPosts;
+    return platformFilteredPosts.filter(
+      (p) => getMonthLabel(p.date) === selectedMonth,
+    );
+  }, [platformFilteredPosts, selectedMonth]);
 
-  // ER trung bình (weighted): tổng likes+shares / tổng views của tập đang lọc.
-  // Lấy số này TRƯỚC rồi mới dùng nó để tách 2 bảng bên dưới / trên trung bình.
+  // ER trung bình (weighted): tổng likes+shares / tổng views của tập đang lọc (platform + tháng).
   const { avgEr, rows } = useMemo(() => {
     let sumViews = 0;
     let sumEngaged = 0;
@@ -1575,6 +1637,11 @@ function EngagementRateTables({
         <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">
             Engagement Rate Breakdown
+            {selectedPlatform && (
+              <span className="ml-1.5 normal-case font-semibold text-slate-400">
+                · {selectedPlatform}
+              </span>
+            )}
           </span>
           <span className="text-[10px] sm:text-xs font-mono text-slate-500">
             {loading
@@ -1582,11 +1649,27 @@ function EngagementRateTables({
               : `Avg ER: ${avgEr.toFixed(1)}% · ${rows.length} posts`}
           </span>
         </div>
-        <MonthFilterChips
-          months={availableMonths}
-          active={selectedMonth}
-          onChange={setSelectedMonth}
-        />
+
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <PlatformFilterChips
+            platforms={availablePlatforms}
+            active={selectedPlatform}
+            onChange={setSelectedPlatform}
+          />
+
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="text-[10px] sm:text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-300"
+          >
+            <option value="all">All months</option>
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -1595,6 +1678,30 @@ function EngagementRateTables({
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+          {/* Above average */}
+          <div className="p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-2.5 sm:mb-3 px-1">
+              <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wide text-emerald-600">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Above Average ERF
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400">
+                {aboveAvg.length} posts
+              </span>
+            </div>
+            <div className="space-y-1.5 sm:space-y-2 max-h-[420px] overflow-y-auto pr-1">
+              {aboveAvg.length === 0 ? (
+                <div className="flex items-center justify-center h-20 text-[12px] text-slate-400">
+                  No posts above average.
+                </div>
+              ) : (
+                aboveAvg.map((r, i) => (
+                  <ErPostRow key={r.id} row={r} rank={i + 1} />
+                ))
+              )}
+            </div>
+          </div>
+
           {/* Below average */}
           <div className="p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2.5 sm:mb-3 px-1">
@@ -1619,29 +1726,7 @@ function EngagementRateTables({
             </div>
           </div>
 
-          {/* Above average */}
-          <div className="p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2.5 sm:mb-3 px-1">
-              <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wide text-emerald-600">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Above Average ER
-              </span>
-              <span className="text-[10px] sm:text-[11px] text-slate-400">
-                {aboveAvg.length} posts
-              </span>
-            </div>
-            <div className="space-y-1.5 sm:space-y-2 max-h-[420px] overflow-y-auto pr-1">
-              {aboveAvg.length === 0 ? (
-                <div className="flex items-center justify-center h-20 text-[12px] text-slate-400">
-                  No posts above average.
-                </div>
-              ) : (
-                aboveAvg.map((r, i) => (
-                  <ErPostRow key={r.id} row={r} rank={i + 1} />
-                ))
-              )}
-            </div>
-          </div>
+
         </div>
       )}
     </div>
@@ -1955,9 +2040,9 @@ export default function InsightsPage() {
                           const er =
                             post.views > 0
                               ? (
-                                  ((post.likes + post.shares) / post.views) *
-                                  100
-                                ).toFixed(1)
+                                ((post.likes + post.shares) / post.views) *
+                                100
+                              ).toFixed(1)
                               : "0.0";
                           return (
                             <a
