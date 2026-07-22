@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -8,12 +8,18 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-} from 'recharts';
+} from "recharts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 // Loại nội dung của bài post
-type ContentType = 'video' | 'image' | 'carousel' | 'text' | 'story' | 'unknown';
+type ContentType =
+  | "video"
+  | "image"
+  | "carousel"
+  | "text"
+  | "story"
+  | "unknown";
 
 type Post = {
   id: string | number;
@@ -47,7 +53,7 @@ type TimeEngagementData = {
   full_day_stats: TimeEngagementHour[];
 };
 
-type PlatformKey = 'tiktok' | 'facebook' | 'instagram' | 'youtube';
+type PlatformKey = "tiktok" | "facebook" | "instagram" | "youtube";
 
 type TimeEngagementDayStat = {
   end_time: string;
@@ -57,143 +63,203 @@ type TimeEngagementDayStat = {
 
 type TimeEngagementWeeklyData = Record<string, TimeEngagementDayStat>;
 
-
 type TimeEngagementMonthlyDayStat = {
   top3_vn_times: string[];
   full_day_stats: { vn_hour: number; followers_online: number }[];
 };
 
 // monthKey (vd "Jan-2022") -> weekdayLabel VN (vd "Thứ 2") -> stat
-type TimeEngagementMonthlyData = Record<string, Record<string, TimeEngagementMonthlyDayStat>>;
+type TimeEngagementMonthlyData = Record<
+  string,
+  Record<string, TimeEngagementMonthlyDayStat>
+>;
 
 // Map display day labels (EN, shared with post-history grid) -> backend response keys (VN)
 const VN_WEEKDAY_MAP: Record<string, string> = {
-  Mon: 'Thứ 2',
-  Tue: 'Thứ 3',
-  Wed: 'Thứ 4',
-  Thu: 'Thứ 5',
-  Fri: 'Thứ 6',
-  Sat: 'Thứ 7',
-  Sun: 'Chủ Nhật',
+  Mon: "Thứ 2",
+  Tue: "Thứ 3",
+  Wed: "Thứ 4",
+  Thu: "Thứ 5",
+  Fri: "Thứ 6",
+  Sat: "Thứ 7",
+  Sun: "Chủ Nhật",
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const API_BASE_URL = 'https://thegivecollective-backend.vercel.app/api/v1';
+const API_BASE_URL = "https://thegivecollective-backend.vercel.app/api/v1";
 
 const REAL_DEMOGRAPHICS_SNAPSHOT: DemographicRow[] = [
-  { age: '13-17', female: 8,  male: 6,  undisclosed: 10 },
-  { age: '18-24', female: 33, male: 25, undisclosed: 30 },
-  { age: '25-34', female: 62, male: 48, undisclosed: 26 },
-  { age: '35-44', female: 61, male: 35, undisclosed: 16 },
-  { age: '45-54', female: 22, male: 11, undisclosed: 7  },
-  { age: '55-64', female: 13, male: 4,  undisclosed: 1  },
-  { age: '65+',   female: 1,  male: 2,  undisclosed: 1  },
+  { age: "13-17", female: 8, male: 6, undisclosed: 10 },
+  { age: "18-24", female: 33, male: 25, undisclosed: 30 },
+  { age: "25-34", female: 62, male: 48, undisclosed: 26 },
+  { age: "35-44", female: 61, male: 35, undisclosed: 16 },
+  { age: "45-54", female: 22, male: 11, undisclosed: 7 },
+  { age: "55-64", female: 13, male: 4, undisclosed: 1 },
+  { age: "65+", female: 1, male: 2, undisclosed: 1 },
 ];
 
-const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => i * 2);
 
 const PLATFORM_TABS: { key: PlatformKey; label: string }[] = [
-  { key: 'tiktok', label: 'TikTok' },
-  { key: 'facebook', label: 'Facebook' },
-  { key: 'instagram', label: 'Instagram' },
-  { key: 'youtube', label: 'YouTube' },
+  { key: "tiktok", label: "TikTok" },
+  { key: "facebook", label: "Facebook" },
+  { key: "instagram", label: "Instagram" },
+  { key: "youtube", label: "YouTube" },
 ];
 
 // Metadata hiển thị cho từng content type: nhãn, icon, màu sắc
-const CONTENT_TYPE_META: Record<ContentType, { label: string; icon: string; className: string }> = {
-  video:     { label: 'Video',     icon: '▶',  className: 'bg-violet-100 text-violet-700 border-violet-200' },
-  image:     { label: 'Image',     icon: '🖼',  className: 'bg-sky-100 text-sky-700 border-sky-200' },
-  carousel:  { label: 'Carousel',  icon: '▦',  className: 'bg-amber-100 text-amber-700 border-amber-200' },
-  story:     { label: 'Story',     icon: '◐',  className: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' },
-  text:      { label: 'Text',      icon: '✎',  className: 'bg-slate-100 text-slate-600 border-slate-200' },
-  unknown:   { label: 'Other',     icon: '•',  className: 'bg-slate-100 text-slate-500 border-slate-200' },
+const CONTENT_TYPE_META: Record<
+  ContentType,
+  { label: string; icon: string; className: string }
+> = {
+  video: {
+    label: "Video",
+    icon: "▶",
+    className: "bg-violet-100 text-violet-700 border-violet-200",
+  },
+  image: {
+    label: "Image",
+    icon: "🖼",
+    className: "bg-sky-100 text-sky-700 border-sky-200",
+  },
+  carousel: {
+    label: "Carousel",
+    icon: "▦",
+    className: "bg-amber-100 text-amber-700 border-amber-200",
+  },
+  story: {
+    label: "Story",
+    icon: "◐",
+    className: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
+  },
+  text: {
+    label: "Text",
+    icon: "✎",
+    className: "bg-slate-100 text-slate-600 border-slate-200",
+  },
+  unknown: {
+    label: "Other",
+    icon: "•",
+    className: "bg-slate-100 text-slate-500 border-slate-200",
+  },
 };
 
-const CONTENT_TYPE_ORDER: ContentType[] = ['video', 'image', 'carousel', 'story', 'text', 'unknown'];
+const CONTENT_TYPE_ORDER: ContentType[] = [
+  "video",
+  "image",
+  "carousel",
+  "story",
+  "text",
+  "unknown",
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString();
 }
 
 function splitDateTime(dateStr: string): { date: string; time: string } {
-  if (!dateStr) return { date: '—', time: '' };
-  const [datePart, timePart] = dateStr.split(' ');
-  return { date: datePart || '—', time: timePart || '' };
+  if (!dateStr) return { date: "—", time: "" };
+  const [datePart, timePart] = dateStr.split(" ");
+  return { date: datePart || "—", time: timePart || "" };
 }
 
 // Chuẩn hoá content type từ nhiều nguồn field/giá trị khác nhau của backend
 function normalizeContentType(raw: any): ContentType {
   const val = String(
     raw?.contentType ??
-    raw?.content_type ??
-    raw?.mediaType ??
-    raw?.media_type ??
-    raw?.type ??
-    ''
-  ).toLowerCase().trim();
+      raw?.content_type ??
+      raw?.mediaType ??
+      raw?.media_type ??
+      raw?.type ??
+      "",
+  )
+    .toLowerCase()
+    .trim();
 
-  if (!val) return 'unknown';
+  if (!val) return "unknown";
 
-  if (['video', 'reel', 'reels', 'short', 'shorts'].includes(val)) return 'video';
-  if (['image', 'photo', 'picture', 'img'].includes(val)) return 'image';
-  if (['carousel', 'album', 'sidecar', 'gallery'].includes(val)) return 'carousel';
-  if (['story', 'stories'].includes(val)) return 'story';
-  if (['text', 'status', 'note'].includes(val)) return 'text';
+  if (["video", "reel", "reels", "short", "shorts"].includes(val))
+    return "video";
+  if (["image", "photo", "picture", "img"].includes(val)) return "image";
+  if (["carousel", "album", "sidecar", "gallery"].includes(val))
+    return "carousel";
+  if (["story", "stories"].includes(val)) return "story";
+  if (["text", "status", "note"].includes(val)) return "text";
 
-  return 'unknown';
+  return "unknown";
 }
 
 function normalizeTopPosts(raw: any): Post[] {
   let rawArray: any[] = [];
   if (Array.isArray(raw)) {
     rawArray = raw;
-  } else if (raw && typeof raw === 'object' && Array.isArray(raw.posts)) {
+  } else if (raw && typeof raw === "object" && Array.isArray(raw.posts)) {
     rawArray = raw.posts;
   }
   const flatDocs = rawArray.flat();
 
   return flatDocs.map((doc, idx) => ({
     id: doc._id || idx + 1,
-    platform: doc.platform || 'Unknown',
-    title: doc.title || '(No title)',
+    platform: doc.platform || "Unknown",
+    title: doc.title || "(No title)",
     views: doc.views || 0,
     likes: doc.likes || 0,
     shares: doc.shares || 0,
-    date: doc.date || '',
-    url: doc.url || '',
+    date: doc.date || "",
+    url: doc.url || "",
     contentType: normalizeContentType(doc),
-    rawMediaType: doc.rawMediaType || doc.mediaType || doc.media_type || '',
+    rawMediaType: doc.rawMediaType || doc.mediaType || doc.media_type || "",
   }));
 }
 
 // ─── Trend styles ──────────────────────────────────────────────────────────────
 
 const TREND = {
-  up:   { dot: 'bg-emerald-500', border: 'border-emerald-200', bg: 'bg-emerald-50/60' },
-  down: { dot: 'bg-rose-500',    border: 'border-rose-200',    bg: 'bg-rose-50/60' },
-  none: { dot: 'bg-slate-400',   border: 'border-slate-100',   bg: 'bg-slate-50' },
+  up: {
+    dot: "bg-emerald-500",
+    border: "border-emerald-200",
+    bg: "bg-emerald-50/60",
+  },
+  down: { dot: "bg-rose-500", border: "border-rose-200", bg: "bg-rose-50/60" },
+  none: { dot: "bg-slate-400", border: "border-slate-100", bg: "bg-slate-50" },
 };
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
 function StatCard({
-  label, value, sub, colorKey,
+  label,
+  value,
+  sub,
+  colorKey,
 }: {
-  label: string; value: string; sub: string; colorKey: keyof typeof TREND;
+  label: string;
+  value: string;
+  sub: string;
+  colorKey: keyof typeof TREND;
 }) {
   const s = TREND[colorKey];
   return (
-    <div className={`relative rounded-2xl border p-4 sm:p-5 ${s.border} ${s.bg}`}>
-      <span className={`absolute top-4 right-4 w-2 h-2 rounded-full ${s.dot}`} />
-      <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 sm:mb-3">{label}</p>
-      <p className="text-2xl sm:text-3xl font-bold tabular-nums text-slate-800">{value}</p>
-      <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs text-slate-400">{sub}</p>
+    <div
+      className={`relative rounded-2xl border p-4 sm:p-5 ${s.border} ${s.bg}`}
+    >
+      <span
+        className={`absolute top-4 right-4 w-2 h-2 rounded-full ${s.dot}`}
+      />
+      <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 sm:mb-3">
+        {label}
+      </p>
+      <p className="text-2xl sm:text-3xl font-bold tabular-nums text-slate-800">
+        {value}
+      </p>
+      <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs text-slate-400">
+        {sub}
+      </p>
     </div>
   );
 }
@@ -204,10 +270,19 @@ function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl border border-gray-100 bg-white/95 backdrop-blur shadow-xl px-3 py-2 sm:px-4 sm:py-3 min-w-[120px] sm:min-w-[130px]">
-      <p className="text-[10px] sm:text-xs text-slate-400 mb-1 font-medium">{label}</p>
+      <p className="text-[10px] sm:text-xs text-slate-400 mb-1 font-medium">
+        {label}
+      </p>
       {payload.map((p: any) => (
-        <p key={p.dataKey} className="text-xs sm:text-sm font-bold tabular-nums" style={{ color: p.fill }}>
-          {fmtNum(p.value)} <span className="font-normal text-slate-400">{p.name ?? p.dataKey}</span>
+        <p
+          key={p.dataKey}
+          className="text-xs sm:text-sm font-bold tabular-nums"
+          style={{ color: p.fill }}
+        >
+          {fmtNum(p.value)}{" "}
+          <span className="font-normal text-slate-400">
+            {p.name ?? p.dataKey}
+          </span>
         </p>
       ))}
     </div>
@@ -218,17 +293,22 @@ function ChartTooltip({ active, payload, label }: any) {
 
 function PlatformIcon({ name }: { name: string }) {
   const map: Record<string, { bg: string; label: string }> = {
-    tiktok:    { bg: 'bg-black',        label: 'TK' },
-    facebook:  { bg: 'bg-blue-600',     label: 'FB' },
-    instagram: { bg: 'bg-pink-500',     label: 'IG' },
-    twitter:   { bg: 'bg-sky-500',      label: 'TW' },
-    youtube:   { bg: 'bg-red-600',      label: 'YT' },
-    linkedin:  { bg: 'bg-blue-700',     label: 'LI' },
-    threads:   { bg: 'bg-gray-800',     label: 'TH' },
+    tiktok: { bg: "bg-black", label: "TK" },
+    facebook: { bg: "bg-blue-600", label: "FB" },
+    instagram: { bg: "bg-pink-500", label: "IG" },
+    twitter: { bg: "bg-sky-500", label: "TW" },
+    youtube: { bg: "bg-red-600", label: "YT" },
+    linkedin: { bg: "bg-blue-700", label: "LI" },
+    threads: { bg: "bg-gray-800", label: "TH" },
   };
-  const p = map[name.toLowerCase()] ?? { bg: 'bg-slate-500', label: name.slice(0, 2).toUpperCase() };
+  const p = map[name.toLowerCase()] ?? {
+    bg: "bg-slate-500",
+    label: name.slice(0, 2).toUpperCase(),
+  };
   return (
-    <span className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-md text-white text-[10px] sm:text-xs font-bold ${p.bg}`}>
+    <span
+      className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-md text-white text-[10px] sm:text-xs font-bold ${p.bg}`}
+    >
       {p.label}
     </span>
   );
@@ -252,18 +332,24 @@ function ContentTypeBadge({ type }: { type: ContentType }) {
 // ─── Content Type Filter Chips ──────────────────────────────────────────────────
 
 function ContentTypeFilterChips({
-  availableTypes, active, onChange,
-}: { availableTypes: ContentType[]; active: ContentType | 'all'; onChange: (t: ContentType | 'all') => void }) {
+  availableTypes,
+  active,
+  onChange,
+}: {
+  availableTypes: ContentType[];
+  active: ContentType | "all";
+  onChange: (t: ContentType | "all") => void;
+}) {
   if (availableTypes.length === 0) return null;
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       <button
         type="button"
-        onClick={() => onChange('all')}
+        onClick={() => onChange("all")}
         className={`text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${
-          active === 'all'
-            ? 'bg-slate-800 text-white border-slate-800'
-            : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+          active === "all"
+            ? "bg-slate-800 text-white border-slate-800"
+            : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
         }`}
       >
         All types
@@ -278,7 +364,7 @@ function ContentTypeFilterChips({
             onClick={() => onChange(t)}
             className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${
               isActive
-                ? 'bg-slate-800 text-white border-slate-800'
+                ? "bg-slate-800 text-white border-slate-800"
                 : `${meta.className} hover:opacity-80`
             }`}
           >
@@ -295,28 +381,32 @@ function ContentTypeFilterChips({
 
 function ContentTypePerformanceCard({ posts }: { posts: Post[] }) {
   const chartData = useMemo(() => {
-    const buckets: Record<string, { views: number; likes: number; shares: number; count: number }> = {};
+    const buckets: Record<
+      string,
+      { views: number; likes: number; shares: number; count: number }
+    > = {};
 
     for (const p of posts) {
       const key = p.contentType;
-      if (!buckets[key]) buckets[key] = { views: 0, likes: 0, shares: 0, count: 0 };
+      if (!buckets[key])
+        buckets[key] = { views: 0, likes: 0, shares: 0, count: 0 };
       buckets[key].views += p.views;
       buckets[key].likes += p.likes;
       buckets[key].shares += p.shares;
       buckets[key].count += 1;
     }
 
-    return CONTENT_TYPE_ORDER
-      .filter((t) => buckets[t] && buckets[t].count > 0)
-      .map((t) => {
-        const b = buckets[t];
-        return {
-          type: CONTENT_TYPE_META[t].label,
-          avgViews: Math.round(b.views / b.count),
-          avgLikes: Math.round(b.likes / b.count),
-          count: b.count,
-        };
-      });
+    return CONTENT_TYPE_ORDER.filter(
+      (t) => buckets[t] && buckets[t].count > 0,
+    ).map((t) => {
+      const b = buckets[t];
+      return {
+        type: CONTENT_TYPE_META[t].label,
+        avgViews: Math.round(b.views / b.count),
+        avgLikes: Math.round(b.likes / b.count),
+        count: b.count,
+      };
+    });
   }, [posts]);
 
   if (chartData.length === 0) {
@@ -336,21 +426,61 @@ function ContentTypePerformanceCard({ posts }: { posts: Post[] }) {
       <div className="p-3 sm:p-4">
         <div className="h-[240px] sm:h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis dataKey="type" tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f8fafc' }} />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} />
-              <Bar dataKey="avgViews" name="Avg Views" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={28} />
-              <Bar dataKey="avgLikes" name="Avg Likes" fill="#a5b4fc" radius={[4, 4, 0, 0]} barSize={28} />
+            <BarChart
+              data={chartData}
+              margin={{ top: 8, right: 16, bottom: 0, left: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#e2e8f0"
+              />
+              <XAxis
+                dataKey="type"
+                tick={{ fontSize: 10, fill: "#64748b", fontWeight: 600 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                content={<ChartTooltip />}
+                cursor={{ fill: "#f8fafc" }}
+              />
+              <Legend
+                iconType="circle"
+                wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }}
+              />
+              <Bar
+                dataKey="avgViews"
+                name="Avg Views"
+                fill="#6366f1"
+                radius={[4, 4, 0, 0]}
+                barSize={28}
+              />
+              <Bar
+                dataKey="avgLikes"
+                name="Avg Likes"
+                fill="#a5b4fc"
+                radius={[4, 4, 0, 0]}
+                barSize={28}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {chartData.map((d) => (
-            <span key={d.type} className="text-[10px] sm:text-[11px] text-slate-400">
-              {d.type}: <span className="font-semibold text-slate-600">{d.count} posts</span>
+            <span
+              key={d.type}
+              className="text-[10px] sm:text-[11px] text-slate-400"
+            >
+              {d.type}:{" "}
+              <span className="font-semibold text-slate-600">
+                {d.count} posts
+              </span>
             </span>
           ))}
         </div>
@@ -376,9 +506,9 @@ type ContentTypeRow = {
 // Chuyển raw value (vd: "CAROUSEL_ALBUM", "photo", "blog_post") thành nhãn dễ đọc,
 // không cần phải khớp với 1 danh sách cố định — cứ có giá trị gì thì hiển thị giá trị đó.
 function formatTypeLabel(raw: string): string {
-  if (!raw) return 'Unknown';
+  if (!raw) return "Unknown";
   return raw
-    .replace(/[_-]/g, ' ')
+    .replace(/[_-]/g, " ")
     .trim()
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -386,16 +516,34 @@ function formatTypeLabel(raw: string): string {
 
 function useContentTypeBreakdown(posts: Post[]): ContentTypeRow[] {
   return useMemo(() => {
-    const groups: Record<string, { count: number; views: number; likes: number; shares: number; platforms: Set<string> }> = {};
+    const groups: Record<
+      string,
+      {
+        count: number;
+        views: number;
+        likes: number;
+        shares: number;
+        platforms: Set<string>;
+      }
+    > = {};
 
     for (const p of posts) {
       // Ưu tiên contentType đã chuẩn hoá, fallback về rawMediaType nếu có,
       // cuối cùng mới rơi về 'unknown' — không giới hạn theo 1 danh sách cố định.
-      const raw = (p.contentType && p.contentType !== 'unknown' ? p.contentType : p.rawMediaType) || 'unknown';
-      const key = String(raw).trim() || 'unknown';
+      const raw =
+        (p.contentType && p.contentType !== "unknown"
+          ? p.contentType
+          : p.rawMediaType) || "unknown";
+      const key = String(raw).trim() || "unknown";
 
       if (!groups[key]) {
-        groups[key] = { count: 0, views: 0, likes: 0, shares: 0, platforms: new Set() };
+        groups[key] = {
+          count: 0,
+          views: 0,
+          likes: 0,
+          shares: 0,
+          platforms: new Set(),
+        };
       }
       groups[key].count += 1;
       groups[key].views += p.views || 0;
@@ -413,14 +561,23 @@ function useContentTypeBreakdown(posts: Post[]): ContentTypeRow[] {
         avgViews: Math.round(g.views / g.count),
         avgLikes: Math.round(g.likes / g.count),
         avgShares: Math.round(g.shares / g.count),
-        engagementRate: g.views > 0 ? (((g.likes + g.shares) / g.views) * 100).toFixed(1) : '0.0',
+        engagementRate:
+          g.views > 0
+            ? (((g.likes + g.shares) / g.views) * 100).toFixed(1)
+            : "0.0",
         platforms: Array.from(g.platforms),
       }))
       .sort((a, b) => b.count - a.count);
   }, [posts]);
 }
 
-function ContentTypeBreakdownTable({ posts, loading }: { posts: Post[]; loading: boolean }) {
+function ContentTypeBreakdownTable({
+  posts,
+  loading,
+}: {
+  posts: Post[];
+  loading: boolean;
+}) {
   const rows = useContentTypeBreakdown(posts);
 
   return (
@@ -430,37 +587,57 @@ function ContentTypeBreakdownTable({ posts, loading }: { posts: Post[]; loading:
           Content Type Breakdown
         </span>
         <span className="text-[10px] sm:text-xs font-mono text-indigo-400">
-          {loading ? 'Loading...' : `${rows.length} type${rows.length === 1 ? '' : 's'} found`}
+          {loading
+            ? "Loading..."
+            : `${rows.length} type${rows.length === 1 ? "" : "s"} found`}
         </span>
       </div>
 
       {rows.length === 0 ? (
         <div className="flex items-center justify-center h-24 text-[13px] sm:text-sm text-slate-400">
-          {loading ? 'Loading...' : 'No content type data available yet.'}
+          {loading ? "Loading..." : "No content type data available yet."}
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400">Type</th>
-                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400">Platforms</th>
-                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Posts</th>
-                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Total Views</th>
-                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Avg Views</th>
-                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Avg Likes</th>
-                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">Avg Shares</th>
-                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-indigo-500 text-right">Eng. Rate</th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Type
+                </th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Platforms
+                </th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">
+                  Posts
+                </th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">
+                  Total Views
+                </th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">
+                  Avg Views
+                </th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">
+                  Avg Likes
+                </th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 text-right">
+                  Avg Shares
+                </th>
+                <th className="px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-indigo-500 text-right">
+                  Eng. Rate
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, idx) => (
                 <tr
                   key={r.key}
-                  className={`border-b border-slate-100 last:border-0 ${idx % 2 === 1 ? 'bg-slate-50/40' : ''}`}
+                  className={`border-b border-slate-100 last:border-0 ${idx % 2 === 1 ? "bg-slate-50/40" : ""}`}
                 >
                   <td className="px-4 py-2.5">
-                    <span className="text-xs sm:text-[13px] font-semibold text-slate-700">{r.label}</span>
+                    <span className="text-xs sm:text-[13px] font-semibold text-slate-700">
+                      {r.label}
+                    </span>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1 flex-wrap">
@@ -469,12 +646,24 @@ function ContentTypeBreakdownTable({ posts, loading }: { posts: Post[]; loading:
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] font-bold tabular-nums text-slate-700">{r.count}</td>
-                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.totalViews)}</td>
-                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.avgViews)}</td>
-                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.avgLikes)}</td>
-                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">{fmtNum(r.avgShares)}</td>
-                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] font-bold tabular-nums text-indigo-600">{r.engagementRate}%</td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] font-bold tabular-nums text-slate-700">
+                    {r.count}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">
+                    {fmtNum(r.totalViews)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">
+                    {fmtNum(r.avgViews)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">
+                    {fmtNum(r.avgLikes)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] tabular-nums text-slate-600">
+                    {fmtNum(r.avgShares)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs sm:text-[13px] font-bold tabular-nums text-indigo-600">
+                    {r.engagementRate}%
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -488,10 +677,17 @@ function ContentTypeBreakdownTable({ posts, loading }: { posts: Post[]; loading:
 // ─── Platform navbar switcher ───────────────────────────────────────────────────
 
 function PlatformSwitcher({
-  active, onChange,
-}: { active: PlatformKey; onChange: (p: PlatformKey) => void }) {
+  active,
+  onChange,
+}: {
+  active: PlatformKey;
+  onChange: (p: PlatformKey) => void;
+}) {
   return (
-    <div className="w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 hide-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+    <div
+      className="w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 hide-scrollbar"
+      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+    >
       <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm min-w-max">
         {PLATFORM_TABS.map((p) => (
           <button
@@ -500,8 +696,8 @@ function PlatformSwitcher({
             onClick={() => onChange(p.key)}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors ${
               active === p.key
-                ? 'bg-slate-800 text-white'
-                : 'text-slate-500 hover:bg-slate-50'
+                ? "bg-slate-800 text-white"
+                : "text-slate-500 hover:bg-slate-50"
             }`}
           >
             <PlatformIcon name={p.key} />
@@ -520,7 +716,7 @@ type HeatCell = { count: number; totalViews: number };
 function usePostHistoryGrid(posts: Post[]) {
   return useMemo(() => {
     const g: HeatCell[][] = Array.from({ length: 7 }, () =>
-      Array.from({ length: 24 }, () => ({ count: 0, totalViews: 0 }))
+      Array.from({ length: 24 }, () => ({ count: 0, totalViews: 0 })),
     );
 
     for (const post of posts) {
@@ -528,13 +724,13 @@ function usePostHistoryGrid(posts: Post[]) {
       const { time } = splitDateTime(post.date);
       if (!time) continue;
 
-      const parsed = new Date(post.date.replace(' ', 'T'));
+      const parsed = new Date(post.date.replace(" ", "T"));
       if (isNaN(parsed.getTime())) continue;
 
       // Cộng thêm 1 giờ để chuyển sang giờ SGT
       parsed.setHours(parsed.getHours() + 1);
 
-      const dayIdx = (parsed.getDay() + 6) % 7; 
+      const dayIdx = (parsed.getDay() + 6) % 7;
       const hourIdx = parsed.getHours();
 
       g[dayIdx][hourIdx].count += 1;
@@ -555,21 +751,34 @@ function usePostHistoryGrid(posts: Post[]) {
       }
     }
 
-    return { grid: g, minAvg: any ? min : 0, maxAvg: any ? max : 0, hasData: any };
+    return {
+      grid: g,
+      minAvg: any ? min : 0,
+      maxAvg: any ? max : 0,
+      hasData: any,
+    };
   }, [posts]);
 }
 
 function PostHistoryGridView({
-  grid, minAvg, maxAvg, hasData, loading,
+  grid,
+  minAvg,
+  maxAvg,
+  hasData,
+  loading,
 }: {
-  grid: HeatCell[][]; minAvg: number; maxAvg: number; hasData: boolean; loading: boolean;
+  grid: HeatCell[][];
+  minAvg: number;
+  maxAvg: number;
+  hasData: boolean;
+  loading: boolean;
 }) {
   const cellColor = (cell: HeatCell) => {
-    if (cell.count === 0) return '#eef2f7';
-    if (maxAvg === minAvg) return 'hsl(205, 85%, 55%)';
+    if (cell.count === 0) return "#eef2f7";
+    if (maxAvg === minAvg) return "hsl(205, 85%, 55%)";
     const avg = cell.totalViews / cell.count;
-    const normalized = (avg - minAvg) / (maxAvg - minAvg); 
-    const lightness = 88 - normalized * 68; 
+    const normalized = (avg - minAvg) / (maxAvg - minAvg);
+    const lightness = 88 - normalized * 68;
     return `hsl(205, 85%, ${lightness}%)`;
   };
 
@@ -587,7 +796,10 @@ function PostHistoryGridView({
         <span className="tabular-nums">{fmtNum(minAvg)}</span>
         <span
           className="h-2 sm:h-2.5 w-24 sm:w-32 rounded-full"
-          style={{ background: 'linear-gradient(to right, hsl(205,85%,88%), hsl(205,85%,20%))' }}
+          style={{
+            background:
+              "linear-gradient(to right, hsl(205,85%,88%), hsl(205,85%,20%))",
+          }}
         />
         <span className="tabular-nums">{fmtNum(maxAvg)}</span>
         <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
@@ -599,13 +811,18 @@ function PostHistoryGridView({
       <div className="overflow-x-auto pb-2">
         <div className="min-w-[650px] sm:min-w-[720px]">
           {WEEKDAY_LABELS.map((day, dayIdx) => (
-            <div key={day} className="flex items-center gap-1 sm:gap-1.5 mb-1.5">
-              <span className="w-8 sm:w-9 text-[10px] sm:text-[11px] text-slate-400 text-right pr-1 sm:pr-2 shrink-0">{day}</span>
+            <div
+              key={day}
+              className="flex items-center gap-1 sm:gap-1.5 mb-1.5"
+            >
+              <span className="w-8 sm:w-9 text-[10px] sm:text-[11px] text-slate-400 text-right pr-1 sm:pr-2 shrink-0">
+                {day}
+              </span>
               <div className="flex gap-[3px] sm:gap-[4px] flex-1">
                 {grid[dayIdx].map((cell, hourIdx) => (
                   <div
                     key={hourIdx}
-                    title={`${day} ${String(hourIdx).padStart(2, '0')}:00 SGT — ${cell.count} posts, ${fmtNum(cell.totalViews)} views`}
+                    title={`${day} ${String(hourIdx).padStart(2, "0")}:00 SGT — ${cell.count} posts, ${fmtNum(cell.totalViews)} views`}
                     className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
                     style={{ backgroundColor: cellColor(cell) }}
                   >
@@ -630,7 +847,7 @@ function PostHistoryGridView({
                   className="absolute text-[9px] sm:text-[10px] text-slate-400 -translate-x-1/2"
                   style={{ left: `${(h / 24) * 100}%` }}
                 >
-                  {String(h).padStart(2, '0')}:00
+                  {String(h).padStart(2, "0")}:00
                 </span>
               ))}
             </div>
@@ -644,8 +861,14 @@ function PostHistoryGridView({
 // ─── Big single-panel card: TikTok / Facebook / YouTube ───────────────
 
 function BestTimeBigCard({
-  platform, posts, loading,
-}: { platform: 'tiktok' | 'facebook' | 'youtube'; posts: Post[]; loading: boolean }) {
+  platform,
+  posts,
+  loading,
+}: {
+  platform: "tiktok" | "facebook" | "youtube";
+  posts: Post[];
+  loading: boolean;
+}) {
   const { grid, minAvg, maxAvg, hasData } = usePostHistoryGrid(posts);
 
   return (
@@ -653,14 +876,22 @@ function BestTimeBigCard({
       <div className="px-4 py-3 sm:px-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <PlatformIcon name={platform} />
-          <span className="text-[13px] sm:text-sm font-bold text-slate-800">Best Time to Post (SGT)</span>
+          <span className="text-[13px] sm:text-sm font-bold text-slate-800">
+            Best Time to Post (SGT)
+          </span>
         </div>
         <span className="text-[11px] sm:text-xs font-mono text-slate-400">
-          {loading ? 'Loading...' : 'All time'}
+          {loading ? "Loading..." : "All time"}
         </span>
       </div>
       <div className="p-4 sm:p-6">
-        <PostHistoryGridView grid={grid} minAvg={minAvg} maxAvg={maxAvg} hasData={hasData} loading={loading} />
+        <PostHistoryGridView
+          grid={grid}
+          minAvg={minAvg}
+          maxAvg={maxAvg}
+          hasData={hasData}
+          loading={loading}
+        />
       </div>
     </div>
   );
@@ -670,13 +901,16 @@ function BestTimeBigCard({
 
 function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
   // --- Data source 1: theo tháng, mỗi tháng có 7 ngày x 24 giờ ---
-  const [feMonthlyData, setFeMonthlyData] = useState<TimeEngagementMonthlyData | null>(null);
+  const [feMonthlyData, setFeMonthlyData] =
+    useState<TimeEngagementMonthlyData | null>(null);
   const [feLoading, setFeLoading] = useState(false);
   const [feError, setFeError] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   // --- Data source 2: gộp theo giờ, không tách theo ngày ---
-  const [feDailyData, setFeDailyData] = useState<TimeEngagementData | null>(null);
+  const [feDailyData, setFeDailyData] = useState<TimeEngagementData | null>(
+    null,
+  );
   const [feDailyLoading, setFeDailyLoading] = useState(false);
   const [feDailyError, setFeDailyError] = useState(false);
 
@@ -685,21 +919,24 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
       setFeLoading(true);
       setFeError(false);
       try {
-        const res = await fetch(`${API_BASE_URL}/insights/time-engagement-monthly`);
+        const res = await fetch(
+          `${API_BASE_URL}/insights/time-engagement-monthly`,
+        );
         const json = await res.json();
-        if (!json.success) throw new Error(json.message || 'Fetch failed');
+        if (!json.success) throw new Error(json.message || "Fetch failed");
         setFeMonthlyData(json.data);
 
         // Tự chọn tháng gần nhất (sort theo thời gian thực, không theo alphabet)
         const monthKeys = Object.keys(json.data || {});
         if (monthKeys.length > 0) {
           const sorted = [...monthKeys].sort(
-            (a, b) => new Date(`1 ${a}`).getTime() - new Date(`1 ${b}`).getTime()
+            (a, b) =>
+              new Date(`1 ${a}`).getTime() - new Date(`1 ${b}`).getTime(),
           );
           setSelectedMonth(sorted[sorted.length - 1]);
         }
       } catch (err) {
-        console.error('Error loading time-engagement-monthly (IG):', err);
+        console.error("Error loading time-engagement-monthly (IG):", err);
         setFeError(true);
       } finally {
         setFeLoading(false);
@@ -712,10 +949,10 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
       try {
         const res = await fetch(`${API_BASE_URL}/insights/time-engagement`);
         const json = await res.json();
-        if (!json.success) throw new Error(json.message || 'Fetch failed');
+        if (!json.success) throw new Error(json.message || "Fetch failed");
         setFeDailyData(json.data);
       } catch (err) {
-        console.error('Error loading time-engagement (IG):', err);
+        console.error("Error loading time-engagement (IG):", err);
         setFeDailyError(true);
       } finally {
         setFeDailyLoading(false);
@@ -730,126 +967,165 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
   const availableMonths = useMemo(() => {
     const keys = Object.keys(feMonthlyData || {});
     return keys.sort(
-      (a, b) => new Date(`1 ${b}`).getTime() - new Date(`1 ${a}`).getTime()
+      (a, b) => new Date(`1 ${b}`).getTime() - new Date(`1 ${a}`).getTime(),
     );
   }, [feMonthlyData]);
 
   const feData = selectedMonth ? feMonthlyData?.[selectedMonth] : undefined;
 
   // Set (dayIdx-hourIdx) các bài post rơi vào đúng Thứ + Giờ (SGT) trong tháng đang chọn
-// Map "dayIdx-hourIdx" -> số bài post rơi vào đúng Thứ + Giờ (SGT) trong tháng đang chọn
-const postCountByCell = useMemo(() => {
-  const map = new Map<string, number>();
-  if (!selectedMonth) return map;
+  // Map "dayIdx-hourIdx" -> số bài post rơi vào đúng Thứ + Giờ (SGT) trong tháng đang chọn
+  const postCountByCell = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!selectedMonth) return map;
 
-  const [monShort, yearStr] = selectedMonth.split('-');
-  const refDate = new Date(`1 ${monShort} ${yearStr}`);
-  const targetMonth = refDate.getMonth();
-  const targetYear = refDate.getFullYear();
-
-  console.log('%c[IG monthly] selectedMonth:', 'color:#ec4899;font-weight:bold', selectedMonth, '-> targetMonth:', targetMonth, 'targetYear:', targetYear);
-
-  for (const p of posts) {
-    if (!p.date) continue;
-    const parts = p.date.trim().split(/\s+/);
-    if (parts.length < 2) continue;
-
-    const dPart = parts[0];
-    const tPart = parts[1].length === 5 ? parts[1] : parts[1].padStart(5, '0');
-
-    const vnLogicalDate = new Date(`${dPart}T${tPart}:00Z`);
-    if (isNaN(vnLogicalDate.getTime())) {
-      console.warn('[IG monthly] Không parse được date:', p.date);
-      continue;
-    }
-
-    if (vnLogicalDate.getUTCMonth() !== targetMonth || vnLogicalDate.getUTCFullYear() !== targetYear) {
-      continue; // không thuộc tháng đang chọn, bỏ qua log cho đỡ rối
-    }
-
-    const sgtLogicalDate = new Date(vnLogicalDate.getTime() + 1 * 3600 * 1000);
-    const dayIdx = (sgtLogicalDate.getUTCDay() + 6) % 7;
-    const hourIdx = sgtLogicalDate.getUTCHours();
-
-    const key = `${dayIdx}-${hourIdx}`;
-    map.set(key, (map.get(key) || 0) + 1);
+    const [monShort, yearStr] = selectedMonth.split("-");
+    const refDate = new Date(`1 ${monShort} ${yearStr}`);
+    const targetMonth = refDate.getMonth();
+    const targetYear = refDate.getFullYear();
 
     console.log(
-      `[IG monthly] raw date="${p.date}" (VN)` +
-      ` -> SGT hour=${String(hourIdx).padStart(2,'0')}:00` +
-      ` | weekday=${WEEKDAY_LABELS[dayIdx]} (dayIdx=${dayIdx})` +
-      ` | title="${String(p.title).slice(0, 30)}..."`
+      "%c[IG monthly] selectedMonth:",
+      "color:#ec4899;font-weight:bold",
+      selectedMonth,
+      "-> targetMonth:",
+      targetMonth,
+      "targetYear:",
+      targetYear,
     );
-  }
 
-  console.log('[IG monthly] Tổng kết postCountByCell:', Object.fromEntries(map));
+    for (const p of posts) {
+      if (!p.date) continue;
+      const parts = p.date.trim().split(/\s+/);
+      if (parts.length < 2) continue;
 
-  return map;
-}, [posts, selectedMonth]);
+      const dPart = parts[0];
+      const tPart =
+        parts[1].length === 5 ? parts[1] : parts[1].padStart(5, "0");
+
+      const vnLogicalDate = new Date(`${dPart}T${tPart}:00Z`);
+      if (isNaN(vnLogicalDate.getTime())) {
+        console.warn("[IG monthly] Không parse được date:", p.date);
+        continue;
+      }
+
+      if (
+        vnLogicalDate.getUTCMonth() !== targetMonth ||
+        vnLogicalDate.getUTCFullYear() !== targetYear
+      ) {
+        continue; // không thuộc tháng đang chọn, bỏ qua log cho đỡ rối
+      }
+
+      const sgtLogicalDate = new Date(
+        vnLogicalDate.getTime() + 1 * 3600 * 1000,
+      );
+      const dayIdx = (sgtLogicalDate.getUTCDay() + 6) % 7;
+      const hourIdx = sgtLogicalDate.getUTCHours();
+
+      const key = `${dayIdx}-${hourIdx}`;
+      map.set(key, (map.get(key) || 0) + 1);
+
+      console.log(
+        `[IG monthly] raw date="${p.date}" (VN)` +
+          ` -> SGT hour=${String(hourIdx).padStart(2, "0")}:00` +
+          ` | weekday=${WEEKDAY_LABELS[dayIdx]} (dayIdx=${dayIdx})` +
+          ` | title="${String(p.title).slice(0, 30)}..."`,
+      );
+    }
+
+    console.log(
+      "[IG monthly] Tổng kết postCountByCell:",
+      Object.fromEntries(map),
+    );
+
+    return map;
+  }, [posts, selectedMonth]);
 
   // Build lưới 7 ngày x 24 giờ từ data của tháng đang chọn, quy đổi VN -> SGT
-// Build lưới 7 ngày x 24 giờ từ data của tháng đang chọn, quy đổi VN -> SGT
-const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMonth } = useMemo(() => {
-  const g: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
-  const pCountGrid: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
+  // Build lưới 7 ngày x 24 giờ từ data của tháng đang chọn, quy đổi VN -> SGT
+  const {
+    feGrid,
+    feMin,
+    feMax,
+    feHasData,
+    actualPostCountGrid,
+    totalPostsThisMonth,
+  } = useMemo(() => {
+    const g: number[][] = Array.from({ length: 7 }, () =>
+      new Array(24).fill(0),
+    );
+    const pCountGrid: number[][] = Array.from({ length: 7 }, () =>
+      new Array(24).fill(0),
+    );
 
-  let min = Infinity;
-  let max = -Infinity;
-  let any = false;
+    let min = Infinity;
+    let max = -Infinity;
+    let any = false;
 
-  WEEKDAY_LABELS.forEach((label, dayIdx) => {
-    const vnKey = VN_WEEKDAY_MAP[label];
-    const dayStat = feData?.[vnKey];
-    if (!dayStat) return;
+    WEEKDAY_LABELS.forEach((label, dayIdx) => {
+      const vnKey = VN_WEEKDAY_MAP[label];
+      const dayStat = feData?.[vnKey];
+      if (!dayStat) return;
 
-    for (const h of dayStat.full_day_stats || []) {
-      if (h.vn_hour < 0 || h.vn_hour >= 24) continue;
+      for (const h of dayStat.full_day_stats || []) {
+        if (h.vn_hour < 0 || h.vn_hour >= 24) continue;
 
-      const sgtHour = (h.vn_hour + 1) % 24;
-      const targetDayIdx = h.vn_hour === 23 ? (dayIdx + 1) % 7 : dayIdx;
+        const sgtHour = (h.vn_hour + 1) % 24;
+        const targetDayIdx = h.vn_hour === 23 ? (dayIdx + 1) % 7 : dayIdx;
 
-      g[targetDayIdx][sgtHour] = h.followers_online;
-      any = true;
-      if (h.followers_online < min) min = h.followers_online;
-      if (h.followers_online > max) max = h.followers_online;
-    }
-  });
+        g[targetDayIdx][sgtHour] = h.followers_online;
+        any = true;
+        if (h.followers_online < min) min = h.followers_online;
+        if (h.followers_online > max) max = h.followers_online;
+      }
+    });
 
-  // Điền số lượng bài post thực tế vào TẤT CẢ các ô có trong postCountByCell
-  // (không chỉ những ô có data followers_online, vì bài post có thể rơi vào giờ chưa có data online_followers)
-  let totalPosts = 0;
-  postCountByCell.forEach((count, key) => {
-    const [dStr, hStr] = key.split('-');
-    const d = Number(dStr);
-    const h = Number(hStr);
-    pCountGrid[d][h] = count;
-    totalPosts += count;
-  });
+    // Điền số lượng bài post thực tế vào TẤT CẢ các ô có trong postCountByCell
+    // (không chỉ những ô có data followers_online, vì bài post có thể rơi vào giờ chưa có data online_followers)
+    let totalPosts = 0;
+    postCountByCell.forEach((count, key) => {
+      const [dStr, hStr] = key.split("-");
+      const d = Number(dStr);
+      const h = Number(hStr);
+      pCountGrid[d][h] = count;
+      totalPosts += count;
+    });
 
-  return {
-    feGrid: g,
-    feMin: any ? min : 0,
-    feMax: any ? max : 0,
-    feHasData: any,
-    actualPostCountGrid: pCountGrid,
-    totalPostsThisMonth: totalPosts,
-  };
-}, [feData, postCountByCell]);
+    return {
+      feGrid: g,
+      feMin: any ? min : 0,
+      feMax: any ? max : 0,
+      feHasData: any,
+      actualPostCountGrid: pCountGrid,
+      totalPostsThisMonth: totalPosts,
+    };
+  }, [feData, postCountByCell]);
 
   // Top 3 khung giờ tổng hợp trong tháng đang chọn (đã ở SGT vì feGrid đã quy đổi)
   const overallTop3SgtTimes = useMemo(() => {
     if (!feHasData) return [];
     const hourTotals = new Array(24).fill(0);
-    feGrid.forEach((day) => day.forEach((v, h) => { hourTotals[h] += v; }));
+    feGrid.forEach((day) =>
+      day.forEach((v, h) => {
+        hourTotals[h] += v;
+      }),
+    );
     return hourTotals
       .map((total, hour) => ({ hour, total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 3)
-      .map((t) => `${String(t.hour).padStart(2, '0')}:00`);
+      .map((t) => `${String(t.hour).padStart(2, "0")}:00`);
   }, [feGrid, feHasData]);
 
   // Build 1 hàng 24 giờ từ API daily, quy đổi sang SGT (giữ nguyên logic cũ)
-  const { dailyRow, dailyMin, dailyMax, dailyHasData, dailyRecSet, recommendedSgtTimes } = useMemo(() => {
+  const {
+    dailyRow,
+    dailyMin,
+    dailyMax,
+    dailyHasData,
+    dailyRecSet,
+    recommendedSgtTimes,
+  } = useMemo(() => {
     const hourly = new Array(24).fill(0);
     let any = false;
 
@@ -870,16 +1146,16 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
 
     const recSet = new Set(
       (feDailyData?.recommended_vn_times || []).map((t) => {
-        const vnHour = Number(t.split(':')[0]);
+        const vnHour = Number(t.split(":")[0]);
         return (vnHour + 1) % 24;
-      })
+      }),
     );
 
     const recSgtTimes = (feDailyData?.recommended_vn_times || []).map((t) => {
-      const vnHour = Number(t.split(':')[0]);
+      const vnHour = Number(t.split(":")[0]);
       if (isNaN(vnHour)) return t;
       const sgtHour = (vnHour + 1) % 24;
-      return `${String(sgtHour).padStart(2, '0')}:00`;
+      return `${String(sgtHour).padStart(2, "0")}:00`;
     });
 
     return {
@@ -892,9 +1168,14 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
     };
   }, [feDailyData]);
 
-  const cellColor = (value: number, hasData: boolean, min: number, max: number) => {
-    if (!hasData) return '#eef2f7';
-    if (max === min) return 'hsl(330, 75%, 55%)';
+  const cellColor = (
+    value: number,
+    hasData: boolean,
+    min: number,
+    max: number,
+  ) => {
+    if (!hasData) return "#eef2f7";
+    if (max === min) return "hsl(330, 75%, 55%)";
     const normalized = (value - min) / (max - min);
     const lightness = 88 - normalized * 68;
     return `hsl(330, 75%, ${lightness}%)`;
@@ -908,7 +1189,9 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
       <div className="px-4 py-3 sm:px-5 bg-pink-50/60 border-b border-pink-200 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <PlatformIcon name="instagram" />
-          <span className="text-[13px] sm:text-sm font-bold text-slate-800">Best Time to Post (SGT)</span>
+          <span className="text-[13px] sm:text-sm font-bold text-slate-800">
+            Best Time to Post (SGT)
+          </span>
         </div>
       </div>
 
@@ -944,8 +1227,8 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
                         onClick={() => setSelectedMonth(m)}
                         className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
                           selectedMonth === m
-                            ? 'bg-pink-600 text-white border-pink-600'
-                            : 'bg-white text-pink-600 border-pink-200 hover:bg-pink-50'
+                            ? "bg-pink-600 text-white border-pink-600"
+                            : "bg-white text-pink-600 border-pink-200 hover:bg-pink-50"
                         }`}
                       >
                         {m}
@@ -958,40 +1241,56 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
                   <span className="tabular-nums">{fmtNum(feMin)}</span>
                   <span
                     className="h-2 sm:h-2.5 w-24 sm:w-32 rounded-full"
-                    style={{ background: 'linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))' }}
+                    style={{
+                      background:
+                        "linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))",
+                    }}
                   />
                   <span className="tabular-nums">{fmtNum(feMax)}</span>
                   <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
                     <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
-                    Your posts 
+                    Your posts
                   </span>
                 </div>
 
                 <div className="overflow-x-auto pb-2">
                   <div className="min-w-[650px] sm:min-w-[720px]">
                     {WEEKDAY_LABELS.map((day, dayIdx) => (
-                      <div key={day} className="flex items-center gap-1 sm:gap-1.5 mb-1.5">
-                        <span className="w-8 sm:w-9 text-[10px] sm:text-[11px] text-slate-400 text-right pr-1 sm:pr-2 shrink-0">{day}</span>
+                      <div
+                        key={day}
+                        className="flex items-center gap-1 sm:gap-1.5 mb-1.5"
+                      >
+                        <span className="w-8 sm:w-9 text-[10px] sm:text-[11px] text-slate-400 text-right pr-1 sm:pr-2 shrink-0">
+                          {day}
+                        </span>
                         <div className="flex gap-[3px] sm:gap-[4px] flex-1">
-{feGrid[dayIdx].map((value, hourIdx) => {
-  const postCount = actualPostCountGrid[dayIdx][hourIdx];
-  return (
-    <div
-      key={hourIdx}
-      title={`${day} ${String(hourIdx).padStart(2, '0')}:00 SGT — ${fmtNum(value)} followers online, ${postCount} post${postCount === 1 ? '' : 's'} (${selectedMonth})`}
-      className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
-      style={{ backgroundColor: cellColor(value, feHasData, feMin, feMax) }}
-    >
-      {postCount > 0 && (
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 rounded-full bg-amber-400 text-white text-[8px] sm:text-[9px] font-bold leading-none shadow-sm">
-            {postCount}
-          </span>
-        </span>
-      )}
-    </div>
-  );
-})}
+                          {feGrid[dayIdx].map((value, hourIdx) => {
+                            const postCount =
+                              actualPostCountGrid[dayIdx][hourIdx];
+                            return (
+                              <div
+                                key={hourIdx}
+                                title={`${day} ${String(hourIdx).padStart(2, "0")}:00 SGT — ${fmtNum(value)} followers online, ${postCount} post${postCount === 1 ? "" : "s"} (${selectedMonth})`}
+                                className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
+                                style={{
+                                  backgroundColor: cellColor(
+                                    value,
+                                    feHasData,
+                                    feMin,
+                                    feMax,
+                                  ),
+                                }}
+                              >
+                                {postCount > 0 && (
+                                  <span className="absolute inset-0 flex items-center justify-center">
+                                    <span className="flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 rounded-full bg-amber-400 text-white text-[8px] sm:text-[9px] font-bold leading-none shadow-sm">
+                                      {postCount}
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
@@ -1005,15 +1304,13 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
                             className="absolute text-[9px] sm:text-[10px] text-slate-400 -translate-x-1/2"
                             style={{ left: `${(h / 24) * 100}%` }}
                           >
-                            {String(h).padStart(2, '0')}:00
+                            {String(h).padStart(2, "0")}:00
                           </span>
                         ))}
                       </div>
                     </div>
                   </div>
                 </div>
-
-
               </div>
             )}
 
@@ -1034,7 +1331,10 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
                   <span className="tabular-nums">{fmtNum(dailyMin)}</span>
                   <span
                     className="h-2 sm:h-2.5 w-24 sm:w-32 rounded-full"
-                    style={{ background: 'linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))' }}
+                    style={{
+                      background:
+                        "linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))",
+                    }}
                   />
                   <span className="tabular-nums">{fmtNum(dailyMax)}</span>
                   <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
@@ -1049,9 +1349,16 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
                       {dailyRow.map((value, hourIdx) => (
                         <div
                           key={hourIdx}
-                          title={`${String(hourIdx).padStart(2, '0')}:00 SGT — ${fmtNum(value)} followers online`}
+                          title={`${String(hourIdx).padStart(2, "0")}:00 SGT — ${fmtNum(value)} followers online`}
                           className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
-                          style={{ backgroundColor: cellColor(value, dailyHasData, dailyMin, dailyMax) }}
+                          style={{
+                            backgroundColor: cellColor(
+                              value,
+                              dailyHasData,
+                              dailyMin,
+                              dailyMax,
+                            ),
+                          }}
                         >
                           {dailyRecSet.has(hourIdx) && (
                             <span className="absolute inset-0 flex items-center justify-center">
@@ -1069,7 +1376,7 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
                           className="absolute text-[9px] sm:text-[10px] text-slate-400 -translate-x-1/2"
                           style={{ left: `${(h / 24) * 100}%` }}
                         >
-                          {String(h).padStart(2, '0')}:00
+                          {String(h).padStart(2, "0")}:00
                         </span>
                       ))}
                     </div>
@@ -1078,7 +1385,9 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
 
                 {recommendedSgtTimes.length > 0 && (
                   <div className="mt-4 sm:mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
-                    <p className="text-[11px] sm:text-xs text-pink-700 font-semibold mb-1.5">Best times to post:</p>
+                    <p className="text-[11px] sm:text-xs text-pink-700 font-semibold mb-1.5">
+                      Best times to post:
+                    </p>
                     <div className="flex gap-1.5 sm:gap-2 flex-wrap">
                       {recommendedSgtTimes.map((t) => (
                         <span
@@ -1093,13 +1402,248 @@ const { feGrid, feMin, feMax, feHasData, actualPostCountGrid, totalPostsThisMont
                 )}
 
                 <p className="mt-3 text-[10px] sm:text-[11px] text-slate-400 leading-relaxed">
-                  Actual online followers (SGT time) — not separated by day of the week.
+                  Actual online followers (SGT time) — not separated by day of
+                  the week.
                 </p>
               </div>
             )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Engagement Rate Breakdown: below / above average, filterable by month ─────
+
+type ErRow = Post & { er: number };
+
+// Lấy nhãn tháng dễ đọc (vd "Jul 2026") từ chuỗi date "YYYY-MM-DD HH:mm"
+function getMonthLabel(dateStr: string): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr.replace(" ", "T"));
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleString("en-US", { month: "short", year: "numeric" });
+}
+
+// Dùng làm khoá sort thời gian thực cho các nhãn tháng (vd "Jul 2026" -> timestamp)
+function monthLabelSortKey(label: string): number {
+  const d = new Date(`1 ${label}`);
+  return isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
+function MonthFilterChips({
+  months,
+  active,
+  onChange,
+}: {
+  months: string[];
+  active: string;
+  onChange: (m: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <button
+        type="button"
+        onClick={() => onChange("all")}
+        className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+          active === "all"
+            ? "bg-slate-800 text-white border-slate-800"
+            : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+        }`}
+      >
+        All months
+      </button>
+      {months.map((m) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => onChange(m)}
+          className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+            active === m
+              ? "bg-slate-800 text-white border-slate-800"
+              : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          {m}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
+  return (
+    <a
+      href={row.url}
+      target="_blank"
+      rel="noreferrer"
+      className={`flex items-center gap-2.5 sm:gap-3 rounded-lg border border-slate-100 bg-white px-2.5 py-2 sm:px-3 sm:py-2.5 hover:border-slate-300 hover:shadow-sm transition-all ${!row.url ? "pointer-events-none" : ""}`}
+    >
+      <span className="hidden sm:flex items-center justify-center w-5 h-5 shrink-0 rounded-full bg-slate-100 text-[10px] font-bold text-slate-400">
+        {rank}
+      </span>
+      <PlatformIcon name={row.platform} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <ContentTypeBadge type={row.contentType} />
+          <span className="text-[9px] sm:text-[10px] text-slate-400 shrink-0">
+            {row.date}
+          </span>
+        </div>
+        <h4
+          className="text-[11px] sm:text-xs font-semibold text-slate-800 leading-snug truncate"
+          title={row.title}
+        >
+          {row.title}
+        </h4>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-[9px] sm:text-[10px] text-slate-400 tabular-nums">
+          {fmtNum(row.views)} views
+        </p>
+        <p className="text-xs sm:text-[13px] font-bold tabular-nums">
+          {row.er.toFixed(1)}%
+        </p>
+      </div>
+    </a>
+  );
+}
+
+function EngagementRateTables({
+  posts,
+  loading,
+}: {
+  posts: Post[];
+  loading: boolean;
+}) {
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
+
+  // Chỉ tính trên các bài có views > 0 để không làm lệch ER trung bình
+  const postsWithViews = useMemo(
+    () => posts.filter((p) => p.views > 0),
+    [posts],
+  );
+
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    postsWithViews.forEach((p) => {
+      const m = getMonthLabel(p.date);
+      if (m) set.add(m);
+    });
+    return Array.from(set).sort(
+      (a, b) => monthLabelSortKey(b) - monthLabelSortKey(a),
+    );
+  }, [postsWithViews]);
+
+  const monthFilteredPosts = useMemo(() => {
+    if (selectedMonth === "all") return postsWithViews;
+    return postsWithViews.filter((p) => getMonthLabel(p.date) === selectedMonth);
+  }, [postsWithViews, selectedMonth]);
+
+  // ER trung bình (weighted): tổng likes+shares / tổng views của tập đang lọc.
+  // Lấy số này TRƯỚC rồi mới dùng nó để tách 2 bảng bên dưới / trên trung bình.
+  const { avgEr, rows } = useMemo(() => {
+    let sumViews = 0;
+    let sumEngaged = 0;
+    for (const p of monthFilteredPosts) {
+      sumViews += p.views;
+      sumEngaged += p.likes + p.shares;
+    }
+    const avg = sumViews > 0 ? (sumEngaged / sumViews) * 100 : 0;
+
+    const withEr: ErRow[] = monthFilteredPosts.map((p) => ({
+      ...p,
+      er: p.views > 0 ? ((p.likes + p.shares) / p.views) * 100 : 0,
+    }));
+
+    return { avgEr: avg, rows: withEr };
+  }, [monthFilteredPosts]);
+
+  const belowAvg = useMemo(
+    () => rows.filter((r) => r.er < avgEr).sort((a, b) => a.er - b.er),
+    [rows, avgEr],
+  );
+  const aboveAvg = useMemo(
+    () => rows.filter((r) => r.er >= avgEr).sort((a, b) => b.er - a.er),
+    [rows, avgEr],
+  );
+
+  return (
+    <div className="lg:col-span-12 rounded-2xl border border-slate-200 bg-white overflow-hidden">
+      <div className="px-4 py-3 sm:px-5 flex flex-col gap-2.5 sm:gap-3 bg-slate-50 border-b border-slate-200">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">
+            Engagement Rate Breakdown
+          </span>
+          <span className="text-[10px] sm:text-xs font-mono text-slate-500">
+            {loading
+              ? "Loading..."
+              : `Avg ER: ${avgEr.toFixed(1)}% · ${rows.length} posts`}
+          </span>
+        </div>
+        <MonthFilterChips
+          months={availableMonths}
+          active={selectedMonth}
+          onChange={setSelectedMonth}
+        />
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="flex items-center justify-center h-24 text-[13px] sm:text-sm text-slate-400">
+          {loading ? "Loading..." : "No engagement data available yet."}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+          {/* Below average */}
+          <div className="p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-2.5 sm:mb-3 px-1">
+              <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wide text-rose-600">
+                <span className="w-2 h-2 rounded-full bg-rose-500" />
+                Below Average ER
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400">
+                {belowAvg.length} posts
+              </span>
+            </div>
+            <div className="space-y-1.5 sm:space-y-2 max-h-[420px] overflow-y-auto pr-1">
+              {belowAvg.length === 0 ? (
+                <div className="flex items-center justify-center h-20 text-[12px] text-slate-400">
+                  No posts below average.
+                </div>
+              ) : (
+                belowAvg.map((r, i) => (
+                  <ErPostRow key={r.id} row={r} rank={i + 1} />
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Above average */}
+          <div className="p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-2.5 sm:mb-3 px-1">
+              <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wide text-emerald-600">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Above Average ER
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400">
+                {aboveAvg.length} posts
+              </span>
+            </div>
+            <div className="space-y-1.5 sm:space-y-2 max-h-[420px] overflow-y-auto pr-1">
+              {aboveAvg.length === 0 ? (
+                <div className="flex items-center justify-center h-20 text-[12px] text-slate-400">
+                  No posts above average.
+                </div>
+              ) : (
+                aboveAvg.map((r, i) => (
+                  <ErPostRow key={r.id} row={r} rank={i + 1} />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1113,13 +1657,17 @@ export default function InsightsPage() {
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [allPostsLoading, setAllPostsLoading] = useState(false);
 
-  const [demographics, setDemographics] = useState<DemographicRow[]>(REAL_DEMOGRAPHICS_SNAPSHOT);
+  const [demographics, setDemographics] = useState<DemographicRow[]>(
+    REAL_DEMOGRAPHICS_SNAPSHOT,
+  );
   const [demoLoading, setDemoLoading] = useState(false);
 
-  const [activePlatform, setActivePlatform] = useState<PlatformKey>('tiktok');
+  const [activePlatform, setActivePlatform] = useState<PlatformKey>("tiktok");
 
   // Bộ lọc content type áp dụng cho khu vực Top Posts
-  const [activeContentType, setActiveContentType] = useState<ContentType | 'all'>('all');
+  const [activeContentType, setActiveContentType] = useState<
+    ContentType | "all"
+  >("all");
 
   useEffect(() => {
     const fetchTopPosts = async () => {
@@ -1174,10 +1722,14 @@ export default function InsightsPage() {
   const totalViews = topPosts.reduce((s, p) => s + p.views, 0);
   const totalLikes = topPosts.reduce((s, p) => s + p.likes, 0);
   const totalShares = topPosts.reduce((s, p) => s + p.shares, 0);
-  const engagementRate = totalViews > 0 ? (((totalLikes + totalShares) / totalViews) * 100).toFixed(1) : '0.0';
+  const engagementRate =
+    totalViews > 0
+      ? (((totalLikes + totalShares) / totalViews) * 100).toFixed(1)
+      : "0.0";
 
   const totalKnownFollowers = demographics.reduce(
-    (s, d) => s + d.female + d.male + d.undisclosed, 0,
+    (s, d) => s + d.female + d.male + d.undisclosed,
+    0,
   );
 
   // Danh sách content type thực sự xuất hiện trong topPosts, để render chip filter
@@ -1189,32 +1741,55 @@ export default function InsightsPage() {
 
   // Áp dụng filter content type trước khi group theo platform
   const filteredTopPosts = useMemo(() => {
-    if (activeContentType === 'all') return topPosts;
+    if (activeContentType === "all") return topPosts;
     return topPosts.filter((p) => p.contentType === activeContentType);
   }, [topPosts, activeContentType]);
 
+  const TOP_POSTS_PER_PLATFORM = 5;
+
   const groupedPosts = useMemo(() => {
-    return filteredTopPosts.reduce((acc, post) => {
-      if (!acc[post.platform]) acc[post.platform] = [];
-      acc[post.platform].push(post);
-      return acc;
-    }, {} as Record<string, Post[]>);
+    const grouped = filteredTopPosts.reduce(
+      (acc, post) => {
+        if (!acc[post.platform]) acc[post.platform] = [];
+        acc[post.platform].push(post);
+        return acc;
+      },
+      {} as Record<string, Post[]>,
+    );
+    // Giới hạn tối đa 5 bài / platform (API có thể trả nhiều hơn nếu backend hỗ trợ)
+    for (const platform of Object.keys(grouped)) {
+      grouped[platform] = grouped[platform].slice(0, TOP_POSTS_PER_PLATFORM);
+    }
+    return grouped;
   }, [filteredTopPosts]);
 
   const platformCount = Object.keys(groupedPosts).length;
 
-  const tiktokPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'tiktok'), [allPosts]);
-  const facebookPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'facebook'), [allPosts]);
-  const instagramPosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'instagram'), [allPosts]);
-  const youtubePosts = useMemo(() => allPosts.filter((p) => p.platform?.toLowerCase() === 'youtube'), [allPosts]);
+  const tiktokPosts = useMemo(
+    () => allPosts.filter((p) => p.platform?.toLowerCase() === "tiktok"),
+    [allPosts],
+  );
+  const facebookPosts = useMemo(
+    () => allPosts.filter((p) => p.platform?.toLowerCase() === "facebook"),
+    [allPosts],
+  );
+  const instagramPosts = useMemo(
+    () => allPosts.filter((p) => p.platform?.toLowerCase() === "instagram"),
+    [allPosts],
+  );
+  const youtubePosts = useMemo(
+    () => allPosts.filter((p) => p.platform?.toLowerCase() === "youtube"),
+    [allPosts],
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16 pb-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8 space-y-8 sm:space-y-10">
-
         {/* Header */}
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Insights &amp; Performance</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
+            Insights &amp; Performance
+          </h1>
           <p className="text-[13px] sm:text-sm text-slate-500 mt-1">
             In-depth analysis of our audience and top-performing content.
           </p>
@@ -1223,18 +1798,37 @@ export default function InsightsPage() {
         {/* ── SECTION 1: Overview ── */}
         <section className="space-y-4 sm:space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <StatCard label="Total Views"      value={fmtNum(totalViews)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="up"   />
-            <StatCard label="Total Likes"      value={fmtNum(totalLikes)}     sub={`Top posts across ${platformCount} platforms`}   colorKey="none" />
-            <StatCard label="Engagement Rate"  value={`${engagementRate}%`}   sub="Likes + shares / views, top posts"               colorKey="none" />
+            <StatCard
+              label="Total Views"
+              value={fmtNum(totalViews)}
+              sub={`Top posts across ${platformCount} platforms`}
+              colorKey="up"
+            />
+            <StatCard
+              label="Total Likes"
+              value={fmtNum(totalLikes)}
+              sub={`Top posts across ${platformCount} platforms`}
+              colorKey="none"
+            />
+            <StatCard
+              label="Engagement Rate"
+              value={`${engagementRate}%`}
+              sub="Likes + shares / views, top posts"
+              colorKey="none"
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Demographics */}
             <div className="lg:col-span-5 rounded-2xl border border-emerald-200 bg-white overflow-hidden flex flex-col">
               <div className="px-4 py-3 sm:px-5 flex items-center justify-between bg-emerald-50/60 border-b border-emerald-200">
-                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-emerald-600">Audience</span>
+                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-emerald-600">
+                  Audience
+                </span>
                 <span className="text-[10px] sm:text-xs font-mono text-emerald-600">
-                  {demoLoading ? 'Loading...' : `${fmtNum(totalKnownFollowers)} followers`}
+                  {demoLoading
+                    ? "Loading..."
+                    : `${fmtNum(totalKnownFollowers)} followers`}
                 </span>
               </div>
               <div className="p-3 sm:p-4 flex-1 flex flex-col">
@@ -1245,14 +1839,60 @@ export default function InsightsPage() {
                       layout="vertical"
                       margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="#e2e8f0" />
-                      <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                      <YAxis dataKey="age" type="category" tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} width={45} />
-                      <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f8fafc' }} />
-                      <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} />
-                      <Bar dataKey="female" name="Female" stackId="a" fill="#ec4899" barSize={16} />
-                      <Bar dataKey="male" name="Male" stackId="a" fill="#6366f1" barSize={16} />
-                      <Bar dataKey="undisclosed" name="Undisclosed" stackId="a" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={16} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        horizontal
+                        vertical={false}
+                        stroke="#e2e8f0"
+                      />
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 10, fill: "#94a3b8" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        dataKey="age"
+                        type="category"
+                        tick={{
+                          fontSize: 10,
+                          fill: "#64748b",
+                          fontWeight: 600,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={45}
+                      />
+                      <Tooltip
+                        content={<ChartTooltip />}
+                        cursor={{ fill: "#f8fafc" }}
+                      />
+                      <Legend
+                        iconType="circle"
+                        wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }}
+                      />
+                      <Bar
+                        dataKey="female"
+                        name="Female"
+                        stackId="a"
+                        fill="#ec4899"
+                        barSize={16}
+                      />
+                      <Bar
+                        dataKey="male"
+                        name="Male"
+                        stackId="a"
+                        fill="#6366f1"
+                        barSize={16}
+                      />
+                      <Bar
+                        dataKey="undisclosed"
+                        name="Undisclosed"
+                        stackId="a"
+                        fill="#cbd5e1"
+                        radius={[0, 4, 4, 0]}
+                        barSize={16}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1260,9 +1900,12 @@ export default function InsightsPage() {
                 <div className="mt-4 p-3 sm:p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl flex gap-2 sm:gap-3">
                   <span className="text-lg sm:text-xl">💡</span>
                   <div>
-                    <p className="text-[13px] sm:text-sm text-emerald-800 font-semibold mb-1">Quick Insight</p>
+                    <p className="text-[13px] sm:text-sm text-emerald-800 font-semibold mb-1">
+                      Quick Insight
+                    </p>
                     <p className="text-[11px] sm:text-xs text-emerald-600 leading-relaxed">
-                      The 25-44 age group makes up the majority of followers with available demographic data.
+                      The 25-44 age group makes up the majority of followers
+                      with available demographic data.
                     </p>
                   </div>
                 </div>
@@ -1273,9 +1916,11 @@ export default function InsightsPage() {
             <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white overflow-hidden flex flex-col">
               <div className="px-4 py-3 sm:px-5 flex flex-col gap-2 sm:gap-3 bg-slate-50 border-b border-slate-200">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">Top posts</span>
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Top posts
+                  </span>
                   <span className="text-[10px] sm:text-xs font-mono text-slate-400">
-                    {postsLoading ? 'Loading...' : 'Top 3 / platform'}
+                    {postsLoading ? "Loading..." : "Top 5 / platform"}
                   </span>
                 </div>
                 {/* Filter theo content type */}
@@ -1288,9 +1933,9 @@ export default function InsightsPage() {
 
               <div className="p-4 sm:p-5 flex-1 overflow-y-auto max-h-[500px] space-y-6 sm:space-y-8">
                 {postsLoading && topPosts.length === 0 ? (
-                   <div className="flex items-center justify-center h-full text-[13px] sm:text-sm text-slate-400 py-10">
-                     Loading posts...
-                   </div>
+                  <div className="flex items-center justify-center h-full text-[13px] sm:text-sm text-slate-400 py-10">
+                    Loading posts...
+                  </div>
                 ) : Object.keys(groupedPosts).length === 0 ? (
                   <div className="flex items-center justify-center h-full text-[13px] sm:text-sm text-slate-400 py-10">
                     No posts available.
@@ -1300,50 +1945,84 @@ export default function InsightsPage() {
                     <div key={platform}>
                       <div className="flex items-center gap-2 mb-3 sm:mb-4">
                         <PlatformIcon name={platform} />
-                        <h3 className="text-[13px] sm:text-sm font-bold text-slate-700 capitalize">{platform}</h3>
+                        <h3 className="text-[13px] sm:text-sm font-bold text-slate-700 capitalize">
+                          {platform}
+                        </h3>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                        {posts.map((post) => (
-                          <a
-                            key={post.id}
-                            href={post.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`relative rounded-xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between ${!post.url ? 'pointer-events-none' : ''}`}
-                          >
-                            <div className="mb-3 sm:mb-4">
-                              <div className="flex items-center justify-between gap-2 mb-1.5">
-                                <ContentTypeBadge type={post.contentType} />
-                              </div>
-                              <h4 className="text-xs sm:text-[13px] font-semibold text-slate-800 leading-snug line-clamp-2 sm:line-clamp-3" title={post.title}>
-                                {post.title}
-                              </h4>
-                              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 sm:mt-1.5">{post.date}</p>
-                            </div>
+                      <div className="flex flex-col gap-2">
+                        {posts.map((post, i) => {
+                          const er =
+                            post.views > 0
+                              ? (
+                                  ((post.likes + post.shares) / post.views) *
+                                  100
+                                ).toFixed(1)
+                              : "0.0";
+                          return (
+                            <a
+                              key={post.id}
+                              href={post.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3 hover:border-slate-300 hover:shadow-sm transition-all ${!post.url ? "pointer-events-none" : ""}`}
+                            >
+                              <span className="hidden sm:flex items-center justify-center w-5 h-5 shrink-0 rounded-full bg-slate-100 text-[10px] font-bold text-slate-400">
+                                {i + 1}
+                              </span>
 
-                            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2 sm:p-2.5 text-center mt-auto">
-                              <div>
-                                <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
-                                <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.views)}</p>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {/* <ContentTypeBadge type={post.contentType} /> */}
+                                  <span className="text-[10px] sm:text-[11px] text-slate-400 shrink-0">
+                                    {post.date}
+                                  </span>
+                                </div>
+                                <h4
+                                  className="text-xs sm:text-[13px] font-semibold text-slate-800 leading-snug truncate group-hover:text-slate-900"
+                                  title={post.title}
+                                >
+                                  {post.title}
+                                </h4>
                               </div>
-                              <div className="border-l border-slate-200">
-                                <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
-                                <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.likes)}</p>
+
+                              <div className="hidden xs:flex sm:flex items-center gap-3 sm:gap-4 shrink-0 text-right">
+                                <div>
+                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">
+                                    Views
+                                  </p>
+                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">
+                                    {fmtNum(post.views)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">
+                                    Likes
+                                  </p>
+                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">
+                                    {fmtNum(post.likes)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">
+                                    Shares
+                                  </p>
+                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">
+                                    {fmtNum(post.shares)}
+                                  </p>
+                                </div>
+                                <div className="min-w-[44px]">
+                                  <p className="text-[8px] sm:text-[9px] font-medium text-indigo-400 uppercase tracking-wide">
+                                    ER
+                                  </p>
+                                  <p className="text-xs sm:text-[13px] font-bold text-indigo-600 tabular-nums">
+                                    {er}%
+                                  </p>
+                                </div>
                               </div>
-                              <div className="border-l border-slate-200">
-                                <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Shares</p>
-                                <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-slate-700">{fmtNum(post.shares)}</p>
-                              </div>
-                              <div className="border-l border-slate-200">
-                                <p className="text-[8px] sm:text-[9px] font-medium text-indigo-400 uppercase tracking-wide">Eng. Rate</p>
-                                <p className="mt-0.5 text-xs sm:text-[13px] font-bold text-indigo-600">
-                                  {post.views > 0 ? (((post.likes + post.shares) / post.views) * 100).toFixed(1) : '0.0'}%
-                                </p>
-                              </div>
-                            </div>
-                          </a>
-                        ))}
+                            </a>
+                          );
+                        })}
                       </div>
                     </div>
                   ))
@@ -1355,8 +2034,13 @@ export default function InsightsPage() {
             <ContentTypePerformanceCard posts={allPosts} />
 
             {/* Content Type Breakdown Table — hiển thị động theo dữ liệu thực tế đang có */}
-            <ContentTypeBreakdownTable posts={allPosts} loading={allPostsLoading} />
+            <ContentTypeBreakdownTable
+              posts={allPosts}
+              loading={allPostsLoading}
+            />
 
+            {/* Engagement Rate Breakdown — ER trung bình + bảng dưới/trên trung bình, filter theo tháng */}
+            <EngagementRateTables posts={allPosts} loading={allPostsLoading} />
           </div>
         </section>
 
@@ -1364,29 +2048,48 @@ export default function InsightsPage() {
         <section className="space-y-3 sm:space-y-4">
           <div className="flex items-center justify-between flex-col sm:flex-row gap-3 sm:gap-0">
             <div className="w-full sm:w-auto">
-              <h2 className="text-lg font-bold text-slate-800">Best Time to Post</h2>
+              <h2 className="text-lg font-bold text-slate-800">
+                Best Time to Post
+              </h2>
               <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
                 Select a platform to view detailed best posting times.
               </p>
             </div>
             {/* Display Platform Switcher full width on mobile if needed */}
-            <PlatformSwitcher active={activePlatform} onChange={setActivePlatform} />
+            <PlatformSwitcher
+              active={activePlatform}
+              onChange={setActivePlatform}
+            />
           </div>
 
-          {activePlatform === 'tiktok' && (
-            <BestTimeBigCard platform="tiktok" posts={tiktokPosts} loading={allPostsLoading} />
+          {activePlatform === "tiktok" && (
+            <BestTimeBigCard
+              platform="tiktok"
+              posts={tiktokPosts}
+              loading={allPostsLoading}
+            />
           )}
-          {activePlatform === 'facebook' && (
-            <BestTimeBigCard platform="facebook" posts={facebookPosts} loading={allPostsLoading} />
+          {activePlatform === "facebook" && (
+            <BestTimeBigCard
+              platform="facebook"
+              posts={facebookPosts}
+              loading={allPostsLoading}
+            />
           )}
-          {activePlatform === 'instagram' && (
-            <InstagramBigCard posts={instagramPosts} loading={allPostsLoading} />
+          {activePlatform === "instagram" && (
+            <InstagramBigCard
+              posts={instagramPosts}
+              loading={allPostsLoading}
+            />
           )}
-          {activePlatform === 'youtube' && (
-            <BestTimeBigCard platform="youtube" posts={youtubePosts} loading={allPostsLoading} />
+          {activePlatform === "youtube" && (
+            <BestTimeBigCard
+              platform="youtube"
+              posts={youtubePosts}
+              loading={allPostsLoading}
+            />
           )}
         </section>
-
       </div>
     </div>
   );
