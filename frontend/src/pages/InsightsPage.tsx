@@ -12,7 +12,7 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-// Loại nội dung của bài post
+// Content type of a post
 type ContentType =
   | "video"
   | "image"
@@ -68,7 +68,7 @@ type TimeEngagementMonthlyDayStat = {
   full_day_stats: { vn_hour: number; followers_online: number }[];
 };
 
-// monthKey (vd "Jan-2022") -> weekdayLabel VN (vd "Thứ 2") -> stat
+// monthKey (e.g. "Jan-2022") -> VN weekday label (e.g. "Thứ 2") -> stat
 type TimeEngagementMonthlyData = Record<
   string,
   Record<string, TimeEngagementMonthlyDayStat>
@@ -109,7 +109,7 @@ const PLATFORM_TABS: { key: PlatformKey; label: string }[] = [
   { key: "youtube", label: "YouTube" },
 ];
 
-// Metadata hiển thị cho từng content type: nhãn, icon, màu sắc
+// Display metadata for each content type: label, icon, color
 const CONTENT_TYPE_META: Record<
   ContentType,
   { label: string; icon: string; className: string }
@@ -169,7 +169,25 @@ function splitDateTime(dateStr: string): { date: string; time: string } {
   return { date: datePart || "—", time: timePart || "" };
 }
 
-// Chuẩn hoá content type từ nhiều nguồn field/giá trị khác nhau của backend
+// Parse a "YYYY-MM-DD HH:mm" date string (stored in VN time) and shift it
+// forward by 1 hour to get the equivalent SGT (Singapore) time.
+function toSgtDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr.replace(" ", "T"));
+  if (isNaN(d.getTime())) return null;
+  d.setHours(d.getHours() + 1);
+  return d;
+}
+
+// Format a VN-time date string as a "YYYY-MM-DD HH:mm" SGT string for display.
+function formatSgtDateTime(dateStr: string): string {
+  const d = toSgtDate(dateStr);
+  if (!d) return dateStr || "—";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Normalize content type from various backend field/value sources
 function normalizeContentType(raw: any): ContentType {
   const val = String(
     raw?.contentType ??
@@ -487,7 +505,7 @@ function ContentTypePerformanceCard({ posts }: { posts: Post[] }) {
   );
 }
 
-// ─── Content Type Breakdown Table (dynamic — hiển thị đúng những gì đang có trong data) ───
+// ─── Content Type Breakdown Table (dynamic — shows exactly what's present in the data) ───
 
 type ContentTypeRow = {
   key: string;
@@ -501,8 +519,8 @@ type ContentTypeRow = {
   platforms: string[];
 };
 
-// Chuyển raw value (vd: "CAROUSEL_ALBUM", "photo", "blog_post") thành nhãn dễ đọc,
-// không cần phải khớp với 1 danh sách cố định — cứ có giá trị gì thì hiển thị giá trị đó.
+// Convert a raw value (e.g. "CAROUSEL_ALBUM", "photo", "blog_post") into a readable label,
+// no need to match a fixed list — just display whatever value exists.
 function formatTypeLabel(raw: string): string {
   if (!raw) return "Unknown";
   return raw
@@ -526,8 +544,8 @@ function useContentTypeBreakdown(posts: Post[]): ContentTypeRow[] {
     > = {};
 
     for (const p of posts) {
-      // Ưu tiên contentType đã chuẩn hoá, fallback về rawMediaType nếu có,
-      // cuối cùng mới rơi về 'unknown' — không giới hạn theo 1 danh sách cố định.
+      // Prefer the normalized contentType, fall back to rawMediaType if available,
+      // and finally fall back to 'unknown' — not limited to a fixed list.
       const raw =
         (p.contentType && p.contentType !== "unknown"
           ? p.contentType
@@ -724,7 +742,7 @@ function usePostHistoryGrid(posts: Post[]) {
       const parsed = new Date(post.date.replace(" ", "T"));
       if (isNaN(parsed.getTime())) continue;
 
-      // Cộng thêm 1 giờ để chuyển sang giờ SGT
+      // Add 1 hour to convert to SGT
       parsed.setHours(parsed.getHours() + 1);
 
       const dayIdx = (parsed.getDay() + 6) % 7;
@@ -897,14 +915,14 @@ function BestTimeBigCard({
 // ─── Big single-panel card: Instagram ──────
 
 function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
-  // --- Data source 1: theo tháng, mỗi tháng có 7 ngày x 24 giờ ---
+  // --- Data source 1: by month, each month has 7 days x 24 hours ---
   const [feMonthlyData, setFeMonthlyData] =
     useState<TimeEngagementMonthlyData | null>(null);
   const [feLoading, setFeLoading] = useState(false);
   const [feError, setFeError] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  // --- Data source 2: gộp theo giờ, không tách theo ngày ---
+  // --- Data source 2: aggregated by hour, not split by day ---
   const [feDailyData, setFeDailyData] = useState<TimeEngagementData | null>(
     null,
   );
@@ -923,7 +941,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
         if (!json.success) throw new Error(json.message || "Fetch failed");
         setFeMonthlyData(json.data);
 
-        // Tự chọn tháng gần nhất (sort theo thời gian thực, không theo alphabet)
+        // Auto-select the most recent month (sort by actual time, not alphabetically)
         const monthKeys = Object.keys(json.data || {});
         if (monthKeys.length > 0) {
           const sorted = [...monthKeys].sort(
@@ -960,7 +978,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
     fetchDaily();
   }, []);
 
-  // Danh sách tháng có data, sort mới nhất trước, dùng để render tag chọn tháng
+  // List of months with data, sorted newest first, used to render month selector tags
   const availableMonths = useMemo(() => {
     const keys = Object.keys(feMonthlyData || {});
     return keys.sort(
@@ -970,8 +988,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
 
   const feData = selectedMonth ? feMonthlyData?.[selectedMonth] : undefined;
 
-  // Set (dayIdx-hourIdx) các bài post rơi vào đúng Thứ + Giờ (SGT) trong tháng đang chọn
-  // Map "dayIdx-hourIdx" -> số bài post rơi vào đúng Thứ + Giờ (SGT) trong tháng đang chọn
+  // Map "dayIdx-hourIdx" -> number of posts falling into that weekday + hour (SGT) in the selected month
   const postCountByCell = useMemo(() => {
     const map = new Map<string, number>();
     if (!selectedMonth) return map;
@@ -1002,7 +1019,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
 
       const vnLogicalDate = new Date(`${dPart}T${tPart}:00Z`);
       if (isNaN(vnLogicalDate.getTime())) {
-        console.warn("[IG monthly] Không parse được date:", p.date);
+        console.warn("[IG monthly] Could not parse date:", p.date);
         continue;
       }
 
@@ -1010,7 +1027,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
         vnLogicalDate.getUTCMonth() !== targetMonth ||
         vnLogicalDate.getUTCFullYear() !== targetYear
       ) {
-        continue; // không thuộc tháng đang chọn, bỏ qua log cho đỡ rối
+        continue; // not part of the selected month, skip logging to reduce noise
       }
 
       const sgtLogicalDate = new Date(
@@ -1031,15 +1048,14 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
     }
 
     console.log(
-      "[IG monthly] Tổng kết postCountByCell:",
+      "[IG monthly] postCountByCell summary:",
       Object.fromEntries(map),
     );
 
     return map;
   }, [posts, selectedMonth]);
 
-  // Build lưới 7 ngày x 24 giờ từ data của tháng đang chọn, quy đổi VN -> SGT
-  // Build lưới 7 ngày x 24 giờ từ data của tháng đang chọn, quy đổi VN -> SGT
+  // Build a 7-day x 24-hour grid from the selected month's data, converting VN -> SGT
   const {
     feGrid,
     feMin,
@@ -1077,8 +1093,9 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
       }
     });
 
-    // Điền số lượng bài post thực tế vào TẤT CẢ các ô có trong postCountByCell
-    // (không chỉ những ô có data followers_online, vì bài post có thể rơi vào giờ chưa có data online_followers)
+    // Fill in actual post counts for ALL cells present in postCountByCell
+    // (not just cells with followers_online data, since a post may fall into
+    // an hour without online_followers data)
     let totalPosts = 0;
     postCountByCell.forEach((count, key) => {
       const [dStr, hStr] = key.split("-");
@@ -1098,7 +1115,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
     };
   }, [feData, postCountByCell]);
 
-  // Top 3 khung giờ tổng hợp trong tháng đang chọn (đã ở SGT vì feGrid đã quy đổi)
+  // Top 3 aggregated time slots in the selected month (already in SGT since feGrid was converted)
   const overallTop3SgtTimes = useMemo(() => {
     if (!feHasData) return [];
     const hourTotals = new Array(24).fill(0);
@@ -1114,7 +1131,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
       .map((t) => `${String(t.hour).padStart(2, "0")}:00`);
   }, [feGrid, feHasData]);
 
-  // Build 1 hàng 24 giờ từ API daily, quy đổi sang SGT (giữ nguyên logic cũ)
+  // Build a single 24-hour row from the daily API, converting to SGT (keeping original logic)
   const {
     dailyRow,
     dailyMin,
@@ -1203,7 +1220,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
           </div>
         ) : (
           <div className="space-y-6 sm:space-y-8">
-            {/* ===== Table 1: theo Tháng (7 ngày x 24 giờ) ===== */}
+            {/* ===== Table 1: By Month (7 days x 24 hours) ===== */}
             {feError ? (
               <div className="flex items-center justify-center h-20 text-[13px] sm:text-sm text-slate-400">
                 Failed to load monthly data.
@@ -1312,7 +1329,7 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
 
             <div className="border-t border-pink-100" />
 
-            {/* ===== Table 2: gộp theo giờ, không tách theo Thứ (giữ nguyên) ===== */}
+            {/* ===== Table 2: Aggregated by hour, not split by weekday (unchanged) ===== */}
             {feDailyError ? (
               <div className="flex items-center justify-center h-20 text-[13px] sm:text-sm text-slate-400">
                 Failed to load hourly aggregated data.
@@ -1414,15 +1431,15 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
 
 type ErRow = Post & { er: number };
 
-// Lấy nhãn tháng dễ đọc (vd "Jul 2026") từ chuỗi date "YYYY-MM-DD HH:mm"
+// Get a readable month label (e.g. "Jul 2026") from a VN-time date string
+// "YYYY-MM-DD HH:mm", converted to SGT first so the month bucket matches SGT.
 function getMonthLabel(dateStr: string): string | null {
-  if (!dateStr) return null;
-  const d = new Date(dateStr.replace(" ", "T"));
-  if (isNaN(d.getTime())) return null;
+  const d = toSgtDate(dateStr);
+  if (!d) return null;
   return d.toLocaleString("en-US", { month: "short", year: "numeric" });
 }
 
-// Dùng làm khoá sort thời gian thực cho các nhãn tháng (vd "Jul 2026" -> timestamp)
+// Used as a real-time sort key for month labels (e.g. "Jul 2026" -> timestamp)
 function monthLabelSortKey(label: string): number {
   const d = new Date(`1 ${label}`);
   return isNaN(d.getTime()) ? 0 : d.getTime();
@@ -1482,7 +1499,7 @@ function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
         <div className="flex items-center gap-1.5 mb-0.5">
           <ContentTypeBadge type={row.contentType} />
           <span className="text-[9px] sm:text-[10px] text-slate-400 shrink-0">
-            {row.date}
+            {formatSgtDateTime(row.date)}
           </span>
         </div>
         <h4
@@ -1504,7 +1521,7 @@ function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
   );
 }
 
-// ─── Platform Filter Chips (dùng riêng cho Engagement Rate Breakdown) ──────────
+// ─── Platform Filter Chips (used specifically for Engagement Rate Breakdown) ──────────
 
 function PlatformFilterChips({
   platforms,
@@ -1548,13 +1565,13 @@ function EngagementRateTables({
   const [selectedPlatform, setSelectedPlatform] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
-  // Chỉ tính trên các bài có views > 0 để không làm lệch ER trung bình
+  // Only count posts with views > 0 to avoid skewing the average ER
   const postsWithViews = useMemo(
     () => posts.filter((p) => p.views > 0),
     [posts],
   );
 
-  // Danh sách platform thực sự có trong data
+  // List of platforms actually present in the data
   const availablePlatforms = useMemo(() => {
     const set = new Set<string>();
     postsWithViews.forEach((p) => {
@@ -1563,8 +1580,9 @@ function EngagementRateTables({
     return Array.from(set).sort();
   }, [postsWithViews]);
 
-  // Không còn nút "All platforms" nên cần tự chọn platform mặc định
-  // (platform đầu tiên có data) khi danh sách thay đổi hoặc lựa chọn hiện tại không còn hợp lệ.
+  // There's no "All platforms" button, so we need to auto-select a default platform
+  // (the first platform with data) when the list changes or the current selection
+  // becomes invalid.
   useEffect(() => {
     if (availablePlatforms.length === 0) {
       if (selectedPlatform !== "") setSelectedPlatform("");
@@ -1580,7 +1598,7 @@ function EngagementRateTables({
     return postsWithViews.filter((p) => p.platform === selectedPlatform);
   }, [postsWithViews, selectedPlatform]);
 
-  // Danh sách tháng chỉ tính trong phạm vi platform đang chọn
+  // Month list is scoped to the currently selected platform, and computed in SGT
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
     platformFilteredPosts.forEach((p) => {
@@ -1592,7 +1610,8 @@ function EngagementRateTables({
     );
   }, [platformFilteredPosts]);
 
-  // Đổi platform thì reset lại bộ lọc tháng, tránh rơi vào tháng không tồn tại ở platform mới
+  // Reset the month filter when the platform changes, to avoid landing on a
+  // month that doesn't exist for the new platform
   useEffect(() => {
     setSelectedMonth("all");
   }, [selectedPlatform]);
@@ -1604,7 +1623,7 @@ function EngagementRateTables({
     );
   }, [platformFilteredPosts, selectedMonth]);
 
-  // ER trung bình (weighted): tổng likes+shares / tổng views của tập đang lọc (platform + tháng).
+  // Average ER (weighted): total likes+shares / total views of the filtered set (platform + month, in SGT).
   const { avgEr, rows } = useMemo(() => {
     let sumViews = 0;
     let sumEngaged = 0;
@@ -1646,7 +1665,7 @@ function EngagementRateTables({
           <span className="text-[10px] sm:text-xs font-mono text-slate-500">
             {loading
               ? "Loading..."
-              : `Avg ER: ${avgEr.toFixed(1)}% · ${rows.length} posts`}
+              : `Avg ER: ${avgEr.toFixed(1)}% · ${rows.length} posts (SGT)`}
           </span>
         </div>
 
@@ -1683,7 +1702,7 @@ function EngagementRateTables({
             <div className="flex items-center justify-between mb-2.5 sm:mb-3 px-1">
               <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wide text-emerald-600">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Above Average ERF
+                Above Average ER
               </span>
               <span className="text-[10px] sm:text-[11px] text-slate-400">
                 {aboveAvg.length} posts
@@ -1749,7 +1768,7 @@ export default function InsightsPage() {
 
   const [activePlatform, setActivePlatform] = useState<PlatformKey>("tiktok");
 
-  // Bộ lọc content type áp dụng cho khu vực Top Posts
+  // Content type filter applied to the Top Posts area
   const [activeContentType, setActiveContentType] = useState<
     ContentType | "all"
   >("all");
@@ -1817,14 +1836,14 @@ export default function InsightsPage() {
     0,
   );
 
-  // Danh sách content type thực sự xuất hiện trong topPosts, để render chip filter
+  // List of content types actually present in topPosts, used to render the filter chips
   const availableContentTypes = useMemo(() => {
     const set = new Set<ContentType>();
     topPosts.forEach((p) => set.add(p.contentType));
     return CONTENT_TYPE_ORDER.filter((t) => set.has(t));
   }, [topPosts]);
 
-  // Áp dụng filter content type trước khi group theo platform
+  // Apply the content type filter before grouping by platform
   const filteredTopPosts = useMemo(() => {
     if (activeContentType === "all") return topPosts;
     return topPosts.filter((p) => p.contentType === activeContentType);
@@ -1841,7 +1860,7 @@ export default function InsightsPage() {
       },
       {} as Record<string, Post[]>,
     );
-    // Giới hạn tối đa 5 bài / platform (API có thể trả nhiều hơn nếu backend hỗ trợ)
+    // Cap at 5 posts / platform (the API may return more if the backend supports it)
     for (const platform of Object.keys(grouped)) {
       grouped[platform] = grouped[platform].slice(0, TOP_POSTS_PER_PLATFORM);
     }
@@ -2008,7 +2027,7 @@ export default function InsightsPage() {
                     {postsLoading ? "Loading..." : "Top 5 / platform"}
                   </span>
                 </div>
-                {/* Filter theo content type */}
+                {/* Filter by content type */}
                 <ContentTypeFilterChips
                   availableTypes={availableContentTypes}
                   active={activeContentType}
@@ -2115,16 +2134,16 @@ export default function InsightsPage() {
               </div>
             </div>
 
-            {/* Content Type Performance — dùng allPosts vì đây là nguồn data có contentType/rawMediaType đầy đủ */}
+            {/* Content Type Performance — uses allPosts since that's the source with full contentType/rawMediaType data */}
             <ContentTypePerformanceCard posts={allPosts} />
 
-            {/* Content Type Breakdown Table — hiển thị động theo dữ liệu thực tế đang có */}
+            {/* Content Type Breakdown Table — displayed dynamically based on the actual data present */}
             <ContentTypeBreakdownTable
               posts={allPosts}
               loading={allPostsLoading}
             />
 
-            {/* Engagement Rate Breakdown — ER trung bình + bảng dưới/trên trung bình, filter theo tháng */}
+            {/* Engagement Rate Breakdown — average ER + above/below average tables, filterable by month (SGT) */}
             <EngagementRateTables posts={allPosts} loading={allPostsLoading} />
           </div>
         </section>
