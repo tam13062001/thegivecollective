@@ -1,5 +1,5 @@
 import Metric from "../models/Metric.js";
-import { fetchTikTokStats, fetchInstagramStats, fetchLinkedInStats, fetchMetaStats, fetchYouTubeStats } from '../services/scraperService.js';
+import { fetchTikTokStats, fetchInstagramStats, fetchLinkedInStats, fetchMetaStats, fetchYouTubeStats ,fetchGoogleAnalyticsStats  } from '../services/scraperService.js';
 
 export const getAllMetric = async (req, res) => {
     try {
@@ -24,6 +24,11 @@ export const CreateMetric = async (req, res) => {
 
         const parseSocialUrl = (url) => {
             try {
+                // GA4 Property ID: chuỗi số thuần, VD "531129209" — không phải URL
+                if (/^\d+$/.test(url.trim())) {
+                    return { platform: 'GoogleAnalytics', handle: url.trim() };
+                }
+
                 const urlObj = new URL(url);
                 const hostname = urlObj.hostname.toLowerCase();
                 let pathname = urlObj.pathname;
@@ -58,6 +63,9 @@ export const CreateMetric = async (req, res) => {
             let hasError = false;
 
             switch (platform.toLowerCase()) {
+                case 'googleanalytics':
+                    stats = await fetchGoogleAnalyticsStats();
+                    break;
                 case 'tiktok':
                     stats = await fetchTikTokStats(handle, process.env.APIFY_TOKEN);
                     break;

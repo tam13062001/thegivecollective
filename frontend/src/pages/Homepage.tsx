@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { GrowthChart } from '../components/GrowthChart';
-
+import { GA4Card } from '../components/GA4Card';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Metric {
@@ -159,6 +159,7 @@ const Homepage = () => {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16">
       <div className="mx-auto max-w-7xl px-6 py-8 space-y-10">
         <GrowthChart />
+        {/* <GA4Card /> */}
         {/* ── SECTION 1: Overview stats + charts ── */}
         <section className="space-y-5">
 

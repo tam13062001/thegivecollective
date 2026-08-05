@@ -1,3 +1,97 @@
+import { JWT } from 'google-auth-library';
+
+// Khởi tạo 1 lần, tái sử dụng cho mọi request (JWT tự refresh access token khi hết hạn)
+let gaAuthClient = null;
+function getGAAuthClient() {
+  if (!gaAuthClient) {
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    const decoded = Buffer.from(raw, 'base64').toString('utf-8');
+    const credentials = JSON.parse(decoded);
+
+    gaAuthClient = new JWT({
+      email: credentials.client_email,
+      key: credentials.private_key,
+      scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
+    });
+  }
+  return gaAuthClient;
+}
+
+export const fetchGoogleAnalyticsStats = async () => {
+  try {
+    const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
+    if (!propertyId) {
+      return { followers: 0, posts: 0, views: 0, error: 'Thiếu GOOGLE_ANALYTICS_PROPERTY_ID trong env' };
+    }
+    const authClient = getGAAuthClient();
+    const { token } = await authClient.getAccessToken();
+
+    const response = await fetch(
+      `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          metrics: [
+            { name: 'activeUsers' },
+            { name: 'sessions' },
+            { name: 'engagementRate' },
+            { name: 'screenPageViews' },
+            { name: 'bounceRate' },
+            { name: 'averageSessionDuration' },
+            { name: 'keyEvents' },
+            { name: 'keyEvents:qualify_lead' },
+            { name: 'keyEvents:close_convert_lead' },
+            { name: 'keyEvents:purchase' },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[GA4] API error:', response.status, errorData);
+      return { followers: 0, posts: 0, views: 0, error: `GA4 Error: ${errorData?.error?.message ?? response.status}` };
+    }
+
+    const data = await response.json();
+    const values = data.rows?.[0]?.metricValues ?? [];
+
+    const users            = parseInt(values[0]?.value) || 0;
+    const sessions          = parseInt(values[1]?.value) || 0;
+    const engagementRate    = parseFloat(values[2]?.value) || 0; // 0..1
+    const pageviews         = parseInt(values[3]?.value) || 0;
+    const bounceRate        = parseFloat(values[4]?.value) || 0; // 0..1
+    const avgDuration       = parseFloat(values[5]?.value) || 0; // giây
+    const totalKeyEvents    = parseInt(values[6]?.value) || 0;
+    const qualifyLeads      = parseInt(values[7]?.value) || 0;
+    const closeConvertLeads = parseInt(values[8]?.value) || 0;
+    const purchases         = parseInt(values[9]?.value) || 0;
+
+    return {
+      // Shape cũ, dùng cho flow Metric chung
+      followers: users,
+      posts: sessions,
+      views: pageviews,
+      // Field mở rộng cho GA4 card
+      pageviews,
+      users,
+      sessions,
+      bounceRate: Math.round(bounceRate * 100),
+      avgDuration: Math.round(avgDuration),
+      engagementRate: Math.round(engagementRate * 100),
+      totalKeyEvents,
+      qualifyLeads,
+      closeConvertLeads,
+      purchases,
+    };
+  } catch (error) {
+    console.error('[GA4] Fetch error:', error);
+    return { followers: 0, posts: 0, views: 0, error: 'Failed to fetch Google Analytics stats' };
+  }
+};
+
 export const fetchYouTubeStats = async (channelHandle, apiKey) => {
   try {
     const channelResponse = await fetch(
