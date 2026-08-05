@@ -101,7 +101,7 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
       for (const { post, views } of results) {
         allContent.push({
           platform: 'Facebook',
-          title: post.message ? post.message.slice(0, 120) : '(Không có nội dung)',
+          title: post.message ? post.message.slice(0, 120) : '(No caption)',
           views,
           likes: post.likes?.summary?.total_count || 0,
           date: formatDateTime(post.created_time),

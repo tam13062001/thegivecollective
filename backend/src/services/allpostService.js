@@ -122,7 +122,7 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
         const attachmentFirst = post.attachments?.data?.[0];
         allContent.push({
           platform: 'Facebook',
-          title: post.message ? post.message.slice(0, 120) : '(Không có nội dung)',
+          title: post.message ? post.message.slice(0, 120) : '(No caption)',
           views,
           likes: post.likes?.summary?.total_count || 0,
           shares: post.shares?.count || 0,
