@@ -39,7 +39,7 @@ metadata.metrics?.forEach((m) => {
   console.log(`${m.apiName.padEnd(35)} ${m.uiName}`);
 });
 
-// 4. Thử lấy 1 bộ metric mở rộng (an toàn, hầu hết property nào cũng có)
+// 4. Thử lấy 1 bộ metric mở rộng 
 const extendedRes = await fetch(
   `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
   {

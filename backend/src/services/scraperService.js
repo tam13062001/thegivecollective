@@ -17,6 +17,106 @@ function getGAAuthClient() {
   return gaAuthClient;
 }
 
+// Gọi runReport thô, trả về toàn bộ rows (mỗi row có dimensionValues + metricValues)
+const runGA4Report = async (propertyId, token, body) => {
+  const response = await fetch(
+    `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        ...body,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = `GA4 Error: ${errorData?.error?.message ?? response.status}`;
+    console.error('[GA4] API error:', response.status, errorData);
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  return data.rows ?? [];
+};
+
+// ---- Các breakdown theo dimension ----
+
+const fetchTrafficSources = async (propertyId, token) => {
+  const rows = await runGA4Report(propertyId, token, {
+    dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
+    metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    limit: 10,
+  });
+
+  return rows.map((row) => ({
+    source: row.dimensionValues?.[0]?.value ?? '(not set)',
+    medium: row.dimensionValues?.[1]?.value ?? '(not set)',
+    sessions: parseInt(row.metricValues?.[0]?.value) || 0,
+    users: parseInt(row.metricValues?.[1]?.value) || 0,
+  }));
+};
+
+const fetchCountries = async (propertyId, token) => {
+  const rows = await runGA4Report(propertyId, token, {
+    dimensions: [{ name: 'country' }],
+    metrics: [{ name: 'activeUsers' }, { name: 'sessions' }],
+    orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }],
+    limit: 10,
+  });
+
+  return rows.map((row) => ({
+    country: row.dimensionValues?.[0]?.value ?? '(not set)',
+    users: parseInt(row.metricValues?.[0]?.value) || 0,
+    sessions: parseInt(row.metricValues?.[1]?.value) || 0,
+  }));
+};
+
+// Lưu ý: cần bật Google Signals trong GA4 property thì age/gender mới có data,
+// nếu không tất cả sẽ trả về "(not set)"/"unknown"
+const fetchAgeBrackets = async (propertyId, token) => {
+  const rows = await runGA4Report(propertyId, token, {
+    dimensions: [{ name: 'userAgeBracket' }],
+    metrics: [{ name: 'activeUsers' }],
+    orderBys: [{ dimension: { dimensionName: 'userAgeBracket' } }],
+  });
+
+  return rows.map((row) => ({
+    age: row.dimensionValues?.[0]?.value ?? 'unknown',
+    users: parseInt(row.metricValues?.[0]?.value) || 0,
+  }));
+};
+
+const fetchGenders = async (propertyId, token) => {
+  const rows = await runGA4Report(propertyId, token, {
+    dimensions: [{ name: 'userGender' }],
+    metrics: [{ name: 'activeUsers' }],
+  });
+
+  return rows.map((row) => ({
+    gender: row.dimensionValues?.[0]?.value ?? 'unknown',
+    users: parseInt(row.metricValues?.[0]?.value) || 0,
+  }));
+};
+
+const fetchTopPages = async (propertyId, token) => {
+  const rows = await runGA4Report(propertyId, token, {
+    dimensions: [{ name: 'pagePath' }],
+    metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }],
+    orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+    limit: 10,
+  });
+
+  return rows.map((row) => ({
+    path: row.dimensionValues?.[0]?.value ?? '(not set)',
+    views: parseInt(row.metricValues?.[0]?.value) || 0,
+    users: parseInt(row.metricValues?.[1]?.value) || 0,
+  }));
+};
+
 export const fetchGoogleAnalyticsStats = async () => {
   try {
     const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
@@ -26,48 +126,53 @@ export const fetchGoogleAnalyticsStats = async () => {
     const authClient = getGAAuthClient();
     const { token } = await authClient.getAccessToken();
 
-    const response = await fetch(
-      `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
-          metrics: [
-            { name: 'activeUsers' },
-            { name: 'sessions' },
-            { name: 'engagementRate' },
-            { name: 'screenPageViews' },
-            { name: 'bounceRate' },
-            { name: 'averageSessionDuration' },
-            { name: 'keyEvents' },
-            { name: 'keyEvents:qualify_lead' },
-            { name: 'keyEvents:close_convert_lead' },
-            { name: 'keyEvents:purchase' },
-          ],
-        }),
-      }
-    );
+    const [
+      batch1,
+      batch2,
+      trafficSources,
+      countries,
+      ageBrackets,
+      genders,
+      topPages,
+    ] = await Promise.all([
+      runGA4Report(propertyId, token, {
+        metrics: [
+          { name: 'activeUsers' },
+          { name: 'newUsers' },
+          { name: 'sessions' },
+          { name: 'engagementRate' },
+          { name: 'screenPageViews' },
+          { name: 'bounceRate' },
+          { name: 'averageSessionDuration' },
+        ],
+      }).then((rows) => rows[0]?.metricValues ?? []),
+      runGA4Report(propertyId, token, {
+        metrics: [
+          { name: 'keyEvents' },
+          { name: 'keyEvents:qualify_lead' },
+          { name: 'keyEvents:close_convert_lead' },
+          { name: 'keyEvents:purchase' },
+        ],
+      }).then((rows) => rows[0]?.metricValues ?? []),
+      fetchTrafficSources(propertyId, token),
+      fetchCountries(propertyId, token),
+      fetchAgeBrackets(propertyId, token),
+      fetchGenders(propertyId, token),
+      fetchTopPages(propertyId, token),
+    ]);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('[GA4] API error:', response.status, errorData);
-      return { followers: 0, posts: 0, views: 0, error: `GA4 Error: ${errorData?.error?.message ?? response.status}` };
-    }
+    const users            = parseInt(batch1[0]?.value) || 0;
+    const newUsers          = parseInt(batch1[1]?.value) || 0;
+    const sessions          = parseInt(batch1[2]?.value) || 0;
+    const engagementRate    = parseFloat(batch1[3]?.value) || 0; // 0..1
+    const pageviews         = parseInt(batch1[4]?.value) || 0;
+    const bounceRate        = parseFloat(batch1[5]?.value) || 0; // 0..1
+    const avgDuration       = parseFloat(batch1[6]?.value) || 0; // giây
 
-    const data = await response.json();
-    const values = data.rows?.[0]?.metricValues ?? [];
-
-    const users            = parseInt(values[0]?.value) || 0;
-    const sessions          = parseInt(values[1]?.value) || 0;
-    const engagementRate    = parseFloat(values[2]?.value) || 0; // 0..1
-    const pageviews         = parseInt(values[3]?.value) || 0;
-    const bounceRate        = parseFloat(values[4]?.value) || 0; // 0..1
-    const avgDuration       = parseFloat(values[5]?.value) || 0; // giây
-    const totalKeyEvents    = parseInt(values[6]?.value) || 0;
-    const qualifyLeads      = parseInt(values[7]?.value) || 0;
-    const closeConvertLeads = parseInt(values[8]?.value) || 0;
-    const purchases         = parseInt(values[9]?.value) || 0;
+    const totalKeyEvents    = parseInt(batch2[0]?.value) || 0;
+    const qualifyLeads      = parseInt(batch2[1]?.value) || 0;
+    const closeConvertLeads = parseInt(batch2[2]?.value) || 0;
+    const purchases         = parseInt(batch2[3]?.value) || 0;
 
     return {
       // Shape cũ, dùng cho flow Metric chung
@@ -77,6 +182,7 @@ export const fetchGoogleAnalyticsStats = async () => {
       // Field mở rộng cho GA4 card
       pageviews,
       users,
+      newUsers,
       sessions,
       bounceRate: Math.round(bounceRate * 100),
       avgDuration: Math.round(avgDuration),
@@ -85,10 +191,16 @@ export const fetchGoogleAnalyticsStats = async () => {
       qualifyLeads,
       closeConvertLeads,
       purchases,
+      // Breakdown
+      trafficSources,
+      countries,
+      ageBrackets,
+      genders,
+      topPages,
     };
   } catch (error) {
     console.error('[GA4] Fetch error:', error);
-    return { followers: 0, posts: 0, views: 0, error: 'Failed to fetch Google Analytics stats' };
+    return { followers: 0, posts: 0, views: 0, error: error.message || 'Failed to fetch Google Analytics stats' };
   }
 };
 

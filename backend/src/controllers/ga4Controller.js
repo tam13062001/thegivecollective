@@ -26,6 +26,7 @@ export const refreshGA4Stats = async (req, res) => {
     const doc = await getSingletonDoc();
     doc.pageviews = stats.pageviews;
     doc.users = stats.users;
+    doc.newUsers = stats.newUsers;
     doc.sessions = stats.sessions;
     doc.bounceRate = stats.bounceRate;
     doc.avgDuration = stats.avgDuration;
@@ -34,6 +35,11 @@ export const refreshGA4Stats = async (req, res) => {
     doc.qualifyLeads = stats.qualifyLeads;
     doc.closeConvertLeads = stats.closeConvertLeads;
     doc.purchases = stats.purchases;
+    doc.trafficSources = stats.trafficSources;
+    doc.countries = stats.countries;
+    doc.ageBrackets = stats.ageBrackets;
+    doc.genders = stats.genders;
+    doc.topPages = stats.topPages;
     doc.lastUpdated = new Date();
     await doc.save();
 
