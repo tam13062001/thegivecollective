@@ -21,8 +21,9 @@ const app = express();
 // Chuyển CORS lên đầu tiên để mở cửa trước khi làm bất cứ việc gì khác
 app.use(cors({
   origin: [
-    'https://thegivecollective.vercel.app',  // FE domain
-    'http://localhost:5173',                  // local dev
+    'https://client.100xmedia.agency',
+    'https://thegivecollective.vercel.app',  
+    'http://localhost:5173',                  
     'http://localhost:3000',
     'https://analytics.thegivecollective.com',
   ],
