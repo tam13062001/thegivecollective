@@ -1,4 +1,5 @@
 import GA4StatSecondary from '../models/GA4StatSecondary.js';
+import GA4History from '../models/GA4History.js';
 import { fetchGoogleAnalyticsStatsSecondary } from '../services/scraperService.js';
 
 // Chỉ track 1 website (secondary) nên dùng 1 document duy nhất (singleton)
@@ -62,5 +63,74 @@ export const updateGA4WebsiteSecondary = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Lỗi hệ thống' });
+  }
+};
+
+/**
+ * Lưu snapshot GA4 của ngày hôm nay vào lịch sử (upsert)
+ */
+export const saveDailyGA4History = async (req, res) => {
+  try {
+    const stats = await fetchGoogleAnalyticsStatsSecondary();
+    if (stats.error) {
+      return res.status(502).json({ message: stats.error });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const historyData = {
+      date: today,
+      websiteUrl: stats.websiteUrl || 'https://analytics.thegivecollective.com',
+      pageviews: stats.pageviews,
+      users: stats.users,
+      newUsers: stats.newUsers,
+      sessions: stats.sessions,
+      bounceRate: stats.bounceRate,
+      avgDuration: stats.avgDuration,
+      engagementRate: stats.engagementRate,
+      totalKeyEvents: stats.totalKeyEvents,
+      qualifyLeads: stats.qualifyLeads,
+      closeConvertLeads: stats.closeConvertLeads,
+      purchases: stats.purchases,
+      trafficSources: stats.trafficSources,
+      countries: stats.countries,
+      ageBrackets: stats.ageBrackets,
+      genders: stats.genders,
+      topPages: stats.topPages,
+    };
+
+    const result = await GA4History.findOneAndUpdate(
+      { date: today },
+      historyData,
+      { upsert: true, new: true }
+    );
+
+    res.status(200).json({ message: `Saved snapshot for ${today}`, data: result });
+  } catch (error) {
+    console.error('[GA4 History] Save error:', error);
+    res.status(500).json({ message: 'Lỗi lưu lịch sử GA4' });
+  }
+};
+
+/**
+ * Lấy dữ liệu lịch sử trong khoảng ngày
+ * Query: ?days=30 (mặc định 30)
+ */
+export const getGA4History = async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const sinceStr = since.toISOString().split('T')[0];
+
+    const history = await GA4History.find(
+      { date: { $gte: sinceStr } },
+      { _id: 0, __v: 0, createdAt: 0, updatedAt: 0 }
+    ).sort({ date: 1 });
+
+    res.status(200).json(history);
+  } catch (error) {
+    console.error('[GA4 History] Get error:', error);
+    res.status(500).json({ message: 'Lỗi lấy lịch sử GA4' });
   }
 };
