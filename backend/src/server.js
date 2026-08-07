@@ -5,7 +5,7 @@ import historyRoutes from './routes/historyRoute.js';
 import insightsRoutes from './routes/Insights.js';
 import topPostsRouter from './routes/ToppostsRoute.js';
 import ga4Routes from './routes/ga4Routes.js';
-import ga4SecondaryRoutes from './routes/ga4SecondaryRoutes.js';
+import ga4SecondaryRoutes from './routes/ga4secondaryroutes.js';
 import { takeSnapshot } from './jobs/snapshotjob.js';
 import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
 import { connectDB } from './config/db.js';
