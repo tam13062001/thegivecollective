@@ -1,4 +1,4 @@
-const PRODUCTION_ORIGIN = ['https://thegivecollective-backend.vercel.app',];
+const PRODUCTION_ORIGIN = ['https://thegivecollective-backend.vercel.app','https://analytics.thegivecollective.com']; 
 
 // Cho phép thêm các origin localhost khi dev (Vite/CRA thường chạy các port này).
 // Production luôn chỉ nhận đúng PRODUCTION_ORIGIN.
