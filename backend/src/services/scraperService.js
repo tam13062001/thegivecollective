@@ -23,14 +23,15 @@ function getGAAuthClient(envVarName = 'GOOGLE_SERVICE_ACCOUNT_JSON') {
 }
 
 // Gọi runReport thô, trả về toàn bộ rows (mỗi row có dimensionValues + metricValues)
-const runGA4Report = async (propertyId, token, body) => {
+// days: số ngày lấy dữ liệu, mặc định 30 (thay cho hardcode '30daysAgo' trước đây)
+const runGA4Report = async (propertyId, token, body, days = 30) => {
   const response = await fetch(
     `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }],
         ...body,
       }),
     }
@@ -49,13 +50,13 @@ const runGA4Report = async (propertyId, token, body) => {
 
 // ---- Các breakdown theo dimension ----
 
-const fetchTrafficSources = async (propertyId, token) => {
+const fetchTrafficSources = async (propertyId, token, days) => {
   const rows = await runGA4Report(propertyId, token, {
     dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
     metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
     orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
     limit: 10,
-  });
+  }, days);
 
   return rows.map((row) => ({
     source: row.dimensionValues?.[0]?.value ?? '(not set)',
@@ -65,13 +66,13 @@ const fetchTrafficSources = async (propertyId, token) => {
   }));
 };
 
-const fetchCountries = async (propertyId, token) => {
+const fetchCountries = async (propertyId, token, days) => {
   const rows = await runGA4Report(propertyId, token, {
     dimensions: [{ name: 'country' }],
     metrics: [{ name: 'activeUsers' }, { name: 'sessions' }],
     orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }],
     limit: 10,
-  });
+  }, days);
 
   return rows.map((row) => ({
     country: row.dimensionValues?.[0]?.value ?? '(not set)',
@@ -82,12 +83,12 @@ const fetchCountries = async (propertyId, token) => {
 
 // Lưu ý: cần bật Google Signals trong GA4 property thì age/gender mới có data,
 // nếu không tất cả sẽ trả về "(not set)"/"unknown"
-const fetchAgeBrackets = async (propertyId, token) => {
+const fetchAgeBrackets = async (propertyId, token, days) => {
   const rows = await runGA4Report(propertyId, token, {
     dimensions: [{ name: 'userAgeBracket' }],
     metrics: [{ name: 'activeUsers' }],
     orderBys: [{ dimension: { dimensionName: 'userAgeBracket' } }],
-  });
+  }, days);
 
   return rows.map((row) => ({
     age: row.dimensionValues?.[0]?.value ?? 'unknown',
@@ -95,11 +96,11 @@ const fetchAgeBrackets = async (propertyId, token) => {
   }));
 };
 
-const fetchGenders = async (propertyId, token) => {
+const fetchGenders = async (propertyId, token, days) => {
   const rows = await runGA4Report(propertyId, token, {
     dimensions: [{ name: 'userGender' }],
     metrics: [{ name: 'activeUsers' }],
-  });
+  }, days);
 
   return rows.map((row) => ({
     gender: row.dimensionValues?.[0]?.value ?? 'unknown',
@@ -107,13 +108,13 @@ const fetchGenders = async (propertyId, token) => {
   }));
 };
 
-const fetchTopPages = async (propertyId, token) => {
+const fetchTopPages = async (propertyId, token, days) => {
   const rows = await runGA4Report(propertyId, token, {
     dimensions: [{ name: 'pagePath' }],
     metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }],
     orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
     limit: 10,
-  });
+  }, days);
 
   return rows.map((row) => ({
     path: row.dimensionValues?.[0]?.value ?? '(not set)',
@@ -122,14 +123,32 @@ const fetchTopPages = async (propertyId, token) => {
   }));
 };
 
+// Breakdown TOÀN BỘ key events (thay vì chỉ 4 cái hardcode như trước) —
+// GA4 trả về từng eventName kèm số lần kích hoạt (chỉ tính event đã đánh dấu "Key event" trong GA4)
+const fetchKeyEventsBreakdown = async (propertyId, token, days) => {
+  const rows = await runGA4Report(propertyId, token, {
+    dimensions: [{ name: 'eventName' }],
+    metrics: [{ name: 'keyEvents' }],
+    orderBys: [{ metric: { metricName: 'keyEvents' }, desc: true }],
+    limit: 20,
+  }, days);
+
+  return rows
+    .map((row) => ({
+      eventName: row.dimensionValues?.[0]?.value ?? '(not set)',
+      count: parseInt(row.metricValues?.[0]?.value) || 0,
+    }))
+    .filter((e) => e.count > 0); // bỏ event có count 0 (không phải key event thật sự trong kỳ này)
+};
+
 // ---- Core: fetch toàn bộ report cho 1 propertyId, dùng auth client theo envVarName chỉ định ----
-const fetchGA4StatsForProperty = async (propertyId, envVarName) => {
+const fetchGA4StatsForProperty = async (propertyId, envVarName, days = 30) => {
   const authClient = getGAAuthClient(envVarName);
   const { token } = await authClient.getAccessToken();
 
   const [
     batch1,
-    batch2,
+    keyEventsBreakdown,
     trafficSources,
     countries,
     ageBrackets,
@@ -146,20 +165,13 @@ const fetchGA4StatsForProperty = async (propertyId, envVarName) => {
         { name: 'bounceRate' },
         { name: 'averageSessionDuration' },
       ],
-    }).then((rows) => rows[0]?.metricValues ?? []),
-    runGA4Report(propertyId, token, {
-      metrics: [
-        { name: 'keyEvents' },
-        { name: 'keyEvents:qualify_lead' },
-        { name: 'keyEvents:close_convert_lead' },
-        { name: 'keyEvents:purchase' },
-      ],
-    }).then((rows) => rows[0]?.metricValues ?? []),
-    fetchTrafficSources(propertyId, token),
-    fetchCountries(propertyId, token),
-    fetchAgeBrackets(propertyId, token),
-    fetchGenders(propertyId, token),
-    fetchTopPages(propertyId, token),
+    }, days).then((rows) => rows[0]?.metricValues ?? []),
+    fetchKeyEventsBreakdown(propertyId, token, days),
+    fetchTrafficSources(propertyId, token, days),
+    fetchCountries(propertyId, token, days),
+    fetchAgeBrackets(propertyId, token, days),
+    fetchGenders(propertyId, token, days),
+    fetchTopPages(propertyId, token, days),
   ]);
 
   const users            = parseInt(batch1[0]?.value) || 0;
@@ -170,10 +182,22 @@ const fetchGA4StatsForProperty = async (propertyId, envVarName) => {
   const bounceRate        = parseFloat(batch1[5]?.value) || 0; // 0..1
   const avgDuration       = parseFloat(batch1[6]?.value) || 0; // giây
 
-  const totalKeyEvents    = parseInt(batch2[0]?.value) || 0;
-  const qualifyLeads      = parseInt(batch2[1]?.value) || 0;
-  const closeConvertLeads = parseInt(batch2[2]?.value) || 0;
-  const purchases         = parseInt(batch2[3]?.value) || 0;
+  const totalKeyEvents = keyEventsBreakdown.reduce((sum, e) => sum + e.count, 0);
+
+  const findCount = (name) => keyEventsBreakdown.find((e) => e.eventName === name)?.count || 0;
+
+  // Funnel donate của thegivecollective.com — 7 event cụ thể theo đúng tên trong GA4
+  // (checkout_btn_click, donate_now_btn, donation_amount_edit, donation_confirmation,
+  //  donation_payment, donor_info_form, tip_edit_button_click)
+  const donationFunnel = {
+    donateNowBtn: findCount('donate_now_btn'),
+    donorInfoForm: findCount('donor_info_form'),
+    donationAmountEdit: findCount('donation_amount_edit'),
+    tipEditButtonClick: findCount('tip_edit_button_click'),
+    checkoutBtnClick: findCount('checkout_btn_click'),
+    donationPayment: findCount('donation_payment'),
+    donationConfirmation: findCount('donation_confirmation'),
+  };
 
   return {
     followers: users,
@@ -186,10 +210,10 @@ const fetchGA4StatsForProperty = async (propertyId, envVarName) => {
     bounceRate: Math.round(bounceRate * 100),
     avgDuration: Math.round(avgDuration),
     engagementRate: Math.round(engagementRate * 100),
+    days,
     totalKeyEvents,
-    qualifyLeads,
-    closeConvertLeads,
-    purchases,
+    donationFunnel, // MỚI: 7 event donate cụ thể, tên field rõ nghĩa để render funnel trên UI
+    keyEventsBreakdown, // full list [{ eventName, count }] tất cả key events, không giới hạn
     trafficSources,
     countries,
     ageBrackets,
@@ -199,13 +223,13 @@ const fetchGA4StatsForProperty = async (propertyId, envVarName) => {
 };
 
 // Property GA4 chính — service account gốc (GOOGLE_SERVICE_ACCOUNT_JSON)
-export const fetchGoogleAnalyticsStats = async () => {
+export const fetchGoogleAnalyticsStats = async (days = 30) => {
   try {
     const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
     if (!propertyId) {
       return { followers: 0, posts: 0, views: 0, error: 'Thiếu GOOGLE_ANALYTICS_PROPERTY_ID trong env' };
     }
-    return await fetchGA4StatsForProperty(propertyId, 'GOOGLE_SERVICE_ACCOUNT_JSON');
+    return await fetchGA4StatsForProperty(propertyId, 'GOOGLE_SERVICE_ACCOUNT_JSON', days);
   } catch (error) {
     console.error('[GA4] Fetch error:', error);
     return { followers: 0, posts: 0, views: 0, error: error.message || 'Failed to fetch Google Analytics stats' };
@@ -214,13 +238,13 @@ export const fetchGoogleAnalyticsStats = async () => {
 
 // Property GA4 thứ 2 (analytics.thegivecollective.com) — service account RIÊNG
 // (GOOGLE_SERVICE_ACCOUNT_JSON_2), khác project với service account chính
-export const fetchGoogleAnalyticsStatsSecondary = async () => {
+export const fetchGoogleAnalyticsStatsSecondary = async (days = 30) => {
   try {
     const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID_2;
     if (!propertyId) {
       return { followers: 0, posts: 0, views: 0, error: 'Thiếu GOOGLE_ANALYTICS_PROPERTY_ID_2 trong env' };
     }
-    return await fetchGA4StatsForProperty(propertyId, 'GOOGLE_SERVICE_ACCOUNT_JSON_2');
+    return await fetchGA4StatsForProperty(propertyId, 'GOOGLE_SERVICE_ACCOUNT_JSON_2', days);
   } catch (error) {
     console.error('[GA4-2] Fetch error:', error);
     return { followers: 0, posts: 0, views: 0, error: error.message || 'Failed to fetch Google Analytics stats (secondary)' };

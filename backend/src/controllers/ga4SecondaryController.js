@@ -2,6 +2,7 @@ import GA4StatSecondary from '../models/GA4StatSecondary.js';
 import GA4History from '../models/GA4History.js';
 import { fetchGoogleAnalyticsStatsSecondary } from '../services/scraperService.js';
 
+
 // Chỉ track 1 website (secondary) nên dùng 1 document duy nhất (singleton)
 const getSingletonDoc = async () => {
   let doc = await GA4StatSecondary.findOne();
@@ -21,7 +22,11 @@ export const getGA4StatsSecondary = async (req, res) => {
 
 export const refreshGA4StatsSecondary = async (req, res) => {
   try {
-    const stats = await fetchGoogleAnalyticsStatsSecondary();
+    // ?days=7|14|30|90 — mặc định 30 nếu không truyền hoặc truyền sai
+    const parsedDays = parseInt(req.query.days, 10);
+    const days = [7, 14, 30, 90].includes(parsedDays) ? parsedDays : 30;
+
+    const stats = await fetchGoogleAnalyticsStatsSecondary(days);
     if (stats.error) return res.status(502).json({ message: stats.error });
 
     const doc = await getSingletonDoc();
@@ -32,10 +37,10 @@ export const refreshGA4StatsSecondary = async (req, res) => {
     doc.bounceRate = stats.bounceRate;
     doc.avgDuration = stats.avgDuration;
     doc.engagementRate = stats.engagementRate;
+    doc.days = stats.days;
     doc.totalKeyEvents = stats.totalKeyEvents;
-    doc.qualifyLeads = stats.qualifyLeads;
-    doc.closeConvertLeads = stats.closeConvertLeads;
-    doc.purchases = stats.purchases;
+    doc.donationFunnel = stats.donationFunnel;
+    doc.keyEventsBreakdown = stats.keyEventsBreakdown;
     doc.trafficSources = stats.trafficSources;
     doc.countries = stats.countries;
     doc.ageBrackets = stats.ageBrackets;

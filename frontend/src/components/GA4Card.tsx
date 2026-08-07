@@ -1,44 +1,175 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import {
   Eye, Users, UserPlus, BarChart3, TrendingUp, Clock, RefreshCw, Pencil,
-  Globe, FileText, AlertTriangle, Activity, MousePointerClick
+  Globe, FileText, AlertTriangle, Zap,
 } from 'lucide-react';
-// import { GA4Stats } from '../types'; // Đảm bảo bạn đã import đúng đường dẫn
-// import { GA4_API_URL, fmtDuration, fmtLastUpdated } from '../utils';
+import {
+  AreaChart, Area,
+  XAxis, YAxis,
+  CartesianGrid, Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 
-// ─── Component GA4Card ───────────────────────────────────────────────────────
+// ─── GA4 Types ────────────────────────────────────────────────────────────────
+
+interface TrafficSource {
+  source: string;
+  medium: string;
+  sessions: number;
+  users: number;
+}
+
+interface CountryStat {
+  country: string;
+  users: number;
+  sessions: number;
+}
+
+interface AgeBracket {
+  age: string;
+  users: number;
+}
+
+interface GenderStat {
+  gender: string;
+  users: number;
+}
+
+interface TopPage {
+  path: string;
+  views: number;
+  users: number;
+}
+
+interface KeyEvent {
+  eventName: string;
+  count: number;
+}
+
+interface DonationFunnel {
+  donateNowBtn: number;
+  donorInfoForm: number;
+  donationAmountEdit: number;
+  tipEditButtonClick: number;
+  checkoutBtnClick: number;
+  donationPayment: number;
+  donationConfirmation: number;
+}
+
+interface GA4Stats {
+  _id?: string;
+  websiteUrl: string;
+  pageviews: number;
+  users: number;
+  newUsers: number;
+  sessions: number;
+  bounceRate: number;
+  avgDuration: number;
+  engagementRate: number;
+  days: number;
+  totalKeyEvents: number;
+  donationFunnel: DonationFunnel;
+  keyEventsBreakdown: KeyEvent[];
+  trafficSources: TrafficSource[];
+  countries: CountryStat[];
+  ageBrackets: AgeBracket[];
+  genders: GenderStat[];
+  topPages: TopPage[];
+  lastUpdated: string;
+}
+
+// ─── Growth Chart Types ───────────────────────────────────────────────────────
+
+interface ChartPoint {
+  date: string;
+  views: number;
+  posts: number;
+  followers?: number;
+}
+
+interface Platform {
+  taskId: string;
+  platformName: string;
+  accountHandle: string;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const GA4_API_URL = 'https://thegivecollective-backend.vercel.app/api/v1/ga4-secondary';
+const HISTORY_API = 'https://thegivecollective-backend.vercel.app/api/v1/history';
+
+const RANGES = [
+  { label: '7D',  days: 7  },
+  { label: '14D', days: 14 },
+  { label: '30D', days: 30 },
+  { label: '90D', days: 90 },
+];
+
+// GA4 dùng chung mảng RANGES, tách alias cho rõ nghĩa ở phần GA4Card
+const GA4_RANGES = RANGES;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtDuration(seconds: number): string {
+  return `${Math.round(seconds)}s`;
+}
+
+function fmtLastUpdated(value: string | undefined | null): string {
+  if (!value) return 'No data';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'No data';
+  return date.toISOString();
+}
+
+function fmtNum(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: '2-digit',
+  });
+}
+
+function getDelta(data: ChartPoint[], key: keyof ChartPoint): number | null {
+  if (data.length < 2) return null;
+  const first = data[0][key] as number;
+  const last  = data[data.length - 1][key] as number;
+  if (!first) return null;
+  return ((last - first) / first) * 100;
+}
+
+// ─── GA4 Component ────────────────────────────────────────────────────────────
 
 export function GA4Card() {
-  const [stats, setStats] = useState<any | null>(null);
+  const [stats, setStats] = useState<GA4Stats | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [websiteDraft, setWebsiteDraft] = useState('');
-  
-  // NOTE: Đã bỏ state `days` ở đây vì Backend chỉ trả về data của 30 ngày gần nhất.
+  const [days, setDays] = useState(30); // range hiện tại đang hiển thị/refresh
 
   const fetchStats = async () => {
-    setIsLoading(true);
     try {
-      // Đã bỏ ?days=... vì BE không dùng params này cho route GET
-      const res = await fetch('https://thegivecollective-backend.vercel.app/api/v1/ga4-secondary');
+      const res = await fetch(GA4_API_URL);
       const data = await res.json();
 
       if (!res.ok) {
         setLoadError(data?.message || `Error ${res.status} loading GA4 stats`);
         setStats(null);
-      } else {
-        setLoadError(null);
-        setStats(data);
-        setWebsiteDraft(data.websiteUrl ?? '');
+        return;
       }
+
+      setLoadError(null);
+      setStats(data);
+      setWebsiteDraft(data.websiteUrl ?? '');
+      if (data.days) setDays(data.days); // đồng bộ range hiển thị với lần refresh gần nhất đã lưu
     } catch (error) {
       console.error('Error fetching GA4 stats:', error);
       setLoadError('Server connection error');
       setStats(null);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -46,15 +177,16 @@ export function GA4Card() {
     fetchStats();
   }, []);
 
-  const handleRefresh = async () => {
+  // rangeToUse: nếu truyền vào thì refresh theo range đó, không thì dùng range hiện tại
+  const handleRefresh = async (rangeToUse: number = days) => {
     setIsRefreshing(true);
     try {
-      // Đã bỏ ?days=... 
-      const res = await fetch('https://thegivecollective-backend.vercel.app/api/v1/ga4-secondary/refresh', { method: 'POST' });
+      const res = await fetch(`${GA4_API_URL}/refresh?days=${rangeToUse}`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         setLoadError(null);
         setStats(data);
+        setDays(rangeToUse);
       } else {
         alert(data.message || 'Failed to refresh GA4 stats');
       }
@@ -65,9 +197,15 @@ export function GA4Card() {
     }
   };
 
+  // Đổi range → tự động refresh luôn theo range mới (dữ liệu cũ đang lưu là của range khác, hiển thị sẽ sai)
+  const handleRangeChange = (newDays: number) => {
+    setDays(newDays);
+    handleRefresh(newDays);
+  };
+
   const handleSaveWebsite = async () => {
     try {
-      const res = await fetch('https://thegivecollective-backend.vercel.app/api/v1/ga4-secondary/website', {
+      const res = await fetch(`${GA4_API_URL}/website`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ websiteUrl: websiteDraft }),
@@ -84,24 +222,49 @@ export function GA4Card() {
     }
   };
 
-  // Hàm format hiển thị số (ví dụ: 1200 -> 1.2K)
-  const fmtNum = (n: number) => n.toLocaleString();
-  const maxEvents = stats ? Math.max(1, stats.totalKeyEvents) : 1;
+  if (loadError) {
+    return (
+      <div className="rounded-2xl border border-red-100 bg-red-50/60 p-6 flex items-center gap-3">
+        <AlertTriangle size={18} className="text-red-500 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-red-700">Failed to load GA4 stats</p>
+          <p className="text-xs text-red-500 mt-0.5">{loadError}</p>
+        </div>
+        <button
+          onClick={fetchStats}
+          className="ml-auto text-xs font-medium text-red-600 hover:text-red-700 underline"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (!stats) return null;
+
+  const trafficSources = stats.trafficSources ?? [];
+  const countries = stats.countries ?? [];
+  const ageBrackets = stats.ageBrackets ?? [];
+  const genders = stats.genders ?? [];
+  const topPages = stats.topPages ?? [];
+  const keyEventsBreakdown = stats.keyEventsBreakdown ?? [];
+
+  const maxSourceSessions = Math.max(1, ...trafficSources.map((t) => t.sessions));
+  const maxCountryUsers = Math.max(1, ...countries.map((c) => c.users));
+  const maxAgeUsers = Math.max(1, ...ageBrackets.map((a) => a.users));
+  const maxGenderUsers = Math.max(1, ...genders.map((g) => g.users));
+  const maxPageViews = Math.max(1, ...topPages.map((p) => p.views));
+  const maxEventCount = Math.max(1, ...keyEventsBreakdown.map((e) => e.count));
 
   return (
     <div className="relative rounded-2xl border border-slate-100 bg-slate-50/60 p-6">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">Website Analytics (GA4)</h2>
-            {/* Hiển thị rõ Time Range cho người dùng biết (Dựa theo Backend) */}
-            <span className="px-2.5 py-1 rounded-md bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200">
-              Last 30 Days
-            </span>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-slate-500">Website</p>
           </div>
-          
           {isEditing ? (
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-1">
               <input
                 type="text"
                 value={websiteDraft}
@@ -109,13 +272,28 @@ export function GA4Card() {
                 className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm w-72 focus:outline-none focus:ring-1 focus:ring-blue-300"
                 autoFocus
               />
-              <button onClick={handleSaveWebsite} className="text-xs font-medium text-blue-600 hover:text-blue-700">Save</button>
-              <button onClick={() => { setIsEditing(false); setWebsiteDraft(stats?.websiteUrl || ''); }} className="text-xs text-slate-400 hover:text-slate-600">Cancel</button>
+              <button onClick={handleSaveWebsite} className="text-xs font-medium text-blue-600 hover:text-blue-700">
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  setWebsiteDraft(stats.websiteUrl);
+                }}
+                className="text-xs text-slate-400 hover:text-slate-600"
+              >
+                Cancel
+              </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 mt-2">
-              <a href={stats?.websiteUrl || '#'} target="_blank" rel="noreferrer" className="text-lg font-semibold text-blue-600 hover:underline">
-                {stats?.websiteUrl || 'Website not set'}
+            <div className="flex items-center gap-2 mt-1">
+              <a
+                href={stats.websiteUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-lg font-semibold text-blue-600 hover:underline"
+              >
+                {stats.websiteUrl || 'Website not set'}
               </a>
               <button onClick={() => setIsEditing(true)} title="Edit" className="text-slate-400 hover:text-slate-600">
                 <Pencil size={14} />
@@ -124,101 +302,168 @@ export function GA4Card() {
           )}
         </div>
 
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing || isLoading}
-          className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-slate-300 transition-colors"
-        >
-          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-          {isRefreshing ? 'Updating...' : 'Refresh GA4 Stats'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Range pills — chọn xong tự refresh theo range đó */}
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
+            {GA4_RANGES.map(({ label, days: d }) => (
+              <button
+                key={d}
+                onClick={() => handleRangeChange(d)}
+                disabled={isRefreshing}
+                className={`px-3 h-9 font-medium transition-colors disabled:opacity-50 ${
+                  days === d
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => handleRefresh()}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-slate-300 transition-colors"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            {isRefreshing ? 'Updating...' : 'Refresh GA4 Stats'}
+          </button>
+        </div>
       </div>
 
-      {isLoading ? (
-        <div className="h-64 flex items-center justify-center text-slate-500 bg-white rounded-xl border border-slate-100">
-          Loading GA4 data...
-        </div>
-      ) : loadError ? (
-        <div className="rounded-xl border border-red-100 bg-red-50/60 p-6 flex flex-col items-center justify-center gap-3 h-64">
-          <AlertTriangle size={32} className="text-red-400" />
-          <div className="text-center">
-            <p className="text-sm font-medium text-red-700">Failed to load GA4 stats</p>
-            <p className="text-xs text-red-500 mt-1">{loadError}</p>
-          </div>
-          <button onClick={fetchStats} className="mt-2 text-sm font-medium text-red-600 hover:text-red-700 underline">Try again</button>
-        </div>
-      ) : stats ? (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-            <StatBox icon={<Eye size={16} className="text-blue-500" />} label="Pageviews" value={fmtNum(stats.pageviews)} />
-            <StatBox icon={<Users size={16} className="text-emerald-500" />} label="Users" value={fmtNum(stats.users)} />
-            <StatBox icon={<UserPlus size={16} className="text-green-500" />} label="New Users" value={fmtNum(stats.newUsers)} />
-            <StatBox icon={<BarChart3 size={16} className="text-purple-500" />} label="Sessions" value={fmtNum(stats.sessions)} />
-            <StatBox icon={<TrendingUp size={16} className="text-orange-500" />} label="Bounce Rate" value={`${stats.bounceRate}%`} />
-            <StatBox icon={<TrendingUp size={16} className="text-teal-500" />} label="Engage Rate" value={`${stats.engagementRate}%`} />
-            <StatBox icon={<Clock size={16} className="text-pink-500" />} label="Avg Duration" value={`${Math.round(stats.avgDuration)}s`} />
-            <StatBox icon={<MousePointerClick size={16} className="text-yellow-500" />} label="Events" value={fmtNum(stats.totalKeyEvents)} />
-          </div>
+      <div className="grid grid-cols-2 sm:grid-cols-7 gap-4">
+        <StatBox icon={<Eye size={16} className="text-blue-500" />} label="Pageviews" value={stats.pageviews.toLocaleString()} />
+        <StatBox icon={<Users size={16} className="text-emerald-500" />} label="Users" value={stats.users.toLocaleString()} />
+        <StatBox icon={<UserPlus size={16} className="text-green-500" />} label="New Users" value={stats.newUsers.toLocaleString()} />
+        <StatBox icon={<BarChart3 size={16} className="text-purple-500" />} label="Sessions" value={stats.sessions.toLocaleString()} />
+        <StatBox icon={<TrendingUp size={16} className="text-orange-500" />} label="Bounce Rate" value={`${stats.bounceRate}%`} />
+        <StatBox icon={<TrendingUp size={16} className="text-teal-500" />} label="Engagement Rate" value={`${stats.engagementRate}%`} />
+        <StatBox icon={<Clock size={16} className="text-pink-500" />} label="Avg Duration" value={fmtDuration(stats.avgDuration)} />
+      </div>
 
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <BreakdownPanel icon={<Globe size={14} className="text-blue-500" />} title="Traffic Source / Medium">
-              {(!stats.trafficSources || stats.trafficSources.length === 0) && <EmptyNote />}
-              {stats.trafficSources?.map((t: any, i: number) => (
-                <BarRow key={i} label={`${t.source} / ${t.medium}`} value={t.sessions} max={Math.max(1, ...stats.trafficSources.map((x: any) => x.sessions))} suffix={`${t.sessions} sessions`} />
-              ))}
-            </BreakdownPanel>
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BreakdownPanel
+          icon={<Globe size={14} className="text-blue-500" />}
+          title="Traffic Source / Medium"
+        >
+          {trafficSources.length === 0 && <EmptyNote />}
+          {trafficSources.map((t, i) => (
+            <BarRow
+              key={i}
+              label={`${t.source} / ${t.medium}`}
+              value={t.sessions}
+              max={maxSourceSessions}
+              suffix={`${t.sessions} sessions`}
+            />
+          ))}
+        </BreakdownPanel>
 
-            <BreakdownPanel icon={<Globe size={14} className="text-emerald-500" />} title="Countries">
-              {(!stats.countries || stats.countries.length === 0) && <EmptyNote />}
-              {stats.countries?.map((c: any, i: number) => (
-                <BarRow key={i} label={c.country} value={c.users} max={Math.max(1, ...stats.countries.map((x: any) => x.users))} suffix={`${c.users} users`} barClassName="bg-emerald-400" />
-              ))}
-            </BreakdownPanel>
+        <BreakdownPanel
+          icon={<Globe size={14} className="text-emerald-500" />}
+          title="Countries"
+        >
+          {countries.length === 0 && <EmptyNote />}
+          {countries.map((c, i) => (
+            <BarRow
+              key={i}
+              label={c.country}
+              value={c.users}
+              max={maxCountryUsers}
+              suffix={`${c.users} users`}
+              barClassName="bg-emerald-400"
+            />
+          ))}
+        </BreakdownPanel>
 
-            <BreakdownPanel icon={<Users size={14} className="text-purple-500" />} title="Age" note="Enable Google Signals in GA4 to see this data">
-              {(!stats.ageBrackets || stats.ageBrackets.length === 0) && <EmptyNote />}
-              {stats.ageBrackets?.map((a: any, i: number) => (
-                <BarRow key={i} label={a.age} value={a.users} max={Math.max(1, ...stats.ageBrackets.map((x: any) => x.users))} suffix={`${a.users} users`} barClassName="bg-purple-400" />
-              ))}
-            </BreakdownPanel>
+        <BreakdownPanel
+          icon={<Users size={14} className="text-purple-500" />}
+          title="Age"
+          note="Enable Google Signals in GA4 to see this data"
+        >
+          {ageBrackets.length === 0 && <EmptyNote />}
+          {ageBrackets.map((a, i) => (
+            <BarRow
+              key={i}
+              label={a.age}
+              value={a.users}
+              max={maxAgeUsers}
+              suffix={`${a.users} users`}
+              barClassName="bg-purple-400"
+            />
+          ))}
+        </BreakdownPanel>
 
-            <BreakdownPanel icon={<Users size={14} className="text-pink-500" />} title="Gender" note="Enable Google Signals in GA4 to see this data">
-              {(!stats.genders || stats.genders.length === 0) && <EmptyNote />}
-              {stats.genders?.map((g: any, i: number) => (
-                <BarRow key={i} label={g.gender} value={g.users} max={Math.max(1, ...stats.genders.map((x: any) => x.users))} suffix={`${g.users} users`} barClassName="bg-pink-400" />
-              ))}
-            </BreakdownPanel>
+        <BreakdownPanel
+          icon={<Users size={14} className="text-pink-500" />}
+          title="Gender"
+          note="Enable Google Signals in GA4 to see this data"
+        >
+          {genders.length === 0 && <EmptyNote />}
+          {genders.map((g, i) => (
+            <BarRow
+              key={i}
+              label={g.gender}
+              value={g.users}
+              max={maxGenderUsers}
+              suffix={`${g.users} users`}
+              barClassName="bg-pink-400"
+            />
+          ))}
+        </BreakdownPanel>
 
-            {/* BẢNG EVENTS VỪA THÊM THEO YÊU CẦU */}
-            <BreakdownPanel icon={<MousePointerClick size={14} className="text-yellow-500" />} title="Key Events Breakdown">
-              <BarRow label="Total Key Events" value={stats.totalKeyEvents} max={maxEvents} suffix={fmtNum(stats.totalKeyEvents)} barClassName="bg-yellow-400" />
-              <BarRow label="Qualify Leads (qualify_lead)" value={stats.qualifyLeads} max={maxEvents} suffix={fmtNum(stats.qualifyLeads)} barClassName="bg-yellow-400" />
-              <BarRow label="Close Convert Leads (close_convert_lead)" value={stats.closeConvertLeads} max={maxEvents} suffix={fmtNum(stats.closeConvertLeads)} barClassName="bg-yellow-400" />
-              <BarRow label="Purchases (purchase)" value={stats.purchases} max={maxEvents} suffix={fmtNum(stats.purchases)} barClassName="bg-yellow-400" />
-            </BreakdownPanel>
+        <BreakdownPanel
+          icon={<FileText size={14} className="text-orange-500" />}
+          title="Top Pages"
+        >
+          {topPages.length === 0 && <EmptyNote />}
+          {topPages.map((p, i) => (
+            <BarRow
+              key={i}
+              label={p.path}
+              value={p.views}
+              max={maxPageViews}
+              suffix={`${p.views} views · ${p.users} users`}
+              barClassName="bg-orange-400"
+            />
+          ))}
+        </BreakdownPanel>
 
-            <BreakdownPanel icon={<FileText size={14} className="text-orange-500" />} title="Top Pages">
-              {(!stats.topPages || stats.topPages.length === 0) && <EmptyNote />}
-              {stats.topPages?.map((p: any, i: number) => (
-                <BarRow key={i} label={p.path} value={p.views} max={Math.max(1, ...stats.topPages.map((x: any) => x.views))} suffix={`${p.views} views · ${p.users} users`} barClassName="bg-orange-400" />
-              ))}
-            </BreakdownPanel>
-          </div>
+        {/* Full list Key Events (mọi event GA4 đánh dấu Key event, không giới hạn) */}
+        <BreakdownPanel
+          icon={<Zap size={14} className="text-amber-500" />}
+          title={`Key Events (${stats.totalKeyEvents.toLocaleString()} total)`}
+        >
+          {keyEventsBreakdown.length === 0 && <EmptyNote />}
+          {keyEventsBreakdown.map((e, i) => (
+            <BarRow
+              key={i}
+              label={e.eventName}
+              value={e.count}
+              max={maxEventCount}
+              suffix={`${e.count} events`}
+              barClassName="bg-amber-400"
+            />
+          ))}
+        </BreakdownPanel>
 
-          <p className="mt-4 text-right text-xs text-slate-400">
-            Last updated: {stats.lastUpdated ? new Date(stats.lastUpdated).toLocaleString() : 'No data'}
-          </p>
-        </>
-      ) : null}
+        {/* Funnel donate riêng — 7 event cụ thể theo đúng flow */}
+        {stats.donationFunnel && <FunnelPanel funnel={stats.donationFunnel} />}
+      </div>
+
+      <p className="mt-4 text-right text-xs text-slate-400">
+        Data range: last {stats.days ?? days} days · Last updated: {fmtLastUpdated(stats.lastUpdated)}
+      </p>
     </div>
   );
 }
 
-// Sub-components nội bộ của GA4Card
+// ─── GA4 Helper Components ────────────────────────────────────────────────────
+
 function StatBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
-      <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5 whitespace-nowrap">
+    <div className="rounded-xl bg-slate-200/60 px-4 py-3">
+      <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
         {icon}
         <span>{label}</span>
       </div>
@@ -227,28 +472,52 @@ function StatBox({ icon, label, value }: { icon: React.ReactNode; label: string;
   );
 }
 
-function BreakdownPanel({ icon, title, note, className = '', children }: any) {
+function BreakdownPanel({
+  icon,
+  title,
+  note,
+  className = '',
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  note?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className={`rounded-xl bg-white border border-slate-200 p-5 shadow-sm ${className}`}>
+    <div className={`rounded-xl bg-white border border-slate-100 p-4 ${className}`}>
       <div className="flex items-center gap-1.5 mb-1">
         {icon}
-        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">{title}</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{title}</p>
       </div>
-      {note && <p className="text-[11px] text-slate-400 mb-3">{note}</p>}
-      <div className="space-y-3 mt-4">{children}</div>
+      {note && <p className="text-[11px] text-slate-400 mb-2">{note}</p>}
+      <div className="space-y-2 mt-2">{children}</div>
     </div>
   );
 }
 
-function BarRow({ label, value, max, suffix, barClassName = 'bg-blue-400' }: any) {
+function BarRow({
+  label,
+  value,
+  max,
+  suffix,
+  barClassName = 'bg-blue-400',
+}: {
+  label: string;
+  value: number;
+  max: number;
+  suffix: string;
+  barClassName?: string;
+}) {
   const pct = Math.max(2, Math.round((value / max) * 100));
   return (
     <div>
-      <div className="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
+      <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
         <span className="truncate max-w-[65%]" title={label}>{label}</span>
-        <span className="text-slate-500 whitespace-nowrap">{suffix}</span>
+        <span className="text-slate-400 whitespace-nowrap">{suffix}</span>
       </div>
-      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
         <div className={`h-full rounded-full ${barClassName}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -256,5 +525,260 @@ function BarRow({ label, value, max, suffix, barClassName = 'bg-blue-400' }: any
 }
 
 function EmptyNote() {
-  return <p className="text-sm text-slate-400 italic py-2">No data recorded</p>;
+  return <p className="text-xs text-slate-400 italic">No data</p>;
+}
+
+// Funnel donate — hiển thị đúng thứ tự flow, kèm % giữ chân so với bước đầu tiên
+function FunnelPanel({ funnel }: { funnel: DonationFunnel }) {
+  const steps: { label: string; value: number }[] = [
+    { label: 'Donate Now (btn)', value: funnel.donateNowBtn },
+    { label: 'Donor Info Form', value: funnel.donorInfoForm },
+    { label: 'Edit Donation Amount', value: funnel.donationAmountEdit },
+    { label: 'Edit Tip', value: funnel.tipEditButtonClick },
+    { label: 'Checkout (btn)', value: funnel.checkoutBtnClick },
+    { label: 'Payment', value: funnel.donationPayment },
+    { label: 'Confirmation', value: funnel.donationConfirmation },
+  ];
+
+  const hasAnyData = steps.some((s) => s.value > 0);
+  const baseline = steps[0].value || 1;
+
+  return (
+    <div className="rounded-xl bg-white border border-slate-100 p-4 lg:col-span-2">
+      <div className="flex items-center gap-1.5 mb-3">
+        <TrendingUp size={14} className="text-indigo-500" />
+        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Donation Funnel</p>
+      </div>
+
+      {!hasAnyData && <EmptyNote />}
+
+      {hasAnyData && (
+        <div className="space-y-2.5">
+          {steps.map((step, i) => {
+            const pctOfBaseline = Math.round((step.value / baseline) * 100);
+            return (
+              <div key={i} className="flex items-center gap-3">
+                <span className="text-xs text-slate-500 w-40 shrink-0 truncate" title={step.label}>
+                  {step.label}
+                </span>
+                <div className="flex-1 h-6 rounded-md bg-slate-100 overflow-hidden relative">
+                  <div
+                    className="h-full rounded-md bg-indigo-400/80"
+                    style={{ width: `${Math.max(2, pctOfBaseline)}%` }}
+                  />
+                  <span className="absolute inset-0 flex items-center px-2 text-[11px] font-medium text-slate-700">
+                    {step.value.toLocaleString()} {i > 0 && `(${pctOfBaseline}%)`}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Growth Chart Helper Components ───────────────────────────────────────────
+
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white/95 backdrop-blur shadow-xl px-4 py-3 min-w-[140px]">
+      <p className="text-xs text-slate-400 mb-2 font-medium">{label}</p>
+      {payload.map((p: any) => (
+        <p key={p.dataKey} className="text-base font-bold tabular-nums" style={{ color: p.stroke }}>
+          {fmtNum(p.value)}
+          <span className="text-xs font-normal text-slate-400 ml-1">{p.name}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function ChartPanel({
+  title, data, dataKey, color, days,
+}: {
+  title: string;
+  data: ChartPoint[];
+  dataKey: keyof ChartPoint;
+  color: string;
+  days: number;
+}) {
+  const gradId = useId();
+
+  const chartData = data.length === 1
+    ? [{ ...data[0], date: '—' }, ...data.map((d) => ({ ...d, date: fmtDate(d.date) }))]
+    : data.map((d) => ({ ...d, date: fmtDate(d.date) }));
+
+  const delta = getDelta(data, dataKey);
+  const isUp  = delta !== null && delta > 0;
+  const isDown = delta !== null && delta < 0;
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white overflow-hidden">
+      <div className="px-5 py-3 flex items-center justify-between border-b border-slate-100 bg-slate-50/60">
+        <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{title}</span>
+        <span className="text-xs text-slate-400 font-mono">{days} days</span>
+      </div>
+
+      <div className="px-5 pt-4 pb-1 flex items-end gap-3">
+        <span className="text-3xl font-bold text-slate-800 tabular-nums">
+          {fmtNum((data[data.length - 1]?.[dataKey] as number) ?? 0)}
+        </span>
+        {delta !== null && (
+          <span
+            className={`mb-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
+              isUp   ? 'bg-emerald-100 text-emerald-600' :
+              isDown ? 'bg-rose-100 text-rose-600' :
+                       'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {isUp ? '↑' : isDown ? '↓' : '→'} {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%
+          </span>
+        )}
+        {delta === null && (
+          <span className="mb-1 text-xs text-slate-400">vs period start</span>
+        )}
+      </div>
+
+      <div className="px-2 pb-3">
+        {data.length === 0 ? (
+          <div className="h-40 flex items-center justify-center text-sm text-slate-400">
+            No historical data available
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={chartData} margin={{ top: 4, right: 12, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%"   stopColor={color} stopOpacity={0.25} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0.01} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} strokeOpacity={0.6} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tickFormatter={fmtNum}
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tickLine={false}
+                axisLine={false}
+                width={44}
+              />
+              <Tooltip content={<ChartTooltip />} />
+              <Area
+                type="monotone"
+                dataKey={dataKey as string}
+                name={title}
+                stroke={color}
+                strokeWidth={2.5}
+                fill={`url(#${gradId})`}
+                dot={false}
+                activeDot={{ r: 5, fill: color, stroke: '#fff', strokeWidth: 2 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Growth Chart Component ───────────────────────────────────────────────────
+
+export function GrowthChart() {
+  const [platforms, setPlatforms]   = useState<Platform[]>([]);
+  const [selectedId, setSelectedId] = useState<string>('all');
+  const [days, setDays]             = useState(30);
+  const [data, setData]             = useState<ChartPoint[]>([]);
+  const [loading, setLoading]       = useState(false);
+
+  useEffect(() => {
+    fetch(`${HISTORY_API}/platforms`)
+      .then((r) => r.json())
+      .then(setPlatforms)
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const params = new URLSearchParams({ days: String(days) });
+    if (selectedId !== 'all') params.set('taskId', selectedId);
+
+    fetch(`${HISTORY_API}?${params}`)
+      .then((r) => r.json())
+      .then(setData)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [selectedId, days]);
+
+  const selectedPlatform = platforms.find((p) => p.taskId === selectedId);
+
+  return (
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Daily Growth</h2>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {selectedId === 'all'
+              ? 'Aggregated summary of all platforms'
+              : `${selectedPlatform?.platformName} · @${selectedPlatform?.accountHandle}`}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="h-9 pl-3 pr-8 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-200 appearance-none"
+          >
+            <option value="all">All profiles</option>
+            {platforms.map((p) => (
+              <option key={p.taskId} value={p.taskId}>
+                {p.platformName} · @{p.accountHandle}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
+            {RANGES.map(({ label, days: d }) => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className={`px-3 h-9 font-medium transition-colors ${
+                  days === d
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="h-64 flex items-center justify-center text-slate-400 text-sm">
+          <svg className="animate-spin w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+          Loading...
+        </div>
+      ) : (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ChartPanel title="Views over time"     data={data} dataKey="views"     color="#10b981" days={days} />
+        <ChartPanel title="Posts over time"     data={data} dataKey="posts"     color="#10b981" days={days} />
+        <ChartPanel title="Followers over time" data={data} dataKey="followers" color="#6366f1" days={days} />
+      </div>
+      )}
+    </section>
+  );
 }

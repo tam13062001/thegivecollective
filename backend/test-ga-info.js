@@ -3,6 +3,11 @@ dotenv.config();
 import { JWT } from 'google-auth-library';
 
 const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_2;
+if (!raw) {
+  console.error('Thiếu GOOGLE_SERVICE_ACCOUNT_JSON_2 trong .env');
+  process.exit(1);
+}
+
 const credentials = JSON.parse(Buffer.from(raw, 'base64').toString('utf-8'));
 
 const authClient = new JWT({
@@ -12,56 +17,60 @@ const authClient = new JWT({
 });
 
 const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID_2;
+if (!propertyId) {
+  console.error('Thiếu GOOGLE_ANALYTICS_PROPERTY_ID_2 trong .env');
+  process.exit(1);
+}
+
+// Đổi số này để test range khác — khớp với GA4_RANGES trên UI (7 / 14 / 30 / 90)
+const DAYS = 30;
+
 const { token } = await authClient.getAccessToken();
 
-// 1. Tên property
-const propRes = await fetch(`https://analyticsadmin.googleapis.com/v1beta/properties/${propertyId}`, {
-  headers: { Authorization: `Bearer ${token}` },
-});
-console.log('--- Property ---');
-console.log(await propRes.json());
+console.log(`--- Key Events breakdown (${DAYS} ngày gần nhất) — property ${propertyId} ---\n`);
 
-// 2. Data streams (chứa URL website thật)
-const streamsRes = await fetch(`https://analyticsadmin.googleapis.com/v1beta/properties/${propertyId}/dataStreams`, {
-  headers: { Authorization: `Bearer ${token}` },
-});
-console.log('--- Data Streams ---');
-console.log(JSON.stringify(await streamsRes.json(), null, 2));
-
-// 3. Liệt kê TẤT CẢ metrics khả dụng cho property này
-const metadataRes = await fetch(
-  `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}/metadata`,
-  { headers: { Authorization: `Bearer ${token}` } }
-);
-const metadata = await metadataRes.json();
-console.log('--- Tất cả Metrics khả dụng ---');
-metadata.metrics?.forEach((m) => {
-  console.log(`${m.apiName.padEnd(35)} ${m.uiName}`);
-});
-
-// 4. Thử lấy 1 bộ metric mở rộng 
-const extendedRes = await fetch(
+const res = await fetch(
   `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
   {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
-      metrics: [
-        { name: 'activeUsers' },
-        { name: 'newUsers' },
-        { name: 'sessions' },
-        { name: 'engagementRate' },
-        { name: 'screenPageViews' },
-        { name: 'bounceRate' },
-        { name: 'averageSessionDuration' },
-        { name: 'keyEvents' },
-        { name: 'keyEvents:qualify_lead' },
-        { name: 'keyEvents:close_convert_lead' },
-      ],
+      dateRanges: [{ startDate: `${DAYS}daysAgo`, endDate: 'today' }],
+      dimensions: [{ name: 'eventName' }],
+      metrics: [{ name: 'keyEvents' }],
+      orderBys: [{ metric: { metricName: 'keyEvents' }, desc: true }],
+      limit: 20,
     }),
   }
 );
-const extendedData = await extendedRes.json();
-console.log('--- Bộ metric mở rộng ---');
-console.log(JSON.stringify(extendedData, null, 2));
+
+const data = await res.json();
+
+if (data.error) {
+  console.error('GA4 API error:', data.error);
+  process.exit(1);
+}
+
+const rows = data.rows ?? [];
+
+const keyEventsBreakdown = rows
+  .map((row) => ({
+    eventName: row.dimensionValues?.[0]?.value ?? '(not set)',
+    count: parseInt(row.metricValues?.[0]?.value) || 0,
+  }))
+  .filter((e) => e.count > 0);
+
+if (keyEventsBreakdown.length === 0) {
+  console.log('Không có key event nào có data trong khoảng thời gian này.');
+} else {
+  const maxNameLen = Math.max(...keyEventsBreakdown.map((e) => e.eventName.length));
+  keyEventsBreakdown.forEach((e) => {
+    console.log(`${e.eventName.padEnd(maxNameLen + 2)} ${e.count}`);
+  });
+}
+
+const totalKeyEvents = keyEventsBreakdown.reduce((sum, e) => sum + e.count, 0);
+console.log(`\nTổng: ${totalKeyEvents} key events`);
+
+console.log('\n--- Raw response (để đối chiếu nếu số liệu không khớp GA4 UI) ---');
+console.log(JSON.stringify(data, null, 2));
