@@ -2,7 +2,6 @@ import GA4StatSecondary from '../models/GA4StatSecondary.js';
 import GA4History from '../models/GA4History.js';
 import { fetchGoogleAnalyticsStatsSecondary } from '../services/scraperService.js';
 
-
 // Chỉ track 1 website (secondary) nên dùng 1 document duy nhất (singleton)
 const getSingletonDoc = async () => {
   let doc = await GA4StatSecondary.findOne();
@@ -41,6 +40,7 @@ export const refreshGA4StatsSecondary = async (req, res) => {
     doc.totalKeyEvents = stats.totalKeyEvents;
     doc.donationFunnel = stats.donationFunnel;
     doc.keyEventsBreakdown = stats.keyEventsBreakdown;
+    doc.keyEventsBreakdownExcludeDirect = stats.keyEventsBreakdownExcludeDirect;
     doc.trafficSources = stats.trafficSources;
     doc.countries = stats.countries;
     doc.ageBrackets = stats.ageBrackets;

@@ -22,7 +22,6 @@ if (!propertyId) {
   process.exit(1);
 }
 
-// Đổi số này để test range khác — khớp với GA4_RANGES trên UI (7 / 14 / 30 / 90)
 const DAYS = 30;
 
 const { token } = await authClient.getAccessToken();

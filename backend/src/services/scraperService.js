@@ -123,15 +123,34 @@ const fetchTopPages = async (propertyId, token, days) => {
   }));
 };
 
-// Breakdown TOÀN BỘ key events (thay vì chỉ 4 cái hardcode như trước) —
-// GA4 trả về từng eventName kèm số lần kích hoạt (chỉ tính event đã đánh dấu "Key event" trong GA4)
-const fetchKeyEventsBreakdown = async (propertyId, token, days) => {
-  const rows = await runGA4Report(propertyId, token, {
+// Breakdown TOÀN BỘ key events, trả về từng eventName kèm số lần kích hoạt
+// (chỉ tính event đã đánh dấu "Key event" trong GA4).
+// excludeDirect = true: lọc bỏ traffic có sessionSourceMedium = "(direct) / (none)"
+// (tức chỉ giữ traffic có nguồn xác định được — UTM, referrer, organic...)
+const fetchKeyEventsBreakdown = async (propertyId, token, days, excludeDirect = false) => {
+  const body = {
     dimensions: [{ name: 'eventName' }],
     metrics: [{ name: 'keyEvents' }],
     orderBys: [{ metric: { metricName: 'keyEvents' }, desc: true }],
     limit: 20,
-  }, days);
+  };
+
+  if (excludeDirect) {
+    body.dimensionFilter = {
+      notExpression: {
+        filter: {
+          fieldName: 'sessionSourceMedium',
+          stringFilter: {
+            matchType: 'EXACT',
+            value: '(direct) / (none)',
+            caseSensitive: false,
+          },
+        },
+      },
+    };
+  }
+
+  const rows = await runGA4Report(propertyId, token, body, days);
 
   return rows
     .map((row) => ({
@@ -149,6 +168,7 @@ const fetchGA4StatsForProperty = async (propertyId, envVarName, days = 30) => {
   const [
     batch1,
     keyEventsBreakdown,
+    keyEventsBreakdownExcludeDirect,
     trafficSources,
     countries,
     ageBrackets,
@@ -166,7 +186,8 @@ const fetchGA4StatsForProperty = async (propertyId, envVarName, days = 30) => {
         { name: 'averageSessionDuration' },
       ],
     }, days).then((rows) => rows[0]?.metricValues ?? []),
-    fetchKeyEventsBreakdown(propertyId, token, days),
+    fetchKeyEventsBreakdown(propertyId, token, days, false),
+    fetchKeyEventsBreakdown(propertyId, token, days, true), // MỚI: bảng lọc bỏ (direct)/(none)
     fetchTrafficSources(propertyId, token, days),
     fetchCountries(propertyId, token, days),
     fetchAgeBrackets(propertyId, token, days),
@@ -214,6 +235,7 @@ const fetchGA4StatsForProperty = async (propertyId, envVarName, days = 30) => {
     totalKeyEvents,
     donationFunnel, // MỚI: 7 event donate cụ thể, tên field rõ nghĩa để render funnel trên UI
     keyEventsBreakdown, // full list [{ eventName, count }] tất cả key events, không giới hạn
+    keyEventsBreakdownExcludeDirect, // giống trên nhưng lọc bỏ traffic (direct)/(none)
     trafficSources,
     countries,
     ageBrackets,

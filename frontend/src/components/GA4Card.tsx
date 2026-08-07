@@ -70,6 +70,7 @@ interface GA4Stats {
   totalKeyEvents: number;
   donationFunnel: DonationFunnel;
   keyEventsBreakdown: KeyEvent[];
+  keyEventsBreakdownExcludeDirect: KeyEvent[];
   trafficSources: TrafficSource[];
   countries: CountryStat[];
   ageBrackets: AgeBracket[];
@@ -78,25 +79,11 @@ interface GA4Stats {
   lastUpdated: string;
 }
 
-// ─── Growth Chart Types ───────────────────────────────────────────────────────
-
-interface ChartPoint {
-  date: string;
-  views: number;
-  posts: number;
-  followers?: number;
-}
-
-interface Platform {
-  taskId: string;
-  platformName: string;
-  accountHandle: string;
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// Dùng proxy nên gọi tương đối, không cần domain + port
 const GA4_API_URL = 'https://thegivecollective-backend.vercel.app/api/v1/ga4-secondary';
-const HISTORY_API = 'https://thegivecollective-backend.vercel.app/api/v1/history';
+const HISTORY_API = 'https://thegivecollective-backend.vercel.app/api/v1/ga4-secondary/history'; 
 
 const RANGES = [
   { label: '7D',  days: 7  },
@@ -105,7 +92,6 @@ const RANGES = [
   { label: '90D', days: 90 },
 ];
 
-// GA4 dùng chung mảng RANGES, tách alias cho rõ nghĩa ở phần GA4Card
 const GA4_RANGES = RANGES;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -149,7 +135,7 @@ export function GA4Card() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [websiteDraft, setWebsiteDraft] = useState('');
-  const [days, setDays] = useState(30); // range hiện tại đang hiển thị/refresh
+  const [days, setDays] = useState(30);
 
   const fetchStats = async () => {
     try {
@@ -165,7 +151,7 @@ export function GA4Card() {
       setLoadError(null);
       setStats(data);
       setWebsiteDraft(data.websiteUrl ?? '');
-      if (data.days) setDays(data.days); // đồng bộ range hiển thị với lần refresh gần nhất đã lưu
+      if (data.days) setDays(data.days);
     } catch (error) {
       console.error('Error fetching GA4 stats:', error);
       setLoadError('Server connection error');
@@ -177,7 +163,6 @@ export function GA4Card() {
     fetchStats();
   }, []);
 
-  // rangeToUse: nếu truyền vào thì refresh theo range đó, không thì dùng range hiện tại
   const handleRefresh = async (rangeToUse: number = days) => {
     setIsRefreshing(true);
     try {
@@ -197,7 +182,6 @@ export function GA4Card() {
     }
   };
 
-  // Đổi range → tự động refresh luôn theo range mới (dữ liệu cũ đang lưu là của range khác, hiển thị sẽ sai)
   const handleRangeChange = (newDays: number) => {
     setDays(newDays);
     handleRefresh(newDays);
@@ -248,6 +232,7 @@ export function GA4Card() {
   const genders = stats.genders ?? [];
   const topPages = stats.topPages ?? [];
   const keyEventsBreakdown = stats.keyEventsBreakdown ?? [];
+  const keyEventsBreakdownExcludeDirect = stats.keyEventsBreakdownExcludeDirect ?? [];
 
   const maxSourceSessions = Math.max(1, ...trafficSources.map((t) => t.sessions));
   const maxCountryUsers = Math.max(1, ...countries.map((c) => c.users));
@@ -255,6 +240,7 @@ export function GA4Card() {
   const maxGenderUsers = Math.max(1, ...genders.map((g) => g.users));
   const maxPageViews = Math.max(1, ...topPages.map((p) => p.views));
   const maxEventCount = Math.max(1, ...keyEventsBreakdown.map((e) => e.count));
+  const maxEventCountExcludeDirect = Math.max(1, ...keyEventsBreakdownExcludeDirect.map((e) => e.count));
 
   return (
     <div className="relative rounded-2xl border border-slate-100 bg-slate-50/60 p-6">
@@ -303,7 +289,6 @@ export function GA4Card() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Range pills — chọn xong tự refresh theo range đó */}
           <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
             {GA4_RANGES.map(({ label, days: d }) => (
               <button
@@ -429,7 +414,6 @@ export function GA4Card() {
           ))}
         </BreakdownPanel>
 
-        {/* Full list Key Events (mọi event GA4 đánh dấu Key event, không giới hạn) */}
         <BreakdownPanel
           icon={<Zap size={14} className="text-amber-500" />}
           title={`Key Events (${stats.totalKeyEvents.toLocaleString()} total)`}
@@ -447,8 +431,24 @@ export function GA4Card() {
           ))}
         </BreakdownPanel>
 
-        {/* Funnel donate riêng — 7 event cụ thể theo đúng flow */}
-        {/* {stats.donationFunnel && <FunnelPanel funnel={stats.donationFunnel} />} */}
+        <BreakdownPanel
+          icon={<Zap size={14} className="text-cyan-500" />}
+          title="Key Events (excl. direct/none)"
+          note="Eliminate traffic with unknown sources (direct URL, bookmarks...)"
+        >
+          {keyEventsBreakdownExcludeDirect.length === 0 && <EmptyNote />}
+          {keyEventsBreakdownExcludeDirect.map((e, i) => (
+            <BarRow
+              key={i}
+              label={e.eventName}
+              value={e.count}
+              max={maxEventCountExcludeDirect}
+              suffix={`${e.count} events`}
+              barClassName="bg-cyan-400"
+            />
+          ))}
+        </BreakdownPanel>
+
       </div>
 
       <p className="mt-4 text-right text-xs text-slate-400">
@@ -528,58 +528,14 @@ function EmptyNote() {
   return <p className="text-xs text-slate-400 italic">No data</p>;
 }
 
-// Funnel donate — hiển thị đúng thứ tự flow, kèm % giữ chân so với bước đầu tiên
-function FunnelPanel({ funnel }: { funnel: DonationFunnel }) {
-  const steps: { label: string; value: number }[] = [
-    { label: 'Donate Now (btn)', value: funnel.donateNowBtn },
-    { label: 'Donor Info Form', value: funnel.donorInfoForm },
-    { label: 'Edit Donation Amount', value: funnel.donationAmountEdit },
-    { label: 'Edit Tip', value: funnel.tipEditButtonClick },
-    { label: 'Checkout (btn)', value: funnel.checkoutBtnClick },
-    { label: 'Payment', value: funnel.donationPayment },
-    { label: 'Confirmation', value: funnel.donationConfirmation },
-  ];
+// ─── Growth Chart Types ─────────────────────────────────────────────────────
 
-  const hasAnyData = steps.some((s) => s.value > 0);
-  const baseline = steps[0].value || 1;
-
-  return (
-    <div className="rounded-xl bg-white border border-slate-100 p-4 lg:col-span-2">
-      <div className="flex items-center gap-1.5 mb-3">
-        <TrendingUp size={14} className="text-indigo-500" />
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Donation Funnel</p>
-      </div>
-
-      {!hasAnyData && <EmptyNote />}
-
-      {hasAnyData && (
-        <div className="space-y-2.5">
-          {steps.map((step, i) => {
-            const pctOfBaseline = Math.round((step.value / baseline) * 100);
-            return (
-              <div key={i} className="flex items-center gap-3">
-                <span className="text-xs text-slate-500 w-40 shrink-0 truncate" title={step.label}>
-                  {step.label}
-                </span>
-                <div className="flex-1 h-6 rounded-md bg-slate-100 overflow-hidden relative">
-                  <div
-                    className="h-full rounded-md bg-indigo-400/80"
-                    style={{ width: `${Math.max(2, pctOfBaseline)}%` }}
-                  />
-                  <span className="absolute inset-0 flex items-center px-2 text-[11px] font-medium text-slate-700">
-                    {step.value.toLocaleString()} {i > 0 && `(${pctOfBaseline}%)`}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+interface ChartPoint {
+  date: string;
+  views: number;
+  posts: number;
+  followers?: number;
 }
-
-// ─── Growth Chart Helper Components ───────────────────────────────────────────
 
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
@@ -781,4 +737,11 @@ export function GrowthChart() {
       )}
     </section>
   );
+}
+
+// ─── Need to define Platform interface for GrowthChart ─────────────────────
+interface Platform {
+  taskId: string;
+  platformName: string;
+  accountHandle: string;
 }

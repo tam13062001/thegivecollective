@@ -59,6 +59,7 @@ const ga4StatSecondarySchema = new mongoose.Schema(
     totalKeyEvents: { type: Number, default: 0 },
     donationFunnel: { type: donationFunnelSchema, default: () => ({}) },
     keyEventsBreakdown: [keyEventSchema],
+    keyEventsBreakdownExcludeDirect: [keyEventSchema], // MỚI: bảng lọc bỏ (direct)/(none)
     trafficSources: [trafficSourceSchema],
     countries: [countrySchema],
     ageBrackets: [ageBracketSchema],
