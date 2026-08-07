@@ -24,7 +24,7 @@ app.use(cors({
   origin: [
     'https://client.100xmedia.agency',
     'https://thegivecollective.vercel.app',  
-    'http://localhost:5173',                  
+    'http://localhost:5173',           
     'http://localhost:3000',
     'https://analytics.thegivecollective.com',
   ],
