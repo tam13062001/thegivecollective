@@ -180,11 +180,17 @@ export function GrowthChart() {
   const [data, setData]             = useState<ChartPoint[]>([]);
   const [loading, setLoading]       = useState(false);
 
-  // Load history-enabled platforms
+  // Load history-enabled platforms & Lọc bỏ GoogleAnalytics
   useEffect(() => {
     fetch(`${API}/platforms`)
       .then((r) => r.json())
-      .then(setPlatforms)
+      .then((data: Platform[]) => {
+        // Chỉ lấy những platform khác 'GoogleAnalytics'
+        const filteredPlatforms = data.filter(
+          (p) => p.platformName !== 'GoogleAnalytics'
+        );
+        setPlatforms(filteredPlatforms);
+      })
       .catch(console.error);
   }, []);
 

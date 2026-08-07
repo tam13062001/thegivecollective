@@ -62,9 +62,9 @@ function fmtDuration(seconds: number): string {
 }
 
 function fmtLastUpdated(value: string | undefined | null): string {
-  if (!value) return 'Chưa có dữ liệu';
+  if (!value) return 'No data available';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Chưa có dữ liệu';
+  if (Number.isNaN(date.getTime())) return 'No data available';
   return date.toISOString();
 }
 
@@ -270,39 +270,17 @@ export function GA4Card() {
           ))}
         </BreakdownPanel>
 
-        <BreakdownPanel
-          icon={<Users size={14} className="text-purple-500" />}
-          title="Age"
-          note="Cần bật Google Signals trong GA4 để có data"
-        >
-          {ageBrackets.length === 0 && <EmptyNote />}
-          {ageBrackets.map((a, i) => (
-            <BarRow
-              key={i}
-              label={a.age}
-              value={a.users}
-              max={maxAgeUsers}
-              suffix={`${a.users} users`}
-              barClassName="bg-purple-400"
-            />
+        <BreakdownPanel icon={<Users size={14} className="text-purple-500" />} title="Age" note="Enable Google Signals in GA4 to see this data">
+          {(!stats.ageBrackets || stats.ageBrackets.length === 0) && <EmptyNote />}
+          {stats.ageBrackets?.map((a, i) => (
+            <BarRow key={i} label={a.age} value={a.users} max={Math.max(1, ...stats.ageBrackets.map(x => x.users))} suffix={`${a.users} users`} barClassName="bg-purple-400" />
           ))}
         </BreakdownPanel>
 
-        <BreakdownPanel
-          icon={<Users size={14} className="text-pink-500" />}
-          title="Gender"
-          note="Cần bật Google Signals trong GA4 để có data"
-        >
-          {genders.length === 0 && <EmptyNote />}
-          {genders.map((g, i) => (
-            <BarRow
-              key={i}
-              label={g.gender}
-              value={g.users}
-              max={maxGenderUsers}
-              suffix={`${g.users} users`}
-              barClassName="bg-pink-400"
-            />
+        <BreakdownPanel icon={<Users size={14} className="text-pink-500" />} title="Gender" note="Enable Google Signals in GA4 to see this data">
+          {(!stats.genders || stats.genders.length === 0) && <EmptyNote />}
+          {stats.genders?.map((g, i) => (
+            <BarRow key={i} label={g.gender} value={g.users} max={Math.max(1, ...stats.genders.map(x => x.users))} suffix={`${g.users} users`} barClassName="bg-pink-400" />
           ))}
         </BreakdownPanel>
 
@@ -397,5 +375,5 @@ function BarRow({
 }
 
 function EmptyNote() {
-  return <p className="text-xs text-slate-400 italic">Chưa có dữ liệu</p>;
+  return <p className="text-xs text-slate-400 italic">No data available</p>;
 }

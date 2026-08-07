@@ -10,6 +10,8 @@ import {
 } from 'recharts';
 import { GrowthChart } from '../components/GrowthChart';
 import { GA4Card } from '../components/GA4Card';
+import { DailyGA4Chart } from '../components/DailyGA4Chart';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Metric {
@@ -21,6 +23,8 @@ interface Metric {
   postsCount: number;
   viewsCount: number;
 }
+
+type TabType = 'social' | 'ga4' | 'daily';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -102,6 +106,9 @@ const Homepage = () => {
   const [metrics, setMetrics]     = useState<Metric[]>([]);
   const [urlInput, setUrlInput]   = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // State quản lý Tab
+  const [activeTab, setActiveTab] = useState<TabType>('social');
 
   const fetchMetrics = async () => {
     try {
@@ -158,11 +165,54 @@ const Homepage = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16">
       <div className="mx-auto max-w-7xl px-6 py-8 space-y-10">
-        <GrowthChart />
-        <GA4Card />
+        
+        {/* ── SECTION: TABS NAVIGATION & CONTENT ── */}
+        <section>
+          <div className="flex flex-wrap sm:flex-nowrap gap-1 bg-slate-200/60 p-1.5 rounded-xl w-fit mb-6">
+            <button
+              onClick={() => setActiveTab('social')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab === 'social'
+                  ? 'bg-white shadow-sm text-blue-600'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/80'
+              }`}
+            >
+              Social Media Growth
+            </button>
+            <button
+              onClick={() => setActiveTab('ga4')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab === 'ga4'
+                  ? 'bg-white shadow-sm text-blue-600'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/80'
+              }`}
+            >
+              Website Analytics (GA4)
+            </button>
+            <button
+              onClick={() => setActiveTab('daily')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab === 'daily'
+                  ? 'bg-white shadow-sm text-blue-600'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/80'
+              }`}
+            >
+              Daily GA4 Trend
+            </button>
+          </div>
+
+          <div className="transition-all duration-300">
+            {activeTab === 'social' && <GrowthChart />}
+            {activeTab === 'ga4' && <GA4Card />}
+            {activeTab === 'daily' && <DailyGA4Chart />}
+          </div>
+        </section>
+
+        {/* ── DIVIDER ── */}
+        <div className="border-t border-slate-200" />
+
         {/* ── SECTION 1: Overview stats + charts ── */}
         <section className="space-y-5">
-
           {/* Stat cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard label="Total Views"     value={totalViews}     sub={`Total from ${metrics.length} platforms`} colorKey="up"   />
@@ -219,7 +269,7 @@ const Homepage = () => {
         </section>
 
         {/* ── DIVIDER ── */}
-        <div className="border-t border-slate-100" />
+        <div className="border-t border-slate-200" />
 
         {/* ── SECTION 2: Social Media Performance ── */}
         <section className="space-y-6">
@@ -272,7 +322,6 @@ const Homepage = () => {
           {/* Platform cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {metrics
-              .filter(metric => metric.platformName !== 'GoogleAnalytics') /* Ẩn card Google Analytics */
               .map((metric) => (
               <div
                 key={metric._id}
