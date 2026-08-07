@@ -5,6 +5,7 @@ import historyRoutes from './routes/historyRoute.js';
 import insightsRoutes from './routes/Insights.js';
 import topPostsRouter from './routes/ToppostsRoute.js';
 import ga4Routes from './routes/ga4Routes.js';
+import ga4SecondaryRoutes from './routes/ga4SecondaryRoutes.js';
 import { takeSnapshot } from './jobs/snapshotjob.js';
 import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
 import { connectDB } from './config/db.js';
@@ -42,6 +43,7 @@ app.use("/api/v1", historyRoutes);
 app.use('/api/v1/insights', insightsRoutes);
 app.use('/api/v1/insights', topPostsRouter);
 app.use('/api/v1', ga4Routes);
+app.use('/api/v1', ga4SecondaryRoutes);
 // Gợi ý: Chắc là bạn sẽ cần khai báo sử dụng historyRoutes ở đây
 // app.use("/api/v1/history", historyRoutes); 
 

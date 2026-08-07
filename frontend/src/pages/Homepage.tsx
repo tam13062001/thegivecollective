@@ -159,7 +159,7 @@ const Homepage = () => {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16">
       <div className="mx-auto max-w-7xl px-6 py-8 space-y-10">
         <GrowthChart />
-        {/* <GA4Card /> */}
+        <GA4Card />
         {/* ── SECTION 1: Overview stats + charts ── */}
         <section className="space-y-5">
 
@@ -262,13 +262,18 @@ const Homepage = () => {
             </div>
             <div className="rounded-2xl bg-purple-50 border border-purple-100 p-5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Connected Platforms</p>
-              <p className="mt-3 text-3xl font-bold text-slate-800">{metrics.length}</p>
+              {/* Lọc bỏ Google Analytics khỏi tổng số platform hiển thị ở đây */}
+              <p className="mt-3 text-3xl font-bold text-slate-800">
+                {metrics.filter(m => m.platformName !== 'GoogleAnalytics').length}
+              </p>
             </div>
           </div>
 
           {/* Platform cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {metrics.map((metric) => (
+            {metrics
+              .filter(metric => metric.platformName !== 'GoogleAnalytics') /* Ẩn card Google Analytics */
+              .map((metric) => (
               <div
                 key={metric._id}
                 className="relative rounded-2xl border border-slate-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
@@ -313,7 +318,8 @@ const Homepage = () => {
               </div>
             ))}
 
-            {metrics.length === 0 && (
+            {/* Hiển thị thông báo rỗng nếu tất cả (trừ GoogleAnalytics) đều không có */}
+            {metrics.filter(m => m.platformName !== 'GoogleAnalytics').length === 0 && (
               <div className="col-span-full py-14 text-center text-slate-400">
                 <p className="text-sm">No platform data available yet.</p>
                 <p className="text-xs mt-1 text-slate-300">Enter a link above to get started.</p>

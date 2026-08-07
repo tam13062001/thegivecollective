@@ -1,20 +1,25 @@
 import { JWT } from 'google-auth-library';
 
-// Khởi tạo 1 lần, tái sử dụng cho mọi request (JWT tự refresh access token khi hết hạn)
-let gaAuthClient = null;
-function getGAAuthClient() {
-  if (!gaAuthClient) {
-    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+// Cache riêng từng auth client theo tên biến env, tránh đè lẫn nhau
+// khi có nhiều service account cho nhiều property khác nhau.
+const authClientCache = {};
+
+function getGAAuthClient(envVarName = 'GOOGLE_SERVICE_ACCOUNT_JSON') {
+  if (!authClientCache[envVarName]) {
+    const raw = process.env[envVarName];
+    if (!raw) {
+      throw new Error(`Thiếu biến env ${envVarName}`);
+    }
     const decoded = Buffer.from(raw, 'base64').toString('utf-8');
     const credentials = JSON.parse(decoded);
 
-    gaAuthClient = new JWT({
+    authClientCache[envVarName] = new JWT({
       email: credentials.client_email,
       key: credentials.private_key,
       scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
     });
   }
-  return gaAuthClient;
+  return authClientCache[envVarName];
 }
 
 // Gọi runReport thô, trả về toàn bộ rows (mỗi row có dimensionValues + metricValues)
@@ -117,90 +122,108 @@ const fetchTopPages = async (propertyId, token) => {
   }));
 };
 
+// ---- Core: fetch toàn bộ report cho 1 propertyId, dùng auth client theo envVarName chỉ định ----
+const fetchGA4StatsForProperty = async (propertyId, envVarName) => {
+  const authClient = getGAAuthClient(envVarName);
+  const { token } = await authClient.getAccessToken();
+
+  const [
+    batch1,
+    batch2,
+    trafficSources,
+    countries,
+    ageBrackets,
+    genders,
+    topPages,
+  ] = await Promise.all([
+    runGA4Report(propertyId, token, {
+      metrics: [
+        { name: 'activeUsers' },
+        { name: 'newUsers' },
+        { name: 'sessions' },
+        { name: 'engagementRate' },
+        { name: 'screenPageViews' },
+        { name: 'bounceRate' },
+        { name: 'averageSessionDuration' },
+      ],
+    }).then((rows) => rows[0]?.metricValues ?? []),
+    runGA4Report(propertyId, token, {
+      metrics: [
+        { name: 'keyEvents' },
+        { name: 'keyEvents:qualify_lead' },
+        { name: 'keyEvents:close_convert_lead' },
+        { name: 'keyEvents:purchase' },
+      ],
+    }).then((rows) => rows[0]?.metricValues ?? []),
+    fetchTrafficSources(propertyId, token),
+    fetchCountries(propertyId, token),
+    fetchAgeBrackets(propertyId, token),
+    fetchGenders(propertyId, token),
+    fetchTopPages(propertyId, token),
+  ]);
+
+  const users            = parseInt(batch1[0]?.value) || 0;
+  const newUsers          = parseInt(batch1[1]?.value) || 0;
+  const sessions          = parseInt(batch1[2]?.value) || 0;
+  const engagementRate    = parseFloat(batch1[3]?.value) || 0; // 0..1
+  const pageviews         = parseInt(batch1[4]?.value) || 0;
+  const bounceRate        = parseFloat(batch1[5]?.value) || 0; // 0..1
+  const avgDuration       = parseFloat(batch1[6]?.value) || 0; // giây
+
+  const totalKeyEvents    = parseInt(batch2[0]?.value) || 0;
+  const qualifyLeads      = parseInt(batch2[1]?.value) || 0;
+  const closeConvertLeads = parseInt(batch2[2]?.value) || 0;
+  const purchases         = parseInt(batch2[3]?.value) || 0;
+
+  return {
+    followers: users,
+    posts: sessions,
+    views: pageviews,
+    pageviews,
+    users,
+    newUsers,
+    sessions,
+    bounceRate: Math.round(bounceRate * 100),
+    avgDuration: Math.round(avgDuration),
+    engagementRate: Math.round(engagementRate * 100),
+    totalKeyEvents,
+    qualifyLeads,
+    closeConvertLeads,
+    purchases,
+    trafficSources,
+    countries,
+    ageBrackets,
+    genders,
+    topPages,
+  };
+};
+
+// Property GA4 chính — service account gốc (GOOGLE_SERVICE_ACCOUNT_JSON)
 export const fetchGoogleAnalyticsStats = async () => {
   try {
     const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
     if (!propertyId) {
       return { followers: 0, posts: 0, views: 0, error: 'Thiếu GOOGLE_ANALYTICS_PROPERTY_ID trong env' };
     }
-    const authClient = getGAAuthClient();
-    const { token } = await authClient.getAccessToken();
-
-    const [
-      batch1,
-      batch2,
-      trafficSources,
-      countries,
-      ageBrackets,
-      genders,
-      topPages,
-    ] = await Promise.all([
-      runGA4Report(propertyId, token, {
-        metrics: [
-          { name: 'activeUsers' },
-          { name: 'newUsers' },
-          { name: 'sessions' },
-          { name: 'engagementRate' },
-          { name: 'screenPageViews' },
-          { name: 'bounceRate' },
-          { name: 'averageSessionDuration' },
-        ],
-      }).then((rows) => rows[0]?.metricValues ?? []),
-      runGA4Report(propertyId, token, {
-        metrics: [
-          { name: 'keyEvents' },
-          { name: 'keyEvents:qualify_lead' },
-          { name: 'keyEvents:close_convert_lead' },
-          { name: 'keyEvents:purchase' },
-        ],
-      }).then((rows) => rows[0]?.metricValues ?? []),
-      fetchTrafficSources(propertyId, token),
-      fetchCountries(propertyId, token),
-      fetchAgeBrackets(propertyId, token),
-      fetchGenders(propertyId, token),
-      fetchTopPages(propertyId, token),
-    ]);
-
-    const users            = parseInt(batch1[0]?.value) || 0;
-    const newUsers          = parseInt(batch1[1]?.value) || 0;
-    const sessions          = parseInt(batch1[2]?.value) || 0;
-    const engagementRate    = parseFloat(batch1[3]?.value) || 0; // 0..1
-    const pageviews         = parseInt(batch1[4]?.value) || 0;
-    const bounceRate        = parseFloat(batch1[5]?.value) || 0; // 0..1
-    const avgDuration       = parseFloat(batch1[6]?.value) || 0; // giây
-
-    const totalKeyEvents    = parseInt(batch2[0]?.value) || 0;
-    const qualifyLeads      = parseInt(batch2[1]?.value) || 0;
-    const closeConvertLeads = parseInt(batch2[2]?.value) || 0;
-    const purchases         = parseInt(batch2[3]?.value) || 0;
-
-    return {
-      // Shape cũ, dùng cho flow Metric chung
-      followers: users,
-      posts: sessions,
-      views: pageviews,
-      // Field mở rộng cho GA4 card
-      pageviews,
-      users,
-      newUsers,
-      sessions,
-      bounceRate: Math.round(bounceRate * 100),
-      avgDuration: Math.round(avgDuration),
-      engagementRate: Math.round(engagementRate * 100),
-      totalKeyEvents,
-      qualifyLeads,
-      closeConvertLeads,
-      purchases,
-      // Breakdown
-      trafficSources,
-      countries,
-      ageBrackets,
-      genders,
-      topPages,
-    };
+    return await fetchGA4StatsForProperty(propertyId, 'GOOGLE_SERVICE_ACCOUNT_JSON');
   } catch (error) {
     console.error('[GA4] Fetch error:', error);
     return { followers: 0, posts: 0, views: 0, error: error.message || 'Failed to fetch Google Analytics stats' };
+  }
+};
+
+// Property GA4 thứ 2 (analytics.thegivecollective.com) — service account RIÊNG
+// (GOOGLE_SERVICE_ACCOUNT_JSON_2), khác project với service account chính
+export const fetchGoogleAnalyticsStatsSecondary = async () => {
+  try {
+    const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID_2;
+    if (!propertyId) {
+      return { followers: 0, posts: 0, views: 0, error: 'Thiếu GOOGLE_ANALYTICS_PROPERTY_ID_2 trong env' };
+    }
+    return await fetchGA4StatsForProperty(propertyId, 'GOOGLE_SERVICE_ACCOUNT_JSON_2');
+  } catch (error) {
+    console.error('[GA4-2] Fetch error:', error);
+    return { followers: 0, posts: 0, views: 0, error: error.message || 'Failed to fetch Google Analytics stats (secondary)' };
   }
 };
 

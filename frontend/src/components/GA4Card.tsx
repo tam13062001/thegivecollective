@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Eye, Users, UserPlus, BarChart3, TrendingUp, Clock, RefreshCw, Pencil,
-  Target, Handshake, ShoppingCart, Globe, FileText,
+  Target, Handshake, ShoppingCart, Globe, FileText, AlertTriangle,
 } from 'lucide-react';
 
 interface TrafficSource {
@@ -55,14 +55,22 @@ interface GA4Stats {
   lastUpdated: string;
 }
 
-const GA4_API_URL = 'http://localhost:5001/api/v1/ga4';
+const GA4_API_URL = 'https://thegivecollective-backend.vercel.app/api/v1/ga4-secondary';
 
 function fmtDuration(seconds: number): string {
   return `${Math.round(seconds)}s`;
 }
 
+function fmtLastUpdated(value: string | undefined | null): string {
+  if (!value) return 'Chưa có dữ liệu';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Chưa có dữ liệu';
+  return date.toISOString();
+}
+
 export function GA4Card() {
   const [stats, setStats] = useState<GA4Stats | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [websiteDraft, setWebsiteDraft] = useState('');
@@ -71,10 +79,22 @@ export function GA4Card() {
     try {
       const res = await fetch(GA4_API_URL);
       const data = await res.json();
+
+      if (!res.ok) {
+        // API trả lỗi (403 Forbidden, 500...) — data lúc này KHÔNG phải shape GA4Stats,
+        // không được setStats(data) vì sẽ crash render bên dưới (thiếu field số).
+        setLoadError(data?.message || `Lỗi ${res.status} khi tải GA4 stats`);
+        setStats(null);
+        return;
+      }
+
+      setLoadError(null);
       setStats(data);
       setWebsiteDraft(data.websiteUrl ?? '');
     } catch (error) {
       console.error('Error fetching GA4 stats:', error);
+      setLoadError('Lỗi kết nối server');
+      setStats(null);
     }
   };
 
@@ -87,8 +107,12 @@ export function GA4Card() {
     try {
       const res = await fetch(`${GA4_API_URL}/refresh`, { method: 'POST' });
       const data = await res.json();
-      if (res.ok) setStats(data);
-      else alert(data.message || 'Không thể refresh GA4 stats');
+      if (res.ok) {
+        setLoadError(null);
+        setStats(data);
+      } else {
+        alert(data.message || 'Không thể refresh GA4 stats');
+      }
     } catch {
       alert('Lỗi kết nối server');
     } finally {
@@ -114,6 +138,25 @@ export function GA4Card() {
       alert('Lỗi kết nối server');
     }
   };
+
+  // Trạng thái lỗi — hiện thông báo rõ ràng thay vì crash hoặc trắng trang
+  if (loadError) {
+    return (
+      <div className="rounded-2xl border border-red-100 bg-red-50/60 p-6 flex items-center gap-3">
+        <AlertTriangle size={18} className="text-red-500 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-red-700">Không tải được GA4 stats</p>
+          <p className="text-xs text-red-500 mt-0.5">{loadError}</p>
+        </div>
+        <button
+          onClick={fetchStats}
+          className="ml-auto text-xs font-medium text-red-600 hover:text-red-700 underline"
+        >
+          Thử lại
+        </button>
+      </div>
+    );
+  }
 
   if (!stats) return null;
 
@@ -283,7 +326,7 @@ export function GA4Card() {
       </div>
 
       <p className="mt-4 text-right text-xs text-slate-400">
-        Last updated: {new Date(stats.lastUpdated).toISOString()}
+        Last updated: {fmtLastUpdated(stats.lastUpdated)}
       </p>
     </div>
   );

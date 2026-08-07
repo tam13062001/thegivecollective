@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { JWT } from 'google-auth-library';
 
-const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_2;
 const credentials = JSON.parse(Buffer.from(raw, 'base64').toString('utf-8'));
 
 const authClient = new JWT({
@@ -11,7 +11,7 @@ const authClient = new JWT({
   scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
 });
 
-const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
+const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID_2;
 const { token } = await authClient.getAccessToken();
 
 // 1. Tên property
