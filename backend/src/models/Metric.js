@@ -7,7 +7,7 @@ const metricSchema = new mongoose.Schema(
       required: true,
       trim: true,
       // Gợi ý: Nếu danh sách nền tảng là cố định, bạn có thể bật enum lên để validate
-      enum: ['Facebook', 'Instagram', 'Tiktok', 'Youtube', 'LinkedIn', 'Threads', 'GoogleAnalytics'],
+      enum: ['Facebook', 'Instagram', 'Tiktok', 'Youtube', 'LinkedIn', 'Threads'],
       default:"tiktok",
     },
     profileUrl: {

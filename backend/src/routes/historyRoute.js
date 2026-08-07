@@ -90,4 +90,55 @@ router.get('/history/platforms', async (req, res) => {
   }
 });
 
+
+/**
+ * DELETE /api/v1/history/:platformName
+ * Xóa toàn bộ lịch sử của một platform theo tên (case‑sensitive)
+ * 
+ * Ví dụ: DELETE /api/v1/history/GoogleAnalytics
+ * 
+ * Response: { message: string, deletedCount: number }
+ */
+router.delete('/history/:platformName', async (req, res) => {
+  const { platformName } = req.params;
+
+  // (Tuỳ chọn) Kiểm tra platformName có tồn tại trong DB không
+  try {
+    const result = await StatsHistory.deleteMany({ platformName });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: `No history found for platform: ${platformName}` });
+    }
+
+    res.json({
+      message: `Deleted ${result.deletedCount} history record(s) for platform "${platformName}"`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (err) {
+    console.error('[DELETE History by Platform]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// (Tuỳ chọn) Xóa theo taskId – hữu ích nếu bạn có sẵn taskId từ API /api/v1/tasks
+router.delete('/history/task/:taskId', async (req, res) => {
+  const { taskId } = req.params;
+  // Kiểm tra ObjectId hợp lệ (nếu dùng MongoDB)
+  if (!mongoose.Types.ObjectId.isValid(taskId)) {
+    return res.status(400).json({ error: 'Invalid taskId format' });
+  }
+  try {
+    const result = await StatsHistory.deleteMany({ taskId });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: `No history found for taskId: ${taskId}` });
+    }
+    res.json({
+      message: `Deleted ${result.deletedCount} history record(s) for taskId "${taskId}"`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
