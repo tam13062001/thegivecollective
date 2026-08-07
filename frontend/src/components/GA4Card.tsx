@@ -448,7 +448,7 @@ export function GA4Card() {
         </BreakdownPanel>
 
         {/* Funnel donate riêng — 7 event cụ thể theo đúng flow */}
-        {stats.donationFunnel && <FunnelPanel funnel={stats.donationFunnel} />}
+        {/* {stats.donationFunnel && <FunnelPanel funnel={stats.donationFunnel} />} */}
       </div>
 
       <p className="mt-4 text-right text-xs text-slate-400">
