@@ -32,6 +32,14 @@
     {
       "path": "/api/v1/insights/all-posts/refresh",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/v1/ga4-secondary/save-history",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/v1/ga4-secondary/refresh",
+      "schedule": "0 0 * * *"
     }
   ]
 }

@@ -120,14 +120,14 @@ export function DailyGA4Chart() {
       </div>
 
       {/* Summary Stats */}
-      {!loading && !error && historyData.length > 0 && (
+      {/* {!loading && !error && historyData.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-slate-100">
           <StatBox label="Total" value={fmtNum(total)} />
           <StatBox label="Average" value={fmtNum(avg)} />
           <StatBox label="Highest" value={fmtNum(max)} />
           <StatBox label="Lowest" value={fmtNum(min)} />
         </div>
-      )}
+      )} */}
 
       {/* Chart Area */}
       <div className="p-4">

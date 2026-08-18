@@ -11,11 +11,11 @@ import {
 const router = express.Router();
 
 router.get('/ga4-secondary', getGA4StatsSecondary);
-router.post('/ga4-secondary/refresh', refreshGA4StatsSecondary);
+router.get('/ga4-secondary/refresh', refreshGA4StatsSecondary);
 router.put('/ga4-secondary/website', updateGA4WebsiteSecondary);
 
 // Lịch sử
 router.get('/ga4-secondary/history', getGA4History);
 router.post('/ga4-secondary/save-history', saveDailyGA4History);
-
+router.get('/ga4-secondary/save-history', saveDailyGA4History);
 export default router;
