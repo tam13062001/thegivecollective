@@ -28,6 +28,7 @@ type Post = {
   views: number;
   likes: number;
   shares: number;
+  clicks?: number;
   date: string;
   url?: string;
   contentType: ContentType;
@@ -229,11 +230,18 @@ function normalizeTopPosts(raw: any): Post[] {
     views: doc.views || 0,
     likes: doc.likes || 0,
     shares: doc.shares || 0,
+    clicks: doc.clicks || 0, // ← dòng bị thiếu, đây là lý do BE có data nhưng FE không hiện
     date: doc.date || "",
     url: doc.url || "",
     contentType: normalizeContentType(doc),
     rawMediaType: doc.rawMediaType || doc.mediaType || doc.media_type || "",
   }));
+}
+
+function getCtr(post: Post): string | null {
+  if (post.platform?.toLowerCase() !== "facebook") return null;
+  if (!post.clicks || post.views <= 0) return null;
+  return ((post.clicks / post.views) * 100).toFixed(1);
 }
 
 // ─── Trend styles ──────────────────────────────────────────────────────────────
@@ -1484,6 +1492,7 @@ function MonthFilterChips({
 }
 
 function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
+  const ctr = getCtr(row);
   return (
     <a
       href={row.url}
@@ -1502,10 +1511,7 @@ function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
             {formatSgtDateTime(row.date)}
           </span>
         </div>
-        <h4
-          className="text-[11px] sm:text-xs font-semibold text-slate-800 leading-snug truncate"
-          title={row.title}
-        >
+        <h4 className="text-[11px] sm:text-xs font-semibold text-slate-800 leading-snug truncate" title={row.title}>
           {row.title}
         </h4>
       </div>
@@ -1516,6 +1522,11 @@ function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
         <p className="text-xs sm:text-[13px] font-bold tabular-nums">
           {row.er.toFixed(1)}%
         </p>
+        {ctr && (
+          <p className="text-[9px] sm:text-[10px] text-indigo-500 font-semibold tabular-nums">
+            CTR {ctr}%
+          </p>
+        )}
       </div>
     </a>
   );
@@ -2048,13 +2059,8 @@ export default function InsightsPage() {
 
                       <div className="flex flex-col gap-2">
                         {posts.map((post, i) => {
-                          const er =
-                            post.views > 0
-                              ? (
-                                ((post.likes + post.shares) / post.views) *
-                                100
-                              ).toFixed(1)
-                              : "0.0";
+                          const er = post.views > 0 ? (((post.likes + post.shares) / post.views) * 100).toFixed(1) : "0.0";
+                          const ctr = getCtr(post);
                           return (
                             <a
                               key={post.id}
@@ -2066,55 +2072,37 @@ export default function InsightsPage() {
                               <span className="hidden sm:flex items-center justify-center w-5 h-5 shrink-0 rounded-full bg-slate-100 text-[10px] font-bold text-slate-400">
                                 {i + 1}
                               </span>
-
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  {/* <ContentTypeBadge type={post.contentType} /> */}
-                                  <span className="text-[10px] sm:text-[11px] text-slate-400 shrink-0">
-                                    {post.date}
-                                  </span>
+                                  <span className="text-[10px] sm:text-[11px] text-slate-400 shrink-0">{post.date}</span>
                                 </div>
-                                <h4
-                                  className="text-xs sm:text-[13px] font-semibold text-slate-800 leading-snug truncate group-hover:text-slate-900"
-                                  title={post.title}
-                                >
+                                <h4 className="text-xs sm:text-[13px] font-semibold text-slate-800 leading-snug truncate group-hover:text-slate-900" title={post.title}>
                                   {post.title}
                                 </h4>
                               </div>
-
                               <div className="hidden xs:flex sm:flex items-center gap-3 sm:gap-4 shrink-0 text-right">
                                 <div>
-                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">
-                                    Views
-                                  </p>
-                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">
-                                    {fmtNum(post.views)}
-                                  </p>
+                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
+                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">{fmtNum(post.views)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">
-                                    Likes
-                                  </p>
-                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">
-                                    {fmtNum(post.likes)}
-                                  </p>
+                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
+                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">{fmtNum(post.likes)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">
-                                    Shares
-                                  </p>
-                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">
-                                    {fmtNum(post.shares)}
-                                  </p>
+                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Shares</p>
+                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">{fmtNum(post.shares)}</p>
                                 </div>
                                 <div className="min-w-[44px]">
-                                  <p className="text-[8px] sm:text-[9px] font-medium text-indigo-400 uppercase tracking-wide">
-                                    ER
-                                  </p>
-                                  <p className="text-xs sm:text-[13px] font-bold text-indigo-600 tabular-nums">
-                                    {er}%
-                                  </p>
+                                  <p className="text-[8px] sm:text-[9px] font-medium text-indigo-400 uppercase tracking-wide">ER</p>
+                                  <p className="text-xs sm:text-[13px] font-bold text-indigo-600 tabular-nums">{er}%</p>
                                 </div>
+                                {ctr && (
+                                  <div className="min-w-[44px]">
+                                    <p className="text-[8px] sm:text-[9px] font-medium text-emerald-500 uppercase tracking-wide">CTR</p>
+                                    <p className="text-xs sm:text-[13px] font-bold text-emerald-600 tabular-nums">{ctr}%</p>
+                                  </div>
+                                )}
                               </div>
                             </a>
                           );
@@ -2126,16 +2114,13 @@ export default function InsightsPage() {
               </div>
             </div>
 
-            {/* Content Type Performance — uses allPosts since that's the source with full contentType/rawMediaType data */}
-            <ContentTypePerformanceCard posts={allPosts} />
+            {/* Content Type: biểu đồ + bảng chi tiết đặt cạnh nhau trên desktop, xếp chồng trên mobile */}
+            <div className="lg:col-span-12 grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <ContentTypePerformanceCard posts={allPosts} />
+              <ContentTypeBreakdownTable posts={allPosts} loading={allPostsLoading} />
+            </div>
 
-            {/* Content Type Breakdown Table — displayed dynamically based on the actual data present */}
-            <ContentTypeBreakdownTable
-              posts={allPosts}
-              loading={allPostsLoading}
-            />
-
-            {/* Engagement Rate Breakdown — average ER + above/below average tables, filterable by month (SGT) */}
+            {/* Engagement Rate Breakdown — giữ full width vì bảng 2 cột bên trong đã đủ rộng */}
             <EngagementRateTables posts={allPosts} loading={allPostsLoading} />
           </div>
         </section>
