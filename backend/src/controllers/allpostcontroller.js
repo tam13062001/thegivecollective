@@ -109,9 +109,14 @@ export const refreshAllPostsFromDb = async (req, res) => {
 
 export const getCachedAllPosts = async (req, res) => {
   try {
-    const days = Number(req.query.days) > 0 ? Number(req.query.days) : 30;
-    const fromDate = new Date();
-    fromDate.setDate(fromDate.getDate() - days);
+    const hasDaysFilter = req.query.days !== undefined && Number(req.query.days) > 0;
+    const days = hasDaysFilter ? Number(req.query.days) : null;
+
+    let fromDate = null;
+    if (days) {
+      fromDate = new Date();
+      fromDate.setDate(fromDate.getDate() - days);
+    }
 
     const query = {};
     if (req.query.platform) {
@@ -121,17 +126,22 @@ export const getCachedAllPosts = async (req, res) => {
 
     const allPosts = await AllPost.find(query).sort({ date: -1 });
 
-    // Lọc theo ngày ở tầng application vì field `date` là String, không dùng $gte của Mongo được
-    const posts = allPosts.filter((post) => {
-      if (!post.date) return false;
-      const parsed = new Date(post.date);
-      if (isNaN(parsed.getTime())) return false; // date không parse được -> bỏ qua
-      return parsed >= fromDate;
-    });
+    // Chỉ lọc theo ngày khi có days trên query; mặc định lấy full vì field `date`
+    // là String nên không dùng $gte của Mongo được, phải lọc ở tầng application.
+    const posts = fromDate
+      ? allPosts.filter((post) => {
+          if (!post.date) return false;
+          const parsed = new Date(post.date);
+          if (isNaN(parsed.getTime())) return false; // date không parse được -> bỏ qua
+          return parsed >= fromDate;
+        })
+      : allPosts;
 
     if (posts.length === 0) {
       return res.status(200).json({
-        message: `Không có bài viết nào phù hợp trong ${days} ngày gần nhất${req.query.platform ? ` cho platform "${req.query.platform}"` : ''}.`,
+        message: days
+          ? `Không có bài viết nào phù hợp trong ${days} ngày gần nhất${req.query.platform ? ` cho platform "${req.query.platform}"` : ''}.`
+          : `Không có bài viết nào phù hợp${req.query.platform ? ` cho platform "${req.query.platform}"` : ''}.`,
         total: 0,
         posts: [],
       });
@@ -147,7 +157,7 @@ export const getCachedAllPosts = async (req, res) => {
 
     res.status(200).json({
       total: posts.length,
-      rangeDays: days,
+      rangeDays: days || 'all',
       platformFilter: req.query.platform || null,
       posts,
       groupedByPlatform: groupedPosts,
