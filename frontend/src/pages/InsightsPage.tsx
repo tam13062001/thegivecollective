@@ -1615,21 +1615,20 @@ function EngagementRateTables({
     );
   }, [platformFilteredPosts, selectedMonth]);
 
-  // Avg ER (weighted): tổng likes+shares / tổng views của tập đã lọc (platform + tháng, giờ SGT).
-  // Post có views = 0 không đóng góp vào tổng views/engaged nhưng vẫn xuất hiện trong danh sách với ER = 0%.
+  // Avg ER = trung bình cộng ER của từng bài trong tập đã lọc (platform + tháng, giờ SGT).
+  // Không dùng weighted (tổng likes+shares / tổng views) nữa vì 1 bài có views = 0
+  // nhưng vẫn có likes/shares sẽ làm sai lệch mẫu số, kéo Avg ER cao bất thường
+  // so với ER thực tế của từng bài trong danh sách.
   const { avgEr, rows } = useMemo(() => {
-    let sumViews = 0;
-    let sumEngaged = 0;
-    for (const p of monthFilteredPosts) {
-      sumViews += p.views;
-      sumEngaged += p.likes + p.shares;
-    }
-    const avg = sumViews > 0 ? (sumEngaged / sumViews) * 100 : 0;
-
     const withEr: ErRow[] = monthFilteredPosts.map((p) => ({
       ...p,
       er: p.views > 0 ? ((p.likes + p.shares) / p.views) * 100 : 0,
     }));
+
+    const avg =
+      withEr.length > 0
+        ? withEr.reduce((sum, r) => sum + r.er, 0) / withEr.length
+        : 0;
 
     return { avgEr: avg, rows: withEr };
   }, [monthFilteredPosts]);
