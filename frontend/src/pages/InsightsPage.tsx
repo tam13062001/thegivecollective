@@ -1,5 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
 import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  CircleDot,
+  ExternalLink,
+  FileText,
+  Image as ImageIcon,
+  Layers3,
+  Lightbulb,
+  RefreshCw,
+  Video,
+} from "lucide-react";
+import {
   BarChart,
   Bar,
   XAxis,
@@ -156,6 +169,93 @@ const CONTENT_TYPE_ORDER: ContentType[] = [
   "unknown",
 ];
 
+type PlatformTheme = {
+  accent: string;
+  soft: string;
+  marker: string;
+  heatColors: readonly string[];
+};
+
+const PLATFORM_THEMES: Record<PlatformKey, PlatformTheme> = {
+  tiktok: {
+    accent: "#111827",
+    soft: "#f3f4f6",
+    marker: "#00a8a2",
+    heatColors: [
+      "#f3f4f6",
+      "#e5e7eb",
+      "#d1d5db",
+      "#9ca3af",
+      "#6b7280",
+      "#4b5563",
+      "#374151",
+      "#111827",
+    ],
+  },
+  facebook: {
+    accent: "#1877f2",
+    soft: "#eff6ff",
+    marker: "#1877f2",
+    heatColors: [
+      "#eff6ff",
+      "#dbeafe",
+      "#bfdbfe",
+      "#93c5fd",
+      "#60a5fa",
+      "#3b82f6",
+      "#2563eb",
+      "#1d4ed8",
+    ],
+  },
+  instagram: {
+    accent: "#c13584",
+    soft: "#fdf2f8",
+    marker: "#c13584",
+    heatColors: [
+      "#fff1f2",
+      "#ffe4e6",
+      "#fecdd3",
+      "#fda4af",
+      "#fb7185",
+      "#f43f5e",
+      "#e11d48",
+      "#be123c",
+    ],
+  },
+  youtube: {
+    accent: "#ff0000",
+    soft: "#fff1f2",
+    marker: "#ff0000",
+    heatColors: [
+      "#fff1f2",
+      "#fee2e2",
+      "#fecaca",
+      "#fca5a5",
+      "#f87171",
+      "#ef4444",
+      "#dc2626",
+      "#991b1b",
+    ],
+  },
+};
+
+const SIGNAL_CHART = {
+  ink: "#172033",
+  panel: "#ffffff",
+  surface: "#ffffff",
+  track: "#f1f5f9",
+  text: "#172033",
+  muted: "#64748b",
+  border: "#e2e8f0",
+  cyan: "#0891b2",
+  coral: "#e11d48",
+  amber: "#d97706",
+  slate: "#64748b",
+  female: "#e11d48",
+  male: "#0891b2",
+  undisclosed: "#94a3b8",
+} as const;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtNum(n: number): string {
@@ -269,21 +369,19 @@ function StatCard({
   sub: string;
   colorKey: keyof typeof TREND;
 }) {
-  const s = TREND[colorKey];
+  const tone = colorKey === "up" ? "cyan" : colorKey === "down" ? "coral" : "slate";
   return (
     <div
-      className={`relative rounded-2xl border p-4 sm:p-5 ${s.border} ${s.bg}`}
+      data-tone={tone === "cyan" ? undefined : tone}
+      className="signal-metric-card min-h-[132px] border p-4 sm:p-5"
     >
-      <span
-        className={`absolute top-4 right-4 w-2 h-2 rounded-full ${s.dot}`}
-      />
-      <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2 sm:mb-3">
+      <p className="font-signal-mono text-[10px] uppercase tracking-[0.14em] text-signal-muted sm:text-[11px]">
         {label}
       </p>
-      <p className="text-2xl sm:text-3xl font-bold tabular-nums text-slate-800">
+      <p className="mt-4 font-signal-display text-3xl font-semibold leading-none tabular-nums text-signal-text sm:text-4xl">
         {value}
       </p>
-      <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs text-slate-400">
+      <p className="mt-3 max-w-[24ch] text-[11px] leading-5 text-signal-muted sm:text-xs">
         {sub}
       </p>
     </div>
@@ -295,22 +393,67 @@ function StatCard({
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-gray-100 bg-white/95 backdrop-blur shadow-xl px-3 py-2 sm:px-4 sm:py-3 min-w-[120px] sm:min-w-[130px]">
-      <p className="text-[10px] sm:text-xs text-slate-400 mb-1 font-medium">
+    <div className="min-w-[140px] rounded-lg border border-signal-border bg-signal-surface px-3 py-2 shadow-lg">
+      <p className="mb-1 font-signal-mono text-[10px] uppercase tracking-wide text-signal-muted">
         {label}
       </p>
       {payload.map((p: any) => (
         <p
           key={p.dataKey}
-          className="text-xs sm:text-sm font-bold tabular-nums"
-          style={{ color: p.fill }}
+          className="text-xs font-bold tabular-nums text-signal-text sm:text-sm"
+          style={{ color: p.color ?? p.fill ?? SIGNAL_CHART.cyan }}
         >
           {fmtNum(p.value)}{" "}
-          <span className="font-normal text-slate-400">
+          <span className="font-signal-body font-normal text-signal-muted">
             {p.name ?? p.dataKey}
           </span>
         </p>
       ))}
+    </div>
+  );
+}
+
+function InlineDataState({
+  tone,
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  tone: "loading" | "empty" | "error";
+  title: string;
+  description?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  const toneClass =
+    tone === "error"
+      ? "border-signal-coral/50 text-signal-coral"
+      : tone === "loading"
+        ? "border-signal-cyan/50 text-signal-cyan"
+        : "border-signal-border text-signal-muted";
+
+  return (
+    <div className={`border-l-2 px-4 py-6 ${toneClass}`} role={tone === "loading" ? "status" : undefined}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-signal-display text-xl font-semibold text-signal-text">{title}</p>
+          {description && <p className="mt-1 text-sm text-signal-muted">{description}</p>}
+        </div>
+        {actionLabel && onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-signal-border bg-signal-surface px-3 py-2 text-xs font-semibold text-signal-text transition-colors hover:border-signal-cyan hover:text-signal-cyan focus-visible:outline-none"
+          >
+            {actionLabel}
+            <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {tone === "empty" && (
+        <ArrowRight aria-hidden="true" className="mt-4 h-4 w-4 text-signal-muted" />
+      )}
     </div>
   );
 }
@@ -333,7 +476,10 @@ function PlatformIcon({ name }: { name: string }) {
   };
   return (
     <span
-      className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-md text-white text-[10px] sm:text-xs font-bold ${p.bg}`}
+      role="img"
+      aria-label={`${name} platform`}
+      title={name}
+      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[9px] font-bold text-white sm:h-7 sm:w-7 sm:text-[10px] ${p.bg}`}
     >
       {p.label}
     </span>
@@ -342,14 +488,31 @@ function PlatformIcon({ name }: { name: string }) {
 
 // ─── Content Type Badge ─────────────────────────────────────────────────────────
 
+function ContentTypeGlyph({ type }: { type: ContentType }) {
+  const Icon =
+    type === "video"
+      ? Video
+      : type === "image"
+        ? ImageIcon
+        : type === "carousel"
+          ? Layers3
+          : type === "text"
+            ? FileText
+            : type === "story"
+              ? CircleDot
+              : CircleDot;
+
+  return <Icon aria-hidden="true" className="h-3 w-3" strokeWidth={2.2} />;
+}
+
 function ContentTypeBadge({ type }: { type: ContentType }) {
   const meta = CONTENT_TYPE_META[type];
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold ${meta.className}`}
+      className="inline-flex items-center gap-1 rounded-md border border-signal-border bg-signal-track px-1.5 py-0.5 text-[9px] font-semibold text-signal-muted sm:text-[10px]"
       title={meta.label}
     >
-      <span aria-hidden>{meta.icon}</span>
+      <ContentTypeGlyph type={type} />
       {meta.label}
     </span>
   );
@@ -368,13 +531,14 @@ function ContentTypeFilterChips({
 }) {
   if (availableTypes.length === 0) return null;
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter top posts by content type">
       <button
         type="button"
+        aria-pressed={active === "all"}
         onClick={() => onChange("all")}
-        className={`text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${active === "all"
-          ? "bg-slate-800 text-white border-slate-800"
-          : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+        className={`min-h-10 rounded-md border px-3 py-2 text-[11px] font-semibold transition-colors focus-visible:outline-none sm:text-xs ${active === "all"
+          ? "border-signal-text bg-signal-text text-signal-ink"
+          : "border-signal-border bg-transparent text-signal-muted hover:border-signal-cyan hover:text-signal-cyan"
           }`}
       >
         All types
@@ -386,13 +550,14 @@ function ContentTypeFilterChips({
           <button
             key={t}
             type="button"
+            aria-pressed={isActive}
             onClick={() => onChange(t)}
-            className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors ${isActive
-              ? "bg-slate-800 text-white border-slate-800"
-              : `${meta.className} hover:opacity-80`
+            className={`inline-flex min-h-10 items-center gap-1.5 rounded-md border px-3 py-2 text-[11px] font-semibold transition-colors focus-visible:outline-none sm:text-xs ${isActive
+              ? "border-signal-cyan bg-signal-cyan text-signal-ink"
+              : "border-signal-border bg-transparent text-signal-muted hover:border-signal-cyan hover:text-signal-cyan"
               }`}
           >
-            <span aria-hidden>{meta.icon}</span>
+            <ContentTypeGlyph type={t} />
             {meta.label}
           </button>
         );
@@ -438,76 +603,49 @@ function ContentTypePerformanceCard({ posts }: { posts: Post[] }) {
   }
 
   return (
-    <div className="lg:col-span-12 rounded-2xl border border-indigo-200 bg-white overflow-hidden">
-      <div className="px-4 py-3 sm:px-5 flex items-center justify-between bg-indigo-50/60 border-b border-indigo-200">
-        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-indigo-600">
-          Performance by Content Type
+    <div className="signal-panel overflow-hidden rounded-2xl border border-signal-border">
+      <div className="flex items-center justify-between border-b border-signal-border px-4 py-3 sm:px-5">
+        <span className="font-signal-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-signal-cyan sm:text-[11px]">
+          Performance by content type
         </span>
-        <span className="text-[10px] sm:text-xs font-mono text-indigo-400">
+        <span className="font-signal-mono text-[10px] text-signal-muted sm:text-xs">
           Avg per post
         </span>
       </div>
-      <div className="p-3 sm:p-4">
-        <div className="h-[240px] sm:h-[280px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              margin={{ top: 8, right: 16, bottom: 0, left: 0 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#e2e8f0"
-              />
-              <XAxis
-                dataKey="type"
-                tick={{ fontSize: 10, fill: "#64748b", fontWeight: 600 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: "#94a3b8" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                content={<ChartTooltip />}
-                cursor={{ fill: "#f8fafc" }}
-              />
-              <Legend
-                iconType="circle"
-                wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }}
-              />
-              <Bar
-                dataKey="avgViews"
-                name="Avg Views"
-                fill="#6366f1"
-                radius={[4, 4, 0, 0]}
-                barSize={28}
-              />
-              <Bar
-                dataKey="avgLikes"
-                name="Avg Likes"
-                fill="#a5b4fc"
-                radius={[4, 4, 0, 0]}
-                barSize={28}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+      <div className="space-y-5 p-4 sm:p-5">
+        <div className="flex items-center gap-4 font-signal-mono text-[10px] uppercase tracking-wide text-signal-muted">
+          <span className="inline-flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-signal-cyan" /> Avg views</span>
+          <span className="inline-flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-signal-slate" /> Avg likes</span>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {chartData.map((d) => (
-            <span
-              key={d.type}
-              className="text-[10px] sm:text-[11px] text-slate-400"
-            >
-              {d.type}:{" "}
-              <span className="font-semibold text-slate-600">
-                {d.count} posts
-              </span>
-            </span>
-          ))}
+        <div className="space-y-5">
+          {chartData.map((d) => {
+            const maxValue = Math.max(...chartData.map((item) => item.avgViews), 1);
+            const maxLikes = Math.max(...chartData.map((item) => item.avgLikes), 1);
+            return (
+              <div key={d.type} className="space-y-2">
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="font-semibold text-signal-text">{d.type} <span className="font-signal-mono text-[10px] text-signal-muted">· {d.count} posts</span></span>
+                  <span className="font-signal-mono text-[10px] text-signal-muted">{fmtNum(d.avgViews)} views</span>
+                </div>
+                <div className="space-y-1.5" aria-label={`${d.type}: average ${fmtNum(d.avgViews)} views and ${fmtNum(d.avgLikes)} likes per post`}>
+                  <div className="h-2 overflow-hidden rounded-sm bg-signal-track">
+                    <div className="h-full rounded-sm bg-signal-cyan" style={{ width: `${(d.avgViews / maxValue) * 100}%` }} />
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-sm bg-signal-track">
+                    <div className="h-full rounded-sm bg-signal-slate" style={{ width: `${(d.avgLikes / maxLikes) * 100}%` }} />
+                  </div>
+                </div>
+                <div className="flex justify-between font-signal-mono text-[10px] text-signal-muted">
+                  <span>{fmtNum(d.avgLikes)} likes</span>
+                  <span>{((d.avgLikes / Math.max(d.avgViews, 1)) * 100).toFixed(1)}% like/view</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
+        <p className="border-t border-signal-border pt-4 text-xs leading-5 text-signal-muted">
+          Views and likes use separate honest scales so smaller signals remain legible.
+        </p>
       </div>
     </div>
   );
@@ -605,12 +743,12 @@ function ContentTypeBreakdownTable({
   const rows = useContentTypeBreakdown(posts);
 
   return (
-    <div className="lg:col-span-12 rounded-2xl border border-indigo-200 bg-white overflow-hidden">
-      <div className="px-4 py-3 sm:px-5 flex items-center justify-between bg-indigo-50/60 border-b border-indigo-200">
-        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-indigo-600">
-          Content Type Breakdown
+    <div className="signal-panel overflow-hidden rounded-2xl border border-signal-border">
+      <div className="flex items-center justify-between border-b border-signal-border px-4 py-3 sm:px-5">
+        <span className="font-signal-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-signal-cyan sm:text-[11px]">
+          Content type breakdown
         </span>
-        <span className="text-[10px] sm:text-xs font-mono text-indigo-400">
+        <span className="font-signal-mono text-[10px] text-signal-muted sm:text-xs">
           {loading
             ? "Loading..."
             : `${rows.length} type${rows.length === 1 ? "" : "s"} found`}
@@ -708,25 +846,36 @@ function PlatformSwitcher({
   onChange: (p: PlatformKey) => void;
 }) {
   return (
-    <div
-      className="w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 hide-scrollbar"
-      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-    >
-      <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm min-w-max">
-        {PLATFORM_TABS.map((p) => (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => onChange(p.key)}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors ${active === p.key
-              ? "bg-slate-800 text-white"
-              : "text-slate-500 hover:bg-slate-50"
-              }`}
-          >
-            <PlatformIcon name={p.key} />
-            {p.label}
-          </button>
-        ))}
+    <div className="w-full overflow-x-auto pb-1 sm:w-auto" role="tablist" aria-label="Best time platform">
+      <div className="inline-flex min-w-max items-stretch gap-1 border-b border-signal-border">
+        {PLATFORM_TABS.map((p) => {
+          const theme = PLATFORM_THEMES[p.key];
+          const isActive = active === p.key;
+
+          return (
+            <button
+              key={p.key}
+              id={`timing-tab-${p.key}`}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => onChange(p.key)}
+              className={`relative flex min-h-11 items-center gap-2 px-3 text-xs font-semibold transition-colors focus-visible:outline-none sm:px-4 ${isActive
+                ? "text-signal-text"
+                : "text-signal-muted hover:text-signal-text"
+                }`}
+              style={{ color: isActive ? theme.accent : undefined }}
+            >
+              <PlatformIcon name={p.key} />
+              {p.label}
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-2 bottom-0 h-0.5"
+                style={{ backgroundColor: isActive ? theme.accent : "transparent" }}
+              />
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -789,20 +938,25 @@ function PostHistoryGridView({
   maxAvg,
   hasData,
   loading,
+  platform,
 }: {
   grid: HeatCell[][];
   minAvg: number;
   maxAvg: number;
   hasData: boolean;
   loading: boolean;
+  platform: PlatformKey;
 }) {
+  const theme = PLATFORM_THEMES[platform];
+  const heatColors = theme.heatColors;
+
   const cellColor = (cell: HeatCell) => {
-    if (cell.count === 0) return "#eef2f7";
-    if (maxAvg === minAvg) return "hsl(205, 85%, 55%)";
+    if (cell.count === 0) return heatColors[0];
+    if (maxAvg === minAvg) return heatColors[4];
     const avg = cell.totalViews / cell.count;
-    const normalized = (avg - minAvg) / (maxAvg - minAvg);
-    const lightness = 88 - normalized * 68;
-    return `hsl(205, 85%, ${lightness}%)`;
+    const normalized = Math.max(0, Math.min(1, (avg - minAvg) / (maxAvg - minAvg)));
+    const colorIndex = Math.round(normalized * (heatColors.length - 1));
+    return heatColors[colorIndex];
   };
 
   if (!hasData && !loading) {
@@ -820,13 +974,15 @@ function PostHistoryGridView({
         <span
           className="h-2 sm:h-2.5 w-24 sm:w-32 rounded-full"
           style={{
-            background:
-              "linear-gradient(to right, hsl(205,85%,88%), hsl(205,85%,20%))",
+            background: `linear-gradient(to right, ${heatColors[0]}, ${heatColors[heatColors.length - 1]})`,
           }}
         />
         <span className="tabular-nums">{fmtNum(maxAvg)}</span>
         <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
-          <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
+          <span
+            className="inline-block h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5"
+            style={{ backgroundColor: theme.marker }}
+          />
           Your posts (SGT)
         </span>
       </div>
@@ -845,13 +1001,19 @@ function PostHistoryGridView({
                 {grid[dayIdx].map((cell, hourIdx) => (
                   <div
                     key={hourIdx}
+                    role="img"
+                    tabIndex={cell.count > 0 ? 0 : -1}
                     title={`${day} ${String(hourIdx).padStart(2, "0")}:00 SGT — ${cell.count} posts, ${fmtNum(cell.totalViews)} views`}
-                    className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
+                    aria-label={`${day} ${String(hourIdx).padStart(2, "0")}:00 SGT, ${cell.count} posts, ${fmtNum(cell.totalViews)} views`}
+                    className="relative flex-1 aspect-square rounded-[3px] outline-none transition-[filter] focus-visible:ring-2 focus-visible:ring-signal-cyan sm:rounded-[4px]"
                     style={{ backgroundColor: cellColor(cell) }}
                   >
                     {cell.count > 0 && (
                       <span className="absolute inset-0 flex items-center justify-center">
-                        <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-amber-400" />
+                        <span
+                          className="h-2.5 w-2.5 rounded-full sm:h-3.5 sm:w-3.5"
+                          style={{ backgroundColor: theme.marker }}
+                        />
                       </span>
                     )}
                   </div>
@@ -892,28 +1054,36 @@ function BestTimeBigCard({
   posts: Post[];
   loading: boolean;
 }) {
+  const theme = PLATFORM_THEMES[platform];
   const { grid, minAvg, maxAvg, hasData } = usePostHistoryGrid(posts);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      <div className="px-4 py-3 sm:px-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
+    <div
+      className="signal-panel overflow-hidden rounded-2xl border border-signal-border border-t-4"
+      style={{ borderTopColor: theme.accent }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-signal-border px-4 py-3 sm:px-5">
         <div className="flex items-center gap-2">
           <PlatformIcon name={platform} />
-          <span className="text-[13px] sm:text-sm font-bold text-slate-800">
-            Best Time to Post (SGT)
+          <span
+            className="font-signal-display text-lg font-semibold"
+            style={{ color: theme.accent }}
+          >
+            Best time to post (SGT)
           </span>
         </div>
-        <span className="text-[11px] sm:text-xs font-mono text-slate-400">
-          {loading ? "Loading..." : "All time"}
+        <span className="font-signal-mono text-[10px] uppercase tracking-wide text-signal-muted sm:text-xs">
+          {loading ? "Loading..." : "All available history"}
         </span>
       </div>
       <div className="p-4 sm:p-6">
-        <PostHistoryGridView
+          <PostHistoryGridView
           grid={grid}
           minAvg={minAvg}
           maxAvg={maxAvg}
           hasData={hasData}
           loading={loading}
+          platform={platform}
         />
       </div>
     </div>
@@ -923,6 +1093,9 @@ function BestTimeBigCard({
 // ─── Big single-panel card: Instagram ──────
 
 function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
+  const theme = PLATFORM_THEMES.instagram;
+  const heatColors = theme.heatColors;
+
   // --- Data source 1: by month, each month has 7 days x 24 hours ---
   const [feMonthlyData, setFeMonthlyData] =
     useState<TimeEngagementMonthlyData | null>(null);
@@ -1196,25 +1369,34 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
     min: number,
     max: number,
   ) => {
-    if (!hasData) return "#eef2f7";
-    if (max === min) return "hsl(330, 75%, 55%)";
-    const normalized = (value - min) / (max - min);
-    const lightness = 88 - normalized * 68;
-    return `hsl(330, 75%, ${lightness}%)`;
+    if (!hasData) return heatColors[0];
+    if (max === min) return heatColors[4];
+    const normalized = Math.max(0, Math.min(1, (value - min) / (max - min)));
+    const colorIndex = Math.round(normalized * (heatColors.length - 1));
+    return heatColors[colorIndex];
   };
 
   const bothLoading = feLoading && feDailyLoading;
   const bothError = feError && feDailyError;
 
   return (
-    <div className="rounded-2xl border border-pink-200 bg-white overflow-hidden">
-      <div className="px-4 py-3 sm:px-5 bg-pink-50/60 border-b border-pink-200 flex items-center justify-between flex-wrap gap-2">
+    <div
+      className="signal-panel overflow-hidden rounded-2xl border border-signal-border border-t-4"
+      style={{ borderTopColor: theme.accent }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-signal-border px-4 py-3 sm:px-5">
         <div className="flex items-center gap-2">
           <PlatformIcon name="instagram" />
-          <span className="text-[13px] sm:text-sm font-bold text-slate-800">
-            Best Time to Post (SGT)
+          <span
+            className="font-signal-display text-lg font-semibold"
+            style={{ color: theme.accent }}
+          >
+            Best time to post (SGT)
           </span>
         </div>
+        <span className="font-signal-mono text-[10px] uppercase tracking-wide text-signal-muted">
+          Monthly + hourly follower activity
+        </span>
       </div>
 
       <div className="p-4 sm:p-6">
@@ -1248,9 +1430,14 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                         type="button"
                         onClick={() => setSelectedMonth(m)}
                         className={`text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${selectedMonth === m
-                          ? "bg-pink-600 text-white border-pink-600"
-                          : "bg-white text-pink-600 border-pink-200 hover:bg-pink-50"
+                          ? "text-white"
+                          : "bg-white"
                           }`}
+                        style={
+                          selectedMonth === m
+                            ? { backgroundColor: theme.accent, borderColor: theme.accent }
+                            : { color: theme.accent, borderColor: `${theme.accent}55` }
+                        }
                       >
                         {m}
                       </button>
@@ -1263,13 +1450,15 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                   <span
                     className="h-2 sm:h-2.5 w-24 sm:w-32 rounded-full"
                     style={{
-                      background:
-                        "linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))",
+background: `linear-gradient(to right, ${heatColors[0]}, ${heatColors[heatColors.length - 1]})`,
                     }}
                   />
                   <span className="tabular-nums">{fmtNum(feMax)}</span>
                   <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
-                    <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
+<span
+                      className="inline-block h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5"
+                      style={{ backgroundColor: theme.marker }}
+                    />
                     Your posts
                   </span>
                 </div>
@@ -1292,7 +1481,10 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                               <div
                                 key={hourIdx}
                                 title={`${day} ${String(hourIdx).padStart(2, "0")}:00 SGT — ${fmtNum(value)} followers online, ${postCount} post${postCount === 1 ? "" : "s"} (${selectedMonth})`}
-                                className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
+                                role="img"
+                                tabIndex={postCount > 0 ? 0 : -1}
+                                aria-label={`${day} ${String(hourIdx).padStart(2, "0")}:00 SGT, ${fmtNum(value)} followers online, ${postCount} posts, ${selectedMonth}`}
+                                className="relative flex-1 aspect-square rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-signal-cyan sm:rounded-[4px]"
                                 style={{
                                   backgroundColor: cellColor(
                                     value,
@@ -1304,7 +1496,10 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                               >
                                 {postCount > 0 && (
                                   <span className="absolute inset-0 flex items-center justify-center">
-                                    <span className="flex items-center justify-center min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-0.5 rounded-full bg-amber-400 text-white text-[8px] sm:text-[9px] font-bold leading-none shadow-sm">
+<span
+                                      className="flex min-w-[14px] items-center justify-center rounded-full px-0.5 text-[8px] font-bold leading-none text-white shadow-sm sm:min-w-[16px] sm:text-[9px]"
+                                      style={{ backgroundColor: theme.marker }}
+                                    >
                                       {postCount}
                                     </span>
                                   </span>
@@ -1335,7 +1530,10 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
               </div>
             )}
 
-            <div className="border-t border-pink-100" />
+            <div
+              className="border-t"
+              style={{ borderColor: `${theme.accent}33` }}
+            />
 
             {/* ===== Table 2: Aggregated by hour, not split by weekday (unchanged) ===== */}
             {feDailyError ? (
@@ -1353,13 +1551,15 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                   <span
                     className="h-2 sm:h-2.5 w-24 sm:w-32 rounded-full"
                     style={{
-                      background:
-                        "linear-gradient(to right, hsl(330,75%,88%), hsl(330,75%,20%))",
+background: `linear-gradient(to right, ${heatColors[0]}, ${heatColors[heatColors.length - 1]})`,
                     }}
                   />
                   <span className="tabular-nums">{fmtNum(dailyMax)}</span>
                   <span className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2">
-                    <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-400 inline-block" />
+<span
+                      className="inline-block h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5"
+                      style={{ backgroundColor: theme.marker }}
+                    />
                     Recommended
                   </span>
                 </div>
@@ -1371,7 +1571,10 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                         <div
                           key={hourIdx}
                           title={`${String(hourIdx).padStart(2, "0")}:00 SGT — ${fmtNum(value)} followers online`}
-                          className="relative flex-1 aspect-square rounded-[3px] sm:rounded-[4px]"
+                          role="img"
+                          tabIndex={dailyRecSet.has(hourIdx) ? 0 : -1}
+                          aria-label={`${String(hourIdx).padStart(2, "0")}:00 SGT, ${fmtNum(value)} followers online`}
+                          className="relative flex-1 aspect-square rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-signal-cyan sm:rounded-[4px]"
                           style={{
                             backgroundColor: cellColor(
                               value,
@@ -1383,7 +1586,10 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                         >
                           {dailyRecSet.has(hourIdx) && (
                             <span className="absolute inset-0 flex items-center justify-center">
-                              <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-amber-400" />
+<span
+                                className="h-2.5 w-2.5 rounded-full sm:h-3.5 sm:w-3.5"
+                                style={{ backgroundColor: theme.marker }}
+                              />
                             </span>
                           )}
                         </div>
@@ -1405,15 +1611,28 @@ function InstagramBigCard({ posts }: { posts: Post[]; loading: boolean }) {
                 </div>
 
                 {recommendedSgtTimes.length > 0 && (
-                  <div className="mt-4 sm:mt-5 p-3 bg-pink-50/50 border border-pink-100 rounded-xl">
-                    <p className="text-[11px] sm:text-xs text-pink-700 font-semibold mb-1.5">
+                  <div
+                    className="mt-4 rounded-xl border p-3 sm:mt-5"
+                    style={{
+                      backgroundColor: theme.soft,
+                      borderColor: `${theme.accent}55`,
+                    }}
+                  >
+                    <p
+                      className="mb-1.5 text-[11px] font-semibold sm:text-xs"
+                      style={{ color: theme.accent }}
+                    >
                       Best times to post:
                     </p>
-                    <div className="flex gap-1.5 sm:gap-2 flex-wrap">
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {recommendedSgtTimes.map((t) => (
                         <span
                           key={t}
-                          className="text-[10px] sm:text-xs font-bold text-pink-600 bg-white border border-pink-200 rounded-full px-2 py-0.5 sm:px-2.5"
+                          className="rounded-full border bg-white px-2 py-0.5 text-[10px] font-bold sm:px-2.5 sm:text-xs"
+                          style={{
+                            color: theme.accent,
+                            borderColor: `${theme.accent}55`,
+                          }}
                         >
                           {t}
                         </span>
@@ -1498,9 +1717,9 @@ function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
       href={row.url}
       target="_blank"
       rel="noreferrer"
-      className={`flex items-center gap-2.5 sm:gap-3 rounded-lg border border-slate-100 bg-white px-2.5 py-2 sm:px-3 sm:py-2.5 hover:border-slate-300 hover:shadow-sm transition-all ${!row.url ? "pointer-events-none" : ""}`}
+      className={`group flex items-center gap-2.5 rounded-lg border border-signal-border bg-signal-surface px-2.5 py-3 transition-colors sm:gap-3 sm:px-3 sm:py-3 ${row.url ? "hover:border-signal-cyan hover:bg-signal-track" : "pointer-events-none"}`}
     >
-      <span className="hidden sm:flex items-center justify-center w-5 h-5 shrink-0 rounded-full bg-slate-100 text-[10px] font-bold text-slate-400">
+      <span className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal-track font-signal-mono text-[10px] font-bold text-signal-muted sm:flex">
         {rank}
       </span>
       <PlatformIcon name={row.platform} />
@@ -1519,13 +1738,13 @@ function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
         <p className="text-[9px] sm:text-[10px] text-slate-400 tabular-nums">
           {fmtNum(row.views)} views
         </p>
-        <p className="text-xs sm:text-[13px] font-bold tabular-nums">
+        <p className="text-xs font-bold tabular-nums text-signal-cyan sm:text-[13px]">
           {row.er.toFixed(1)}%
         </p>
         {ctr && (
-          <p className="text-[9px] sm:text-[10px] text-indigo-500 font-semibold tabular-nums">
-            CTR {ctr}%
-          </p>
+            <p className="font-signal-mono text-[9px] font-semibold tabular-nums text-signal-coral sm:text-[10px]">
+              CTR {ctr}%
+            </p>
         )}
       </div>
     </a>
@@ -1545,15 +1764,16 @@ function PlatformFilterChips({
 }) {
   if (platforms.length === 0) return null;
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter engagement by platform">
       {platforms.map((p) => (
         <button
           key={p}
           type="button"
+          aria-pressed={active === p}
           onClick={() => onChange(p)}
-          className={`inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${active === p
-              ? "bg-slate-800 text-white border-slate-800"
-              : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+          className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-[11px] font-semibold transition-colors focus-visible:outline-none sm:text-xs ${active === p
+              ? "border-signal-cyan bg-signal-cyan text-signal-ink"
+              : "border-signal-border bg-transparent text-signal-muted hover:border-signal-cyan hover:text-signal-cyan"
             }`}
         >
           <PlatformIcon name={p} />
@@ -1561,6 +1781,59 @@ function PlatformFilterChips({
         </button>
       ))}
     </div>
+  );
+}
+
+function EngagementPagination({
+  page,
+  pageCount,
+  pageSize,
+  total,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (pageCount <= 1) return null;
+
+  const firstItem = (page - 1) * pageSize + 1;
+  const lastItem = Math.min(page * pageSize, total);
+
+  return (
+    <nav
+      className="mt-3 flex items-center justify-between gap-3 border-t border-signal-border px-1 pt-3"
+      aria-label="Engagement posts pagination"
+    >
+      <span className="font-signal-mono text-[9px] uppercase tracking-wide text-signal-muted sm:text-[10px]">
+        {firstItem}–{lastItem} of {total}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page === 1}
+          aria-label="Previous engagement posts page"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-signal-border bg-signal-surface text-signal-muted transition-colors hover:border-signal-cyan hover:text-signal-cyan disabled:pointer-events-none disabled:opacity-40"
+        >
+          <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+        <span className="min-w-16 text-center font-signal-mono text-[9px] uppercase tracking-wide text-signal-muted">
+          Page {page} / {pageCount}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page === pageCount}
+          aria-label="Next engagement posts page"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-signal-border bg-signal-surface text-signal-muted transition-colors hover:border-signal-cyan hover:text-signal-cyan disabled:pointer-events-none disabled:opacity-40"
+        >
+          <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </nav>
   );
 }
 
@@ -1575,6 +1848,10 @@ function EngagementRateTables({
 }) {
   const [selectedPlatform, setSelectedPlatform] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
+  const [abovePage, setAbovePage] = useState(1);
+  const [belowPage, setBelowPage] = useState(1);
+
+  const ENGAGEMENT_PAGE_SIZE = 5;
 
   // Hiện toàn bộ posts, kể cả views = 0 (ER sẽ tính ra 0% và rơi vào nhóm Below Average)
   const availablePlatforms = useMemo(() => {
@@ -1653,19 +1930,44 @@ function EngagementRateTables({
     [rows, avgEr],
   );
 
+  const abovePageCount = Math.max(1, Math.ceil(aboveAvg.length / ENGAGEMENT_PAGE_SIZE));
+  const belowPageCount = Math.max(1, Math.ceil(belowAvg.length / ENGAGEMENT_PAGE_SIZE));
+
+  useEffect(() => {
+    setAbovePage(1);
+    setBelowPage(1);
+  }, [selectedPlatform, selectedMonth]);
+
+  useEffect(() => {
+    setAbovePage((page) => Math.min(page, abovePageCount));
+  }, [abovePageCount]);
+
+  useEffect(() => {
+    setBelowPage((page) => Math.min(page, belowPageCount));
+  }, [belowPageCount]);
+
+  const visibleAboveAvg = aboveAvg.slice(
+    (abovePage - 1) * ENGAGEMENT_PAGE_SIZE,
+    abovePage * ENGAGEMENT_PAGE_SIZE,
+  );
+  const visibleBelowAvg = belowAvg.slice(
+    (belowPage - 1) * ENGAGEMENT_PAGE_SIZE,
+    belowPage * ENGAGEMENT_PAGE_SIZE,
+  );
+
   return (
-    <div className="lg:col-span-12 rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      <div className="px-4 py-3 sm:px-5 flex flex-col gap-2.5 sm:gap-3 bg-slate-50 border-b border-slate-200">
+    <div className="signal-panel lg:col-span-12 overflow-hidden rounded-2xl border border-signal-border">
+      <div className="flex flex-col gap-3 border-b border-signal-border bg-signal-surface px-4 py-3 sm:px-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">
-            Engagement Rate Breakdown
+          <span className="font-signal-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-signal-cyan sm:text-[11px]">
+            Engagement compared with the average
             {selectedPlatform && (
-              <span className="ml-1.5 normal-case font-semibold text-slate-400">
+              <span className="ml-1.5 normal-case font-semibold text-signal-muted">
                 · {selectedPlatform}
               </span>
             )}
           </span>
-          <span className="text-[10px] sm:text-xs font-mono text-slate-500">
+          <span className="font-signal-mono text-[10px] text-signal-muted sm:text-xs">
             {loading
               ? "Loading..."
               : `Avg ER: ${avgEr.toFixed(1)}% · ${rows.length} posts (SGT)`}
@@ -1679,18 +1981,22 @@ function EngagementRateTables({
             onChange={setSelectedPlatform}
           />
 
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="text-[10px] sm:text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-300"
-          >
+          <label className="flex min-h-10 items-center gap-2 rounded-md border border-signal-border px-3 text-[11px] font-semibold text-signal-muted">
+            <span className="font-signal-mono text-[9px] uppercase tracking-wide">Month</span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              aria-label="Filter engagement by month"
+              className="cursor-pointer border-0 bg-transparent py-2 text-xs font-semibold text-signal-text outline-none focus:ring-0"
+            >
             <option value="all">All months</option>
             {availableMonths.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
             ))}
-          </select>
+            </select>
+          </label>
         </div>
       </div>
 
@@ -1711,17 +2017,28 @@ function EngagementRateTables({
                 {aboveAvg.length} posts
               </span>
             </div>
-            <div className="space-y-1.5 sm:space-y-2 max-h-[420px] overflow-y-auto pr-1">
+            <div className="space-y-1.5 sm:space-y-2 pr-1">
               {aboveAvg.length === 0 ? (
                 <div className="flex items-center justify-center h-20 text-[12px] text-slate-400">
                   No posts above average.
                 </div>
               ) : (
-                aboveAvg.map((r, i) => (
-                  <ErPostRow key={r.id} row={r} rank={i + 1} />
+                visibleAboveAvg.map((r, i) => (
+                  <ErPostRow
+                    key={r.id}
+                    row={r}
+                    rank={(abovePage - 1) * ENGAGEMENT_PAGE_SIZE + i + 1}
+                  />
                 ))
               )}
             </div>
+            <EngagementPagination
+              page={abovePage}
+              pageCount={abovePageCount}
+              pageSize={ENGAGEMENT_PAGE_SIZE}
+              total={aboveAvg.length}
+              onPageChange={setAbovePage}
+            />
           </div>
 
           {/* Below average */}
@@ -1735,17 +2052,28 @@ function EngagementRateTables({
                 {belowAvg.length} posts
               </span>
             </div>
-            <div className="space-y-1.5 sm:space-y-2 max-h-[420px] overflow-y-auto pr-1">
+            <div className="space-y-1.5 sm:space-y-2 pr-1">
               {belowAvg.length === 0 ? (
                 <div className="flex items-center justify-center h-20 text-[12px] text-slate-400">
                   No posts below average.
                 </div>
               ) : (
-                belowAvg.map((r, i) => (
-                  <ErPostRow key={r.id} row={r} rank={i + 1} />
+                visibleBelowAvg.map((r, i) => (
+                  <ErPostRow
+                    key={r.id}
+                    row={r}
+                    rank={(belowPage - 1) * ENGAGEMENT_PAGE_SIZE + i + 1}
+                  />
                 ))
               )}
             </div>
+            <EngagementPagination
+              page={belowPage}
+              pageCount={belowPageCount}
+              pageSize={ENGAGEMENT_PAGE_SIZE}
+              total={belowAvg.length}
+              onPageChange={setBelowPage}
+            />
           </div>
 
 
@@ -1760,14 +2088,17 @@ function EngagementRateTables({
 export default function InsightsPage() {
   const [topPosts, setTopPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [topPostsError, setTopPostsError] = useState(false);
 
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [allPostsLoading, setAllPostsLoading] = useState(false);
+  const [allPostsError, setAllPostsError] = useState(false);
 
   const [demographics, setDemographics] = useState<DemographicRow[]>(
     REAL_DEMOGRAPHICS_SNAPSHOT,
   );
   const [demoLoading, setDemoLoading] = useState(false);
+  const [demoError, setDemoError] = useState(false);
 
   const [activePlatform, setActivePlatform] = useState<PlatformKey>("tiktok");
 
@@ -1779,13 +2110,16 @@ export default function InsightsPage() {
   useEffect(() => {
     const fetchTopPosts = async () => {
       setPostsLoading(true);
+      setTopPostsError(false);
       try {
         const response = await fetch(`${API_BASE_URL}/insights/top-posts`);
+        if (!response.ok) throw new Error(`Top posts request failed: ${response.status}`);
         const data = await response.json();
         const normalizedPosts = normalizeTopPosts(data);
         setTopPosts(normalizedPosts);
       } catch (error) {
         console.error("Error loading top posts:", error);
+        setTopPostsError(true);
       } finally {
         setPostsLoading(false);
       }
@@ -1796,13 +2130,16 @@ export default function InsightsPage() {
   useEffect(() => {
     const fetchAllPosts = async () => {
       setAllPostsLoading(true);
+      setAllPostsError(false);
       try {
         const response = await fetch(`${API_BASE_URL}/insights/all-posts`);
+        if (!response.ok) throw new Error(`All posts request failed: ${response.status}`);
         const data = await response.json();
         const normalizedPosts = normalizeTopPosts(data);
         setAllPosts(normalizedPosts);
       } catch (error) {
         console.error("Error loading all posts:", error);
+        setAllPostsError(true);
       } finally {
         setAllPostsLoading(false);
       }
@@ -1813,12 +2150,15 @@ export default function InsightsPage() {
   useEffect(() => {
     const fetchDemographics = async () => {
       setDemoLoading(true);
+      setDemoError(false);
       try {
         const res = await fetch(`${API_BASE_URL}/insights/demographics`);
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`Demographics request failed: ${res.status}`);
         const parsed: DemographicRow[] = await res.json();
         if (Array.isArray(parsed) && parsed.length > 0) setDemographics(parsed);
-      } catch {
+      } catch (error) {
+        console.error("Error loading demographics:", error);
+        setDemoError(true);
       } finally {
         setDemoLoading(false);
       }
@@ -1890,52 +2230,72 @@ export default function InsightsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 mt-16 pb-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8 space-y-8 sm:space-y-10">
+    <div className="signal-atlas min-h-screen bg-signal-ink font-signal-body text-signal-text mt-16 pb-16">
+      <div className="mx-auto max-w-[1640px] px-4 sm:px-8 py-10 sm:py-14 space-y-14 sm:space-y-20">
         {/* Header */}
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
-            Insights &amp; Performance
-          </h1>
-          <p className="text-[13px] sm:text-sm text-slate-500 mt-1">
-            In-depth analysis of our audience and top-performing content.
-          </p>
-        </div>
+        <header className="border-b border-signal-border pb-10 sm:pb-14">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="mb-5 flex items-center gap-3 font-signal-mono text-[10px] uppercase tracking-[0.18em] text-signal-muted sm:text-[11px]">
+                <span className="h-0.5 w-8 bg-signal-coral" aria-hidden="true" />
+                Signals at a glance
+              </div>
+              <h1 className="max-w-3xl font-signal-display text-4xl font-semibold leading-[0.95] tracking-[-0.04em] text-signal-text sm:text-6xl">
+                Insights &amp; <span className="text-signal-cyan">performance</span>
+              </h1>
+              <p className="mt-5 max-w-2xl text-base leading-7 text-signal-muted sm:text-lg">
+                Read the audience, compare what landed, then choose when to post.
+              </p>
+            </div>
+            <div className="border-l-2 border-signal-cyan pl-4 font-signal-mono text-[10px] uppercase tracking-[0.12em] text-signal-muted sm:max-w-sm">
+              <span className="text-signal-text">Top-post cohort</span>
+              <span className="mx-2 text-signal-slate">•</span>
+              all available loaded data
+              <span className="mx-2 text-signal-slate">•</span>
+              4 platforms
+            </div>
+          </div>
+        </header>
 
         {/* ── SECTION 1: Overview ── */}
-        <section className="space-y-4 sm:space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <section id="briefing" aria-labelledby="briefing-heading" className="space-y-6 sm:space-y-8">
+          <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-signal-border sm:grid-cols-3 sm:divide-x sm:divide-signal-border">
             <StatCard
-              label="Total Views"
-              value={fmtNum(totalViews)}
-              sub={`Top posts across ${platformCount} platforms`}
+              label="Total views"
+              value={postsLoading && topPosts.length === 0 ? "—" : fmtNum(totalViews)}
+              sub={`Top posts only · ${platformCount} platform${platformCount === 1 ? "" : "s"}`}
               colorKey="up"
             />
             <StatCard
-              label="Total Likes"
-              value={fmtNum(totalLikes)}
-              sub={`Top posts across ${platformCount} platforms`}
+              label="Total likes"
+              value={postsLoading && topPosts.length === 0 ? "—" : fmtNum(totalLikes)}
+              sub={`Same top-post cohort · ${platformCount} platform${platformCount === 1 ? "" : "s"}`}
               colorKey="none"
             />
             <StatCard
-              label="Engagement Rate"
-              value={`${engagementRate}%`}
-              sub="Likes + shares / views, top posts"
-              colorKey="none"
+              label="Engagement rate"
+              value={postsLoading && topPosts.length === 0 ? "—" : `${engagementRate}%`}
+              sub="Likes + shares ÷ views · top posts"
+              colorKey="down"
             />
           </div>
+          <p id="briefing-heading" className="font-signal-mono text-[10px] leading-5 text-signal-muted sm:text-[11px]">
+            Scope note: headline values describe the top-post cohort, not account-wide performance.
+          </p>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Demographics */}
-            <div className="lg:col-span-5 rounded-2xl border border-emerald-200 bg-white overflow-hidden flex flex-col">
-              <div className="px-4 py-3 sm:px-5 flex items-center justify-between bg-emerald-50/60 border-b border-emerald-200">
-                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-emerald-600">
-                  Audience
+            <div className="signal-panel lg:col-span-5 flex flex-col overflow-hidden rounded-2xl border border-signal-border">
+              <div className="flex items-center justify-between border-b border-signal-border px-4 py-3 sm:px-5">
+                <span className="font-signal-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-signal-coral sm:text-[11px]">
+                  Audience snapshot
                 </span>
-                <span className="text-[10px] sm:text-xs font-mono text-emerald-600">
+                <span className="font-signal-mono text-[10px] text-signal-muted sm:text-xs">
                   {demoLoading
                     ? "Loading..."
-                    : `${fmtNum(totalKnownFollowers)} followers`}
+                    : demoError
+                      ? "Snapshot fallback"
+                      : `${fmtNum(totalKnownFollowers)} followers`}
                 </span>
               </div>
               <div className="p-3 sm:p-4 flex-1 flex flex-col">
@@ -1950,11 +2310,11 @@ export default function InsightsPage() {
                         strokeDasharray="3 3"
                         horizontal
                         vertical={false}
-                        stroke="#e2e8f0"
+                        stroke={SIGNAL_CHART.border}
                       />
                       <XAxis
                         type="number"
-                        tick={{ fontSize: 10, fill: "#94a3b8" }}
+                        tick={{ fontSize: 10, fill: SIGNAL_CHART.muted }}
                         axisLine={false}
                         tickLine={false}
                       />
@@ -1963,7 +2323,7 @@ export default function InsightsPage() {
                         type="category"
                         tick={{
                           fontSize: 10,
-                          fill: "#64748b",
+                          fill: SIGNAL_CHART.text,
                           fontWeight: 600,
                         }}
                         axisLine={false}
@@ -1972,31 +2332,31 @@ export default function InsightsPage() {
                       />
                       <Tooltip
                         content={<ChartTooltip />}
-                        cursor={{ fill: "#f8fafc" }}
+                        cursor={{ fill: SIGNAL_CHART.track }}
                       />
                       <Legend
                         iconType="circle"
-                        wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }}
+                        wrapperStyle={{ fontSize: "10px", paddingTop: "8px", color: SIGNAL_CHART.muted }}
                       />
                       <Bar
                         dataKey="female"
                         name="Female"
                         stackId="a"
-                        fill="#ec4899"
+                        fill={SIGNAL_CHART.female}
                         barSize={16}
                       />
                       <Bar
                         dataKey="male"
                         name="Male"
                         stackId="a"
-                        fill="#6366f1"
+                        fill={SIGNAL_CHART.male}
                         barSize={16}
                       />
                       <Bar
                         dataKey="undisclosed"
                         name="Undisclosed"
                         stackId="a"
-                        fill="#cbd5e1"
+                        fill={SIGNAL_CHART.undisclosed}
                         radius={[0, 4, 4, 0]}
                         barSize={16}
                       />
@@ -2004,15 +2364,14 @@ export default function InsightsPage() {
                   </ResponsiveContainer>
                 </div>
 
-                <div className="mt-4 p-3 sm:p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl flex gap-2 sm:gap-3">
-                  <span className="text-lg sm:text-xl">💡</span>
+                <div className="mt-4 flex gap-3 border-l-2 border-signal-coral px-3 py-3 sm:px-4">
+                  <Lightbulb aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-signal-coral" />
                   <div>
-                    <p className="text-[13px] sm:text-sm text-emerald-800 font-semibold mb-1">
-                      Quick Insight
+                    <p className="mb-1 font-signal-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-signal-coral sm:text-[11px]">
+                      Quick insight
                     </p>
-                    <p className="text-[11px] sm:text-xs text-emerald-600 leading-relaxed">
-                      The 25-44 age group makes up the majority of followers
-                      with available demographic data.
+                    <p className="text-xs leading-relaxed text-signal-muted sm:text-sm">
+                      The 25–44 age group makes up the majority of followers with available demographic data.
                     </p>
                   </div>
                 </div>
@@ -2020,13 +2379,13 @@ export default function InsightsPage() {
             </div>
 
             {/* Top Posts */}
-            <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white overflow-hidden flex flex-col">
-              <div className="px-4 py-3 sm:px-5 flex flex-col gap-2 sm:gap-3 bg-slate-50 border-b border-slate-200">
+            <div className="signal-panel lg:col-span-7 flex flex-col overflow-hidden rounded-2xl border border-signal-border">
+              <div className="flex flex-col gap-3 border-b border-signal-border bg-signal-surface px-4 py-3 sm:px-5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">
+                  <span className="font-signal-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-signal-cyan sm:text-[11px]">
                     Top posts
                   </span>
-                  <span className="text-[10px] sm:text-xs font-mono text-slate-400">
+                  <span className="font-signal-mono text-[10px] text-signal-muted sm:text-xs">
                     {postsLoading ? "Loading..." : "Top 5 / platform"}
                   </span>
                 </div>
@@ -2038,69 +2397,91 @@ export default function InsightsPage() {
                 />
               </div>
 
-              <div className="p-4 sm:p-5 flex-1 overflow-y-auto max-h-[500px] space-y-6 sm:space-y-8">
+              <div className="flex-1 space-y-6 p-4 sm:space-y-8 sm:p-5">
                 {postsLoading && topPosts.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-[13px] sm:text-sm text-slate-400 py-10">
-                    Loading posts...
+                  <div className="space-y-3 py-8" aria-live="polite">
+                    <div className="h-12 animate-pulse rounded-lg bg-signal-track" />
+                    <div className="h-12 animate-pulse rounded-lg bg-signal-track" />
+                    <div className="h-12 animate-pulse rounded-lg bg-signal-track" />
+                    <p className="font-signal-mono text-[10px] uppercase tracking-wide text-signal-muted">Loading top posts...</p>
                   </div>
+                ) : topPostsError && topPosts.length === 0 ? (
+                  <InlineDataState
+                    tone="error"
+                    title="Couldn’t load top posts."
+                    description="Other sections remain available."
+                    actionLabel="Try again"
+                    onAction={() => window.location.reload()}
+                  />
                 ) : Object.keys(groupedPosts).length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-[13px] sm:text-sm text-slate-400 py-10">
-                    No posts available.
-                  </div>
+                  <InlineDataState
+                    tone="empty"
+                    title={activeContentType === "all" ? "No posts available." : `No posts match “${CONTENT_TYPE_META[activeContentType].label}”.`}
+                    description={activeContentType === "all" ? "There are no loaded top-post rows yet." : "Try another content type."}
+                  />
                 ) : (
-                  Object.entries(groupedPosts).map(([platform, posts]) => (
-                    <div key={platform}>
-                      <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                  <div className="signal-scroll-area max-h-[560px] overflow-y-auto pr-1 sm:pr-2">
+                    {Object.entries(groupedPosts).map(([platform, posts]) => (
+                    <div key={platform} className="border-b border-signal-border last:border-0">
+                      <div className="flex items-center gap-2 border-b border-signal-border pb-3">
                         <PlatformIcon name={platform} />
-                        <h3 className="text-[13px] sm:text-sm font-bold text-slate-700 capitalize">
+                        <h3 className="font-signal-display text-lg font-semibold capitalize text-signal-text">
                           {platform}
                         </h3>
+                        <span className="font-signal-mono text-[10px] uppercase tracking-wide text-signal-muted">
+                          Top {posts.length} / platform
+                        </span>
                       </div>
 
-                      <div className="flex flex-col gap-2">
+                      <div className="divide-y divide-signal-border">
                         {posts.map((post, i) => {
                           const er = post.views > 0 ? (((post.likes + post.shares) / post.views) * 100).toFixed(1) : "0.0";
                           const ctr = getCtr(post);
                           return (
                             <a
                               key={post.id}
-                              href={post.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={`group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3 hover:border-slate-300 hover:shadow-sm transition-all ${!post.url ? "pointer-events-none" : ""}`}
+                              href={post.url || undefined}
+                              target={post.url ? "_blank" : undefined}
+                              rel={post.url ? "noreferrer" : undefined}
+                              aria-label={post.url ? `Open ${post.title}` : undefined}
+                              className={`group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-4 transition-colors sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:gap-4 ${post.url ? "hover:bg-signal-track/70" : ""} ${!post.url ? "pointer-events-none" : ""}`}
                             >
-                              <span className="hidden sm:flex items-center justify-center w-5 h-5 shrink-0 rounded-full bg-slate-100 text-[10px] font-bold text-slate-400">
-                                {i + 1}
+                              <span className="font-signal-mono text-sm tabular-nums text-signal-slate sm:text-base">
+                                {String(i + 1).padStart(2, "0")}
                               </span>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-[10px] sm:text-[11px] text-slate-400 shrink-0">{post.date}</span>
+                              <div className="min-w-0">
+                                <div className="mb-1 flex flex-wrap items-center gap-2">
+                                  <ContentTypeBadge type={post.contentType} />
+                                  <span className="font-signal-mono text-[10px] text-signal-muted sm:text-[11px]">
+                                    {formatSgtDateTime(post.date)} SGT
+                                  </span>
                                 </div>
-                                <h4 className="text-xs sm:text-[13px] font-semibold text-slate-800 leading-snug truncate group-hover:text-slate-900" title={post.title}>
-                                  {post.title}
+                                <h4 className="flex min-w-0 items-center gap-2 truncate text-sm font-semibold text-signal-text group-hover:text-signal-cyan sm:text-[15px]" title={post.title}>
+                                  <span className="truncate">{post.title}</span>
+                                  {post.url && <ExternalLink aria-hidden="true" className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />}
                                 </h4>
                               </div>
-                              <div className="hidden xs:flex sm:flex items-center gap-3 sm:gap-4 shrink-0 text-right">
-                                <div>
-                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Views</p>
-                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">{fmtNum(post.views)}</p>
+                              <div className="flex items-center gap-3 text-right sm:gap-5">
+                                <div className="hidden sm:block">
+                                  <p className="font-signal-mono text-[9px] uppercase tracking-wide text-signal-muted">Likes</p>
+                                  <p className="text-sm font-semibold tabular-nums text-signal-text">{fmtNum(post.likes)}</p>
+                                </div>
+                                <div className="hidden sm:block">
+                                  <p className="font-signal-mono text-[9px] uppercase tracking-wide text-signal-muted">Shares</p>
+                                  <p className="text-sm font-semibold tabular-nums text-signal-text">{fmtNum(post.shares)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Likes</p>
-                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">{fmtNum(post.likes)}</p>
+                                  <p className="font-signal-mono text-[9px] uppercase tracking-wide text-signal-muted">Views</p>
+                                  <p className="text-sm font-semibold tabular-nums text-signal-text">{fmtNum(post.views)}</p>
                                 </div>
-                                <div>
-                                  <p className="text-[8px] sm:text-[9px] font-medium text-slate-400 uppercase tracking-wide">Shares</p>
-                                  <p className="text-xs sm:text-[13px] font-bold text-slate-700 tabular-nums">{fmtNum(post.shares)}</p>
-                                </div>
-                                <div className="min-w-[44px]">
-                                  <p className="text-[8px] sm:text-[9px] font-medium text-indigo-400 uppercase tracking-wide">ER</p>
-                                  <p className="text-xs sm:text-[13px] font-bold text-indigo-600 tabular-nums">{er}%</p>
+                                <div className="min-w-[46px]">
+                                  <p className="font-signal-mono text-[9px] uppercase tracking-wide text-signal-muted">ER</p>
+                                  <p className="text-sm font-bold tabular-nums text-signal-cyan">{er}%</p>
                                 </div>
                                 {ctr && (
-                                  <div className="min-w-[44px]">
-                                    <p className="text-[8px] sm:text-[9px] font-medium text-emerald-500 uppercase tracking-wide">CTR</p>
-                                    <p className="text-xs sm:text-[13px] font-bold text-emerald-600 tabular-nums">{ctr}%</p>
+                                  <div className="hidden min-w-[46px] sm:block">
+                                    <p className="font-signal-mono text-[9px] uppercase tracking-wide text-signal-muted">CTR</p>
+                                    <p className="text-sm font-bold tabular-nums text-signal-coral">{ctr}%</p>
                                   </div>
                                 )}
                               </div>
@@ -2109,13 +2490,23 @@ export default function InsightsPage() {
                         })}
                       </div>
                     </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
 
             {/* Content Type: biểu đồ + bảng chi tiết đặt cạnh nhau trên desktop, xếp chồng trên mobile */}
-            <div className="lg:col-span-12 grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {allPostsError && (
+              <InlineDataState
+                tone="error"
+                title="Couldn’t load all post history."
+                description="Format and engagement comparisons will update when the source is available."
+                actionLabel="Try again"
+                onAction={() => window.location.reload()}
+              />
+            )}
+            <div className="lg:col-span-12 grid grid-cols-1 gap-4 xl:grid-cols-2">
               <ContentTypePerformanceCard posts={allPosts} />
               <ContentTypeBreakdownTable posts={allPosts} loading={allPostsLoading} />
             </div>
@@ -2126,14 +2517,30 @@ export default function InsightsPage() {
         </section>
 
         {/* ── SECTION 2: Best Time to Post ── */}
-        <section className="space-y-3 sm:space-y-4">
-          <div className="flex items-center justify-between flex-col sm:flex-row gap-3 sm:gap-0">
+        <section id="time-signals" aria-labelledby="time-signals-heading" className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col justify-between gap-5 border-t border-signal-border pt-10 sm:flex-row sm:items-end sm:pt-14">
             <div className="w-full sm:w-auto">
-              <h2 className="text-lg font-bold text-slate-800">
-                Best Time to Post
+              <div
+                className="mb-3 flex items-center gap-3 font-signal-mono text-[10px] uppercase tracking-[0.16em]"
+                style={{ color: PLATFORM_THEMES[activePlatform].accent }}
+              >
+                <span>04</span>
+                <span
+                  className="h-px w-8"
+                  aria-hidden="true"
+                  style={{ backgroundColor: PLATFORM_THEMES[activePlatform].accent }}
+                />
+                Time signals · SGT
+              </div>
+              <h2
+                id="time-signals-heading"
+                className="font-signal-display text-3xl font-semibold text-signal-text sm:text-4xl"
+                style={{ color: PLATFORM_THEMES[activePlatform].accent }}
+              >
+                When to post
               </h2>
-              <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
-                Select a platform to view detailed best posting times.
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-signal-muted sm:text-base">
+                Darker cells indicate stronger historical performance. Accent markers show your published posts.
               </p>
             </div>
             {/* Display Platform Switcher full width on mobile if needed */}

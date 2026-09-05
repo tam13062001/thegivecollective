@@ -1,11 +1,295 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Semi+Condensed:wght@500;600;700&family=Azeret+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@theme {
+  --color-signal-ink: #ffffff;
+  --color-signal-surface: #ffffff;
+  --color-signal-panel: #ffffff;
+  --color-signal-track: #f1f5f9;
+  --color-signal-text: #172033;
+  --color-signal-muted: #64748b;
+  --color-signal-border: #e2e8f0;
+  --color-signal-cyan: #0891b2;
+  --color-signal-coral: #e11d48;
+  --color-signal-amber: #d97706;
+  --color-signal-slate: #64748b;
+  --font-signal-display: "Archivo Semi Condensed", sans-serif;
+  --font-signal-body: "Source Sans 3", sans-serif;
+  --font-signal-mono: "Azeret Mono", monospace;
+}
+
+@layer base {
+  body {
+    min-width: 320px;
+    background: #ffffff;
+    color: #172033;
+    font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  button,
+  a,
+  select,
+  input {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  /* Scoped so the rest of the existing light application keeps its current theme. */
+  .signal-atlas {
+    --signal-ink: #ffffff;
+    --signal-surface: #ffffff;
+    --signal-panel: #ffffff;
+    --signal-track: #f1f5f9;
+    --signal-text: #172033;
+    --signal-muted: #64748b;
+    --signal-border: #e2e8f0;
+    --signal-cyan: #0891b2;
+    --signal-coral: #e11d48;
+    --signal-amber: #d97706;
+    --signal-slate: #64748b;
+
+    background-color: var(--signal-ink) !important;
+    color: var(--signal-text) !important;
+    font-family: var(--font-signal-body);
+  }
+
+  .signal-atlas .font-sans,
+  .signal-atlas .font-source {
+    font-family: var(--font-signal-body);
+  }
+
+  .signal-atlas .font-mono,
+  .signal-atlas .font-azeret {
+    font-family: var(--font-signal-mono);
+  }
+
+  .signal-atlas h1,
+  .signal-atlas h2,
+  .signal-atlas h3,
+  .signal-atlas h4 {
+    font-family: var(--font-signal-display);
+    letter-spacing: -0.02em;
+  }
+
+  .signal-atlas .bg-white,
+  .signal-atlas .bg-white\/95 {
+    background-color: var(--signal-surface) !important;
+  }
+
+  .signal-atlas .bg-slate-50,
+  .signal-atlas .bg-slate-50\/40,
+  .signal-atlas .bg-slate-50\/60,
+  .signal-atlas .bg-slate-100,
+  .signal-atlas .bg-gray-50 {
+    background-color: var(--signal-surface) !important;
+  }
+
+  .signal-atlas .bg-indigo-50\/60,
+  .signal-atlas .bg-emerald-50\/60,
+  .signal-atlas .bg-emerald-50\/50,
+  .signal-atlas .bg-pink-50\/60,
+  .signal-atlas .bg-pink-50\/50,
+  .signal-atlas .bg-violet-100,
+  .signal-atlas .bg-sky-100,
+  .signal-atlas .bg-amber-100,
+  .signal-atlas .bg-fuchsia-100 {
+    background-color: var(--signal-panel) !important;
+  }
+
+  .signal-atlas .border-slate-100,
+  .signal-atlas .border-slate-200,
+  .signal-atlas .border-slate-300,
+  .signal-atlas .border-gray-100,
+  .signal-atlas .border-gray-200,
+  .signal-atlas .border-indigo-200,
+  .signal-atlas .border-indigo-100,
+  .signal-atlas .border-emerald-200,
+  .signal-atlas .border-emerald-100,
+  .signal-atlas .border-pink-200,
+  .signal-atlas .border-pink-100,
+  .signal-atlas .border-violet-200,
+  .signal-atlas .border-sky-200,
+  .signal-atlas .border-amber-200,
+  .signal-atlas .border-fuchsia-200 {
+    border-color: var(--signal-border) !important;
+  }
+
+  .signal-atlas .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  .signal-atlas .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--signal-border) !important;
+  }
+
+  .signal-atlas .text-slate-800,
+  .signal-atlas .text-slate-700,
+  .signal-atlas .text-slate-600,
+  .signal-atlas .text-gray-800,
+  .signal-atlas .text-gray-700 {
+    color: var(--signal-text) !important;
+  }
+
+  .signal-atlas .text-slate-500,
+  .signal-atlas .text-slate-400,
+  .signal-atlas .text-gray-500,
+  .signal-atlas .text-gray-400,
+  .signal-atlas .text-indigo-400,
+  .signal-atlas .text-indigo-500,
+  .signal-atlas .text-emerald-600,
+  .signal-atlas .text-emerald-500 {
+    color: var(--signal-muted) !important;
+  }
+
+  .signal-atlas .text-indigo-600,
+  .signal-atlas .text-indigo-700,
+  .signal-atlas .text-pink-600,
+  .signal-atlas .text-pink-700 {
+    color: var(--signal-cyan) !important;
+  }
+
+  .signal-atlas .text-rose-600,
+  .signal-atlas .text-rose-500 {
+    color: var(--signal-coral) !important;
+  }
+
+  .signal-atlas .bg-slate-800,
+  .signal-atlas .bg-slate-900 {
+    background-color: var(--signal-text) !important;
+    color: var(--signal-ink) !important;
+  }
+
+  .signal-atlas .bg-emerald-500,
+  .signal-atlas .bg-emerald-600,
+  .signal-atlas .bg-emerald-700,
+  .signal-atlas .bg-indigo-500,
+  .signal-atlas .bg-indigo-600,
+  .signal-atlas .bg-pink-500,
+  .signal-atlas .bg-pink-600,
+  .signal-atlas .bg-pink-700 {
+    background-color: var(--signal-cyan) !important;
+  }
+
+  .signal-atlas .bg-rose-500,
+  .signal-atlas .bg-rose-600,
+  .signal-atlas .bg-rose-700 {
+    background-color: var(--signal-coral) !important;
+  }
+
+  .signal-atlas .bg-amber-400,
+  .signal-atlas .bg-amber-500 {
+    background-color: var(--signal-amber) !important;
+  }
+
+  .signal-atlas .shadow-sm,
+  .signal-atlas .shadow-md,
+  .signal-atlas .shadow-lg,
+  .signal-atlas .shadow-xl {
+    box-shadow: none !important;
+  }
+
+  .signal-atlas .rounded-2xl,
+  .signal-atlas .rounded-xl {
+    border-radius: 16px;
+  }
+
+  .signal-atlas .rounded-lg {
+    border-radius: 8px;
+  }
+
+  .signal-atlas .backdrop-blur,
+  .signal-atlas .backdrop-blur-sm {
+    backdrop-filter: none !important;
+  }
+
+  .signal-atlas input,
+  .signal-atlas select {
+    background-color: var(--signal-surface) !important;
+    color: var(--signal-text) !important;
+    border-color: var(--signal-border) !important;
+  }
+
+  .signal-atlas option {
+    background-color: var(--signal-surface);
+    color: var(--signal-text);
+  }
+
+  .signal-atlas button:focus-visible,
+  .signal-atlas a:focus-visible,
+  .signal-atlas select:focus-visible,
+  .signal-atlas input:focus-visible {
+    outline: 2px solid var(--signal-cyan);
+    outline-offset: 3px;
+  }
+
+  .signal-atlas .signal-metric-card {
+    position: relative;
+    overflow: hidden;
+    border-color: var(--signal-border) !important;
+    background: var(--signal-surface) !important;
+  }
+
+  .signal-atlas .signal-metric-card::before {
+    position: absolute;
+    inset: 0 auto auto 0;
+    height: 3px;
+    width: 100%;
+    background: var(--signal-cyan);
+    content: "";
+  }
+
+  .signal-atlas .signal-metric-card[data-tone="coral"]::before {
+    background: var(--signal-coral);
+  }
+
+  .signal-atlas .signal-metric-card[data-tone="slate"]::before {
+    background: var(--signal-slate);
+  }
+
+  .signal-atlas .signal-panel {
+    border-color: var(--signal-border);
+    background: var(--signal-panel) !important;
+  }
+
+  .signal-atlas .signal-track {
+    background: var(--signal-track) !important;
+  }
+
+  .signal-atlas .signal-divider {
+    border-color: var(--signal-border) !important;
+  }
+}
+
 @layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
+  .no-scrollbar::-webkit-scrollbar,
+  .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  .no-scrollbar {
+
+  .no-scrollbar,
+  .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .signal-scroll-area {
+    overscroll-behavior: contain;
+    scrollbar-color: #94a3b8 transparent;
+    scrollbar-width: thin;
+  }
+
+  .signal-scroll-area::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .signal-scroll-area::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .signal-scroll-area::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 999px;
+  }
+
+  .signal-scroll-area::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
   }
 }
