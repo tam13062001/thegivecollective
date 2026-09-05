@@ -234,7 +234,7 @@ export const fetchYouTubeTopPost = async (channelHandle, apiKey) => {
 // Các hàm Dispatcher (fetchTopPostForPlatform, fetchAllTopPostsRaw) giữ nguyên
 export const fetchTopPostForPlatform = async (platformName, handle, tokens) => {
   switch (platformName.toLowerCase()) {
-    case 'facebook': return fetchFacebookTopPost(handle, tokens.metaAccessToken);
+    case 'facebook': return fetchFacebookTopPost(handle, tokens.metaAccessTokenInstagram);
     case 'instagram': return fetchInstagramTopPost(tokens.metaAccessTokenInstagram);
     case 'tiktok': return fetchTikTokTopPost(handle, tokens.apifyToken);
     case 'youtube': return fetchYouTubeTopPost(handle, tokens.youtubeApiKey);

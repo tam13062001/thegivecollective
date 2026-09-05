@@ -9,18 +9,16 @@ const allPostSchema = new mongoose.Schema(
     views: { type: Number, default: 0 },
     likes: { type: Number, default: 0 },
     shares: { type: Number, default: 0 },
+    clicks: { type: Number, default: 0 }, // Chỉ có data thật cho Facebook, Instagram không có metric này ở cấp bài viết
     date: { type: String, default: '' },
     url: { type: String, required: true, unique: true },
 
-    // Loại nội dung đã chuẩn hoá, dùng để filter/so sánh performance trên frontend
     contentType: {
       type: String,
       enum: CONTENT_TYPES,
       default: 'unknown',
     },
 
-    // Giữ lại giá trị gốc từ platform để debug / re-map lại sau này nếu cần,
-    // không bắt buộc và không dùng trực tiếp ở frontend
     rawMediaType: { type: String, default: '' },
     rawMediaProductType: { type: String, default: '' },
   },

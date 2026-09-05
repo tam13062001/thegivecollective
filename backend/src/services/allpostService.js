@@ -54,14 +54,22 @@ export const fetchInstagramTopPost = async (apiKey) => {
       const results = await Promise.all(
         batch.map(async (media) => {
           try {
-            const metric = media.media_type === 'VIDEO' ? 'views' : 'impressions';
-            const insightRes = await fetch(`${BASE}/${media.id}/insights?metric=${metric}&access_token=${apiKey}`);
-            if (!insightRes.ok) return { ...media, views: 0 };
+            // Meta đã hợp nhất mọi media type (Feed/Story/Reels — gồm cả Image, Carousel)
+            // về chung 1 metric "views" từ Graph API v22.0. Metric "impressions" cũ đã bị
+            // deprecate hoàn toàn kể từ 21/4/2025 và trả lỗi cho mọi bài đăng từ 2/7/2024
+            // trở đi — đây là lý do trước đây Carousel/Image luôn bị views: 0.
+            const insightRes = await fetch(`${BASE}/${media.id}/insights?metric=views&access_token=${apiKey}`);
+            if (!insightRes.ok) {
+              const errBody = await insightRes.text();
+              console.warn(`[Instagram] Insight lỗi cho media ${media.id} (${media.media_type}):`, errBody);
+              return { ...media, views: 0 };
+            }
             const insightData = await insightRes.json();
             const insight = insightData.data?.[0];
             const views = insight?.values?.[0]?.value ?? insight?.value ?? 0;
             return { ...media, views };
-          } catch {
+          } catch (err) {
+            console.warn(`[Instagram] Insight exception cho media ${media.id}:`, err.message);
             return { ...media, views: 0 };
           }
         })
@@ -74,7 +82,7 @@ export const fetchInstagramTopPost = async (apiKey) => {
       .sort((a, b) => b.views - a.views)
       .map(top => ({
         platform: 'Instagram',
-        title: top.caption ? top.caption.slice(0, 120) : '(Không có caption)',
+        title: top.caption ? top.caption.slice(0, 120) : '(No caption)',
         views: top.views || 0,
         likes: top.like_count || 0,
         date: formatDateTime(top.timestamp),
@@ -95,10 +103,11 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
     const BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
     const allContent = []; // Gom chung cả Posts và Reels vào đây
 
-    // Posts thường — thêm attachments{media_type,type} để xác định Photo/Video/Album/Link
+    // Posts thường — thêm "shares" để lấy số share thật, và attachments{media_type,type}
+    // để xác định Photo/Video/Album/Link
     const posts = [];
     let postsError = null;
-    let postsUrl = `${BASE}/${pageId}/posts?fields=id,message,created_time,permalink_url,likes.summary(true),attachments{media_type,type}&limit=100&access_token=${accessToken}`;
+    let postsUrl = `${BASE}/${pageId}/posts?fields=id,message,created_time,permalink_url,likes.summary(true),shares,attachments{media_type,type}&limit=100&access_token=${accessToken}`;
     while (postsUrl) {
       const res = await fetch(postsUrl);
       const data = await res.json();
@@ -107,57 +116,94 @@ export const fetchFacebookTopPost = async (pageId, accessToken) => {
       postsUrl = data.paging?.next || null;
     }
 
-    const BATCH_SIZE = 20;
-    for (let i = 0; i < posts.length; i += BATCH_SIZE) {
-      const batch = posts.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(
-        batch.map((post) =>
+  const BATCH_SIZE = 20;
+  for (let i = 0; i < posts.length; i += BATCH_SIZE) {
+    const batch = posts.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async (post) => {
+        // Gọi riêng views và clicks — 1 metric lỗi không làm hỏng metric còn lại
+        const [viewsRes, clicksRes] = await Promise.all([
           fetch(`${BASE}/${post.id}/insights?metric=post_media_view&access_token=${accessToken}`)
             .then((r) => r.json())
-            .then((d) => ({ post, views: d.data?.[0]?.values?.[0]?.value ?? 0 }))
-            .catch(() => ({ post, views: 0 }))
-        )
-      );
-      for (const { post, views } of results) {
-        const attachmentFirst = post.attachments?.data?.[0];
-        allContent.push({
-          platform: 'Facebook',
-          title: post.message ? post.message.slice(0, 120) : '(No caption)',
-          views,
-          likes: post.likes?.summary?.total_count || 0,
-          shares: post.shares?.count || 0,
-          date: formatDateTime(post.created_time),
-          url: post.permalink_url,
-          contentType: mapFacebookContentType(post.attachments),
-          rawMediaType: attachmentFirst?.media_type || attachmentFirst?.type || '',
-        });
-      }
-    }
+            .catch(() => null),
+          fetch(`${BASE}/${post.id}/insights?metric=post_clicks&access_token=${accessToken}`)
+            .then((r) => r.json())
+            .catch(() => null),
+        ]);
 
-    // Reels — luôn là video, không cần gọi thêm field attachments
+        if (viewsRes?.error) console.warn(`[Facebook] views lỗi cho post ${post.id}:`, viewsRes.error.message);
+        if (clicksRes?.error) console.warn(`[Facebook] clicks lỗi cho post ${post.id}:`, clicksRes.error.message);
+
+        const views = viewsRes?.data?.[0]?.values?.[0]?.value ?? 0;
+        const clicks = clicksRes?.data?.[0]?.values?.[0]?.value ?? 0;
+
+        return { post, views, clicks };
+      })
+    );
+    for (const { post, views, clicks } of results) {
+      const attachmentFirst = post.attachments?.data?.[0];
+      allContent.push({
+        platform: 'Facebook',
+        title: post.message ? post.message.slice(0, 120) : '(No caption)',
+        views,
+        likes: post.likes?.summary?.total_count || 0,
+        shares: post.shares?.count || 0,
+        clicks,
+        date: formatDateTime(post.created_time),
+        url: post.permalink_url,
+        contentType: mapFacebookContentType(post.attachments),
+        rawMediaType: attachmentFirst?.media_type || attachmentFirst?.type || '',
+      });
+    }
+  }
+
+    // Reels — KHÔNG nhúng video_insights vào field expansion nữa (1 metric sai sẽ
+    // làm fail toàn bộ query). Lấy field cơ bản trước, insights gọi tách riêng theo
+    // batch giống Posts, để cô lập lỗi nếu 1 video bị thiếu insight.
     let reelsError = null;
-    let reelsUrl = `${BASE}/${pageId}/video_reels?fields=id,description,created_time,permalink_url,likes.summary(true),video_insights.metric(plays,blue_reels_play_count)&limit=100&access_token=${accessToken}`;
+    const reels = [];
+    let reelsUrl = `${BASE}/${pageId}/video_reels?fields=id,description,created_time,permalink_url,likes.summary(true)&limit=100&access_token=${accessToken}`;
     while (reelsUrl) {
       const res = await fetch(reelsUrl);
       const data = await res.json();
       if (data.error) { reelsError = data.error.message; break; }
-      for (const reel of data.data || []) {
-        const insights = reel.video_insights?.data || [];
-        const plays = insights.find((i) => i.name === 'blue_reels_play_count') || insights.find((i) => i.name === 'plays');
-        const views = plays?.values?.[0]?.value ?? 0;
+      reels.push(...(data.data || []));
+      reelsUrl = data.paging?.next || null;
+    }
+
+    for (let i = 0; i < reels.length; i += BATCH_SIZE) {
+      const batch = reels.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map((reel) =>
+          fetch(`${BASE}/${reel.id}/video_insights?metric=blue_reels_play_count&access_token=${accessToken}`)
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.error) {
+                console.warn(`[Facebook] Reel insight lỗi cho video ${reel.id}:`, d.error.message);
+                return { reel, views: 0 };
+              }
+              const views = d.data?.[0]?.values?.[0]?.value ?? 0;
+              return { reel, views };
+            })
+            .catch((err) => {
+              console.warn(`[Facebook] Reel insight exception cho video ${reel.id}:`, err.message);
+              return { reel, views: 0 };
+            })
+        )
+      );
+      for (const { reel, views } of results) {
         allContent.push({
           platform: 'Facebook',
           title: reel.description ? reel.description.slice(0, 120) : '(Reel không có mô tả)',
           views,
           likes: reel.likes?.summary?.total_count || 0,
-          shares: reel.shares?.count || 0,
+          shares: 0, // video_reels edge không trả field "shares", cần call riêng nếu cần
           date: formatDateTime(reel.created_time),
           url: reel.permalink_url,
           contentType: 'video',
           rawMediaType: 'video',
         });
       }
-      reelsUrl = data.paging?.next || null;
     }
 
     if (allContent.length === 0) {
@@ -204,7 +250,7 @@ export const fetchTikTokTopPost = async (handle, apifyToken) => {
       .sort((a, b) => b.views - a.views)
       .map(top => ({
         platform: 'TikTok',
-        title: top.text ? top.text.slice(0, 120) : '(Không có caption)',
+        title: top.text ? top.text.slice(0, 120) : '(No caption)',
         views: top.views,
         likes: Number(top.diggCount) || 0,
         shares: Number(top.shareCount) || 0,

@@ -13,7 +13,20 @@ export const refreshAllPostsFromDb = async (req, res) => {
       youtubeApiKey: process.env.YOUTUBE_API_KEY,
     };
 
-    const metrics = await Metric.find({ platformName: { $in: SUPPORTED_PLATFORMS } });
+    // Cho phép chỉ refresh 1 platform để test riêng, vd: ?platform=facebook
+    // Không truyền thì mặc định refresh hết như cũ.
+    let targetPlatforms = SUPPORTED_PLATFORMS;
+    if (req.query.platform) {
+      const requested = req.query.platform.split(',').map(p => p.trim().toLowerCase());
+      targetPlatforms = SUPPORTED_PLATFORMS.filter(p => requested.includes(p.toLowerCase()));
+      if (targetPlatforms.length === 0) {
+        return res.status(400).json({
+          message: `Platform "${req.query.platform}" không hợp lệ. Chỉ hỗ trợ: ${SUPPORTED_PLATFORMS.join(', ')}.`,
+        });
+      }
+    }
+
+    const metrics = await Metric.find({ platformName: { $in: targetPlatforms } });
 
     if (metrics.length === 0) {
       const msg = 'Chưa có kênh nào trong DB (bảng Metric) để lấy top post.';
@@ -43,12 +56,8 @@ export const refreshAllPostsFromDb = async (req, res) => {
       if (resItem.data && resItem.data.error) {
         failedPosts.push(resItem);
       } else if (Array.isArray(resItem.data) && resItem.data.length > 0) {
-        // FIX: Lấy platform thật từ data trả về (vd 'TikTok', 'YouTube')
-        // thay vì resItem.platform lấy từ Metric.platformName (vd 'Tiktok', 'Youtube').
-        // Casing khác nhau khiến deleteMany bên dưới không khớp được bản ghi cũ.
         const actualPlatform = resItem.data[0].platform;
         successfulPlatforms.push(actualPlatform);
-        // Lấy hết toàn bộ bài viết, không giới hạn top 3 nữa
         allNewPosts.push(...resItem.data);
       } else if (resItem.data && !Array.isArray(resItem.data)) {
         const actualPlatform = resItem.data.platform;
@@ -57,16 +66,9 @@ export const refreshAllPostsFromDb = async (req, res) => {
       }
     });
 
-    // ─── PHẦN QUAN TRỌNG NHẤT: ĐỒNG BỘ INDEX & LƯU DB ───
-
-    // 1. Ép MongoDB đồng bộ lại index. Nó sẽ tự động tìm và xóa cái luật unique: true 
-    // của platform cũ, giúp các bài viết thứ 2, thứ 3 được lưu bình thường.
     await AllPost.syncIndexes();
 
     if (successfulPlatforms.length > 0) {
-      // 2. Dọn rác: Xóa các bài posts cũ của những platform cào thành công
-      // (dùng đúng casing thật sự lưu trong DB), và xóa luôn các bản ghi
-      // bị lỗi platform: null (như bạn thấy trong GET API)
       await AllPost.deleteMany({
         $or: [
           { platform: { $in: successfulPlatforms } },
@@ -74,7 +76,6 @@ export const refreshAllPostsFromDb = async (req, res) => {
         ],
       });
 
-      // 3. Chèn toàn bộ posts mới vào DB
       const insertResult = await AllPost.insertMany(allNewPosts, { ordered: false }).catch(err => {
         console.warn('[AllPosts] Cảnh báo khi lưu DB (Có thể do trùng URL):', err.message);
         if (err.writeErrors) {
@@ -86,9 +87,15 @@ export const refreshAllPostsFromDb = async (req, res) => {
       });
     }
 
+    // Sort theo date mới nhất trước, để xem chi tiết dễ hơn khi test 1 platform
+    const sortedPosts = [...allNewPosts].sort((a, b) => new Date(b.date) - new Date(a.date));
+
     const summary = {
       message: `Cập nhật top posts hoàn tất. Đã lưu ${allNewPosts.length} bài viết mới.`,
-      insertedPosts: allNewPosts,
+      platformsRequested: targetPlatforms,
+      totalPosts: allNewPosts.length,
+      // Show chi tiết từng bài đầy đủ (title, views, likes, shares, date, url, contentType...)
+      insertedPosts: sortedPosts,
       errors: failedPosts,
     };
 
@@ -102,18 +109,36 @@ export const refreshAllPostsFromDb = async (req, res) => {
 
 export const getCachedAllPosts = async (req, res) => {
   try {
-    const posts = await AllPost.find().sort({ updatedAt: -1 });
+    const days = Number(req.query.days) > 0 ? Number(req.query.days) : 30;
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - days);
+
+    const query = {};
+    if (req.query.platform) {
+      const platforms = req.query.platform.split(',').map(p => p.trim());
+      query.platform = platforms.length > 1 ? { $in: platforms } : platforms[0];
+    }
+
+    const allPosts = await AllPost.find(query).sort({ date: -1 });
+
+    // Lọc theo ngày ở tầng application vì field `date` là String, không dùng $gte của Mongo được
+    const posts = allPosts.filter((post) => {
+      if (!post.date) return false;
+      const parsed = new Date(post.date);
+      if (isNaN(parsed.getTime())) return false; // date không parse được -> bỏ qua
+      return parsed >= fromDate;
+    });
 
     if (posts.length === 0) {
       return res.status(200).json({
-        message: 'Chưa có dữ liệu cache. Gọi GET /api/v1/insights/all-posts/refresh trước để cào dữ liệu lần đầu.',
+        message: `Không có bài viết nào phù hợp trong ${days} ngày gần nhất${req.query.platform ? ` cho platform "${req.query.platform}"` : ''}.`,
         total: 0,
         posts: [],
       });
     }
 
     const groupedPosts = posts.reduce((acc, post) => {
-      if (post.platform) { // Bỏ qua nếu platform vô tình bị null
+      if (post.platform) {
         if (!acc[post.platform]) acc[post.platform] = [];
         acc[post.platform].push(post);
       }
@@ -121,9 +146,11 @@ export const getCachedAllPosts = async (req, res) => {
     }, {});
 
     res.status(200).json({
-       total: posts.length,
-       posts: posts,
-       groupedByPlatform: groupedPosts
+      total: posts.length,
+      rangeDays: days,
+      platformFilter: req.query.platform || null,
+      posts,
+      groupedByPlatform: groupedPosts,
     });
   } catch (error) {
     console.error('[TopPosts] Get cached error:', error);

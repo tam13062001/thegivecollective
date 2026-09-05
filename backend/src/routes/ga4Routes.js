@@ -4,7 +4,7 @@ import { getGA4Stats, refreshGA4Stats, updateGA4Website } from '../controllers/g
 const router = express.Router();
 
 router.get('/ga4', getGA4Stats);
-router.post('/ga4/refresh', refreshGA4Stats);
+router.get('/ga4/refresh', refreshGA4Stats);
 router.put('/ga4/website', updateGA4Website);
 
 export default router;
