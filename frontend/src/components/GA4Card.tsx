@@ -166,7 +166,7 @@ export function GA4Card() {
   const handleRefresh = async (rangeToUse: number = days) => {
     setIsRefreshing(true);
     try {
-      const res = await fetch(`${GA4_API_URL}/refresh?days=${rangeToUse}`, { method: 'POST' });
+      const res = await fetch(`${GA4_API_URL}/refresh?days=${rangeToUse}`, { method: 'GET' });
       const data = await res.json();
       if (res.ok) {
         setLoadError(null);
