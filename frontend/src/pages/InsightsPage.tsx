@@ -1565,24 +1565,17 @@ function EngagementRateTables({
   const [selectedPlatform, setSelectedPlatform] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
-  // Only count posts with views > 0 to avoid skewing the average ER
-  const postsWithViews = useMemo(
-    () => posts.filter((p) => p.views > 0),
-    [posts],
-  );
-
-  // List of platforms actually present in the data
+  // Hiện toàn bộ posts, kể cả views = 0 (ER sẽ tính ra 0% và rơi vào nhóm Below Average)
   const availablePlatforms = useMemo(() => {
     const set = new Set<string>();
-    postsWithViews.forEach((p) => {
+    posts.forEach((p) => {
       if (p.platform) set.add(p.platform);
     });
     return Array.from(set).sort();
-  }, [postsWithViews]);
+  }, [posts]);
 
-  // There's no "All platforms" button, so we need to auto-select a default platform
-  // (the first platform with data) when the list changes or the current selection
-  // becomes invalid.
+  // Không có nút "All platforms", nên tự chọn platform đầu tiên có dữ liệu
+  // khi danh sách thay đổi hoặc lựa chọn hiện tại không còn hợp lệ.
   useEffect(() => {
     if (availablePlatforms.length === 0) {
       if (selectedPlatform !== "") setSelectedPlatform("");
@@ -1595,10 +1588,10 @@ function EngagementRateTables({
 
   const platformFilteredPosts = useMemo(() => {
     if (!selectedPlatform) return [];
-    return postsWithViews.filter((p) => p.platform === selectedPlatform);
-  }, [postsWithViews, selectedPlatform]);
+    return posts.filter((p) => p.platform === selectedPlatform);
+  }, [posts, selectedPlatform]);
 
-  // Month list is scoped to the currently selected platform, and computed in SGT
+  // Danh sách tháng chỉ tính trong phạm vi platform đang chọn, theo giờ SGT
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
     platformFilteredPosts.forEach((p) => {
@@ -1610,8 +1603,7 @@ function EngagementRateTables({
     );
   }, [platformFilteredPosts]);
 
-  // Reset the month filter when the platform changes, to avoid landing on a
-  // month that doesn't exist for the new platform
+  // Reset filter tháng khi đổi platform, tránh dừng ở tháng không tồn tại của platform mới
   useEffect(() => {
     setSelectedMonth("all");
   }, [selectedPlatform]);
@@ -1623,7 +1615,8 @@ function EngagementRateTables({
     );
   }, [platformFilteredPosts, selectedMonth]);
 
-  // Average ER (weighted): total likes+shares / total views of the filtered set (platform + month, in SGT).
+  // Avg ER (weighted): tổng likes+shares / tổng views của tập đã lọc (platform + tháng, giờ SGT).
+  // Post có views = 0 không đóng góp vào tổng views/engaged nhưng vẫn xuất hiện trong danh sách với ER = 0%.
   const { avgEr, rows } = useMemo(() => {
     let sumViews = 0;
     let sumEngaged = 0;
