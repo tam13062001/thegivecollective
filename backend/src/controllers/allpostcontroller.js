@@ -1,6 +1,6 @@
 import Metric from '../models/Metric.js';
 import AllPost from '../models/Allpost.js';
-import { fetchTopPostForPlatform } from '../services/allpostService.js';
+import { fetchTopPostForPlatform, fetchInstagramProfileLinksTaps } from '../services/allpostService.js';
 
 const SUPPORTED_PLATFORMS = ['Facebook', 'Instagram', 'Tiktok', 'Youtube'];
 
@@ -90,10 +90,31 @@ export const refreshAllPostsFromDb = async (req, res) => {
     // Sort theo date mới nhất trước, để xem chi tiết dễ hơn khi test 1 platform
     const sortedPosts = [...allNewPosts].sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    // Facebook có clicks thật ở cấp bài viết (post_clicks) nên cộng trực tiếp từ posts.
+    const totalClicks = allNewPosts.reduce((sum, p) => sum + (Number(p.clicks) || 0), 0);
+    const totalViews = allNewPosts.reduce((sum, p) => sum + (Number(p.views) || 0), 0);
+
+    // Instagram: clicks chỉ tồn tại ở CẤP TÀI KHOẢN (profile clicks), lấy tổng lũy kế
+    // và trả riêng — không gán vào từng bài viết.
+    let instagramProfileClicks = null;
+    if (successfulPlatforms.some(p => String(p).toLowerCase() === 'instagram')) {
+      const taps = await fetchInstagramProfileLinksTaps(tokens.metaAccessTokenInstagram);
+      instagramProfileClicks = {
+        total: taps.total,
+        byMetric: taps.byMetric,
+        since: taps.since,
+        error: taps.error,
+      };
+    }
+
     const summary = {
       message: `Cập nhật top posts hoàn tất. Đã lưu ${allNewPosts.length} bài viết mới.`,
       platformsRequested: targetPlatforms,
       totalPosts: allNewPosts.length,
+      totalClicks,
+      // CTR tổng = tổng clicks / tổng views * 100 (%)
+      overallCtr: totalViews > 0 ? Math.round((totalClicks / totalViews) * 10000) / 100 : 0,
+      instagramProfileClicks,
       // Show chi tiết từng bài đầy đủ (title, views, likes, shares, date, url, contentType...)
       insertedPosts: sortedPosts,
       errors: failedPosts,
@@ -104,6 +125,31 @@ export const refreshAllPostsFromDb = async (req, res) => {
   } catch (error) {
     console.error('[TopPosts] Refresh error:', error);
     if (res) res.status(500).json({ message: 'Lỗi hệ thống khi cập nhật top posts' });
+  }
+};
+
+/**
+ * Trả riêng tổng profile clicks của Instagram (metric cấp tài khoản).
+ * Dùng cho frontend hiển thị số clicks IG mà không cần chạy refresh toàn bộ posts.
+ * Query: ?since=YYYY-MM-DD (mặc định lấy theo env IG_INSIGHTS_SINCE / 2 năm gần nhất)
+ */
+export const getInstagramProfileClicks = async (req, res) => {
+  try {
+    if (req.query.since) process.env.IG_INSIGHTS_SINCE = req.query.since;
+
+    const taps = await fetchInstagramProfileLinksTaps(process.env.META_ACCESS_TOKEN_INSTAGRAM);
+
+    res.status(200).json({
+      platform: 'Instagram',
+      profileClicks: taps.total,
+      byMetric: taps.byMetric,
+      since: taps.since,
+      note: 'Instagram chỉ có clicks ở cấp tài khoản (profile clicks), không có clicks theo từng bài viết.',
+      error: taps.error,
+    });
+  } catch (error) {
+    console.error('[Instagram] Profile clicks error:', error);
+    res.status(500).json({ message: 'Lỗi hệ thống khi lấy profile clicks của Instagram', error: error.message });
   }
 };
 
@@ -155,8 +201,13 @@ export const getCachedAllPosts = async (req, res) => {
       return acc;
     }, {});
 
+    const cachedClicks = posts.reduce((sum, p) => sum + (Number(p.clicks) || 0), 0);
+    const cachedViews = posts.reduce((sum, p) => sum + (Number(p.views) || 0), 0);
+
     res.status(200).json({
       total: posts.length,
+      totalClicks: cachedClicks,
+      overallCtr: cachedViews > 0 ? Math.round((cachedClicks / cachedViews) * 10000) / 100 : 0,
       rangeDays: days || 'all',
       platformFilter: req.query.platform || null,
       posts,

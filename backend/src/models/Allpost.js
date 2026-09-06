@@ -9,7 +9,12 @@ const allPostSchema = new mongoose.Schema(
     views: { type: Number, default: 0 },
     likes: { type: Number, default: 0 },
     shares: { type: Number, default: 0 },
-    clicks: { type: Number, default: 0 }, // Chỉ có data thật cho Facebook, Instagram không có metric này ở cấp bài viết
+    // Facebook: post_clicks ở cấp bài viết.
+    // Instagram: Graph API không có clicks cấp bài viết -> lấy profile_links_taps
+    // (cấp tài khoản, theo ngày) và gán cho các bài đăng trong đúng ngày đó.
+    clicks: { type: Number, default: 0 },
+    // ctr = clicks / views * 100 (đơn vị %, làm tròn 2 chữ số thập phân)
+    ctr: { type: Number, default: 0 },
     date: { type: String, default: '' },
     url: { type: String, required: true, unique: true },
 
