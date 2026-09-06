@@ -1,4 +1,4 @@
-// src/components/insights/PlatformIcon.tsx
+// src/components/common/PlatformIcon.tsx
 
 const PLATFORM_BADGES: Record<string, { bg: string; label: string }> = {
   tiktok: { bg: "bg-black", label: "TK" },

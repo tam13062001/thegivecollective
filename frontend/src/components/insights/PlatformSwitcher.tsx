@@ -1,7 +1,7 @@
 // src/components/insights/PlatformSwitcher.tsx
 import { PLATFORM_TABS, PLATFORM_THEMES } from "../../constants/insights";
 import type { PlatformKey } from "../../types/insights";
-import { PlatformIcon } from "./PlatformIcon";
+import { PlatformIcon } from "../common/PlatformIcon";
 
 export function PlatformSwitcher({
   active,

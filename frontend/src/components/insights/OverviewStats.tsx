@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { fmtNum } from "../../utils/insights";
 import type { Post } from "../../types/insights";
-import { StatCard } from "./StatCard";
+import { StatCard } from "../common/StatCard";
 
 export function OverviewStats({
   posts,

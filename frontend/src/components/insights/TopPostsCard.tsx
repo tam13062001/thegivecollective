@@ -7,8 +7,8 @@ import { fmtNum, formatSgtDateTime, getCtr } from "../../utils/insights";
 import type { Post } from "../../types/insights";
 import { ContentTypeBadge } from "./ContentTypeBadge";
 import { ContentTypeFilterChips } from "./ContentTypeFilterChips";
-import { InlineDataState } from "./InlineDataState";
-import { PlatformIcon } from "./PlatformIcon";
+import { InlineDataState } from "../common/InlineDataState";
+import { PlatformIcon } from "../common/PlatformIcon";
 
 function MetricCell({
   label,

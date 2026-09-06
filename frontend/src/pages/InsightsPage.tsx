@@ -7,7 +7,7 @@ import { ContentTypePerformanceCard } from "../components/insights/ContentTypePe
 import { CtrComparisonCard } from "../components/insights/CtrComparisonCard";
 import { DemographicsCard } from "../components/insights/DemographicsCard";
 import { EngagementRateTables } from "../components/insights/EngagementRateTables";
-import { InlineDataState } from "../components/insights/InlineDataState";
+import { InlineDataState } from "../components/common/InlineDataState";
 import { InsightsHeader } from "../components/insights/InsightsHeader";
 import { OverviewStats } from "../components/insights/OverviewStats";
 import { TopPostsCard } from "../components/insights/TopPostsCard";

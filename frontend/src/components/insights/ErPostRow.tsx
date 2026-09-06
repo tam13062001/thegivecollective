@@ -2,7 +2,7 @@
 import { fmtNum, formatSgtDateTime, getCtr } from "../../utils/insights";
 import type { ErRow } from "../../types/insights";
 import { ContentTypeBadge } from "./ContentTypeBadge";
-import { PlatformIcon } from "./PlatformIcon";
+import { PlatformIcon } from "../common/PlatformIcon";
 
 export function ErPostRow({ row, rank }: { row: ErRow; rank: number }) {
   const ctr = getCtr(row);

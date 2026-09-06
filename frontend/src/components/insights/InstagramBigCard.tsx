@@ -14,7 +14,7 @@ import { fmtNum } from "../../utils/insights";
 import type { Post } from "../../types/insights";
 import { HeatScaleLegend } from "./HeatScaleLegend";
 import { HourAxisLabels } from "./HourAxisLabels";
-import { PlatformIcon } from "./PlatformIcon";
+import { PlatformIcon } from "../common/PlatformIcon";
 
 const theme = PLATFORM_THEMES.instagram;
 const heatColors = theme.heatColors;

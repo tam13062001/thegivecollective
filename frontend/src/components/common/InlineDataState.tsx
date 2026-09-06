@@ -1,4 +1,4 @@
-// src/components/insights/InlineDataState.tsx
+// src/components/common/InlineDataState.tsx
 import { ArrowRight, RefreshCw } from "lucide-react";
 
 export function InlineDataState({

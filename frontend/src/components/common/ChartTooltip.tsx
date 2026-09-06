@@ -1,4 +1,4 @@
-// src/components/insights/ChartTooltip.tsx
+// src/components/common/ChartTooltip.tsx
 import { SIGNAL_CHART } from "../../constants/insights";
 import { fmtNum } from "../../utils/insights";
 

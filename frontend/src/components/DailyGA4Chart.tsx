@@ -81,7 +81,7 @@ export function DailyGA4Chart() {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-50/40 to-transparent">
+      <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-signal-panel to-transparent">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <BarChart3 size={20} className="text-blue-500" />
@@ -107,7 +107,7 @@ export function DailyGA4Chart() {
                   onClick={() => setDays(d)}
                   className={`px-3 h-8 font-medium transition-colors ${
                     days === d
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-signal-cyan text-white'
                       : 'bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
@@ -132,11 +132,11 @@ export function DailyGA4Chart() {
       {/* Chart Area */}
       <div className="p-4">
         {loading ? (
-          <div className="h-72 flex items-center justify-center text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100 animate-pulse">
+          <div className="h-72 flex items-center justify-center text-slate-400 bg-signal-track rounded-xl border border-slate-100 animate-pulse">
             Loading chart data...
           </div>
         ) : error ? (
-          <div className="h-72 flex flex-col items-center justify-center text-rose-500 bg-rose-50 rounded-xl border border-rose-100">
+          <div className="h-72 flex flex-col items-center justify-center text-rose-500 bg-signal-panel rounded-xl border border-signal-border">
             <span>{error}</span>
             <button onClick={() => setDays(days)} className="mt-2 text-sm underline hover:text-rose-700">
               Retry
@@ -206,7 +206,7 @@ export function DailyGA4Chart() {
             </div>
 
             {/* Delta */}
-            <div className="mt-4 flex items-center justify-between bg-slate-50/80 rounded-xl px-4 py-3 border border-slate-100">
+            <div className="mt-4 flex items-center justify-between bg-signal-track rounded-xl px-4 py-3 border border-slate-100">
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Calendar size={16} />
                 <span>

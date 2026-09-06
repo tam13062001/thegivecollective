@@ -1,4 +1,4 @@
-// src/components/insights/StatCard.tsx
+// src/components/common/StatCard.tsx
 import type { StatTone } from "../../types/insights";
 
 export function StatCard({

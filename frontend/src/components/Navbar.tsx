@@ -4,11 +4,13 @@ import logo from '../assets/The Give Collective.png';
 
 export function Navbar() {
   const location = useLocation();
-  const isInsights = location.pathname === '/insights';
+  // Both Homepage ('/') and Insights ('/insights') now share the signal-atlas
+  // dark theme, so the navbar switches with them.
+  const isSignalTheme = location.pathname === '/' || location.pathname === '/insights';
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 h-16 border-b transition-colors ${isInsights
+      className={`fixed top-0 left-0 right-0 z-50 h-16 border-b transition-colors ${isSignalTheme
         ? 'border-signal-border bg-signal-ink/95 shadow-none'
         : 'border-slate-100 bg-white shadow-sm'
         }`}
@@ -20,11 +22,11 @@ export function Navbar() {
           <div className="no-scrollbar flex w-full items-center gap-1 overflow-x-auto">
             <NavLink
               to="/"
-              className={({ isActive }) => `whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors md:px-4 md:text-sm ${isActive
-                ? isInsights
-                  ? 'text-signal-muted'
+              className={({ isActive }) => `relative whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors md:px-4 md:text-sm ${isActive
+                ? isSignalTheme
+                  ? 'text-signal-text after:absolute after:inset-x-3 after:-bottom-[17px] after:h-0.5 after:bg-signal-coral md:after:inset-x-4'
                   : 'bg-slate-100 text-slate-800'
-                : isInsights
+                : isSignalTheme
                   ? 'text-signal-muted hover:bg-signal-surface hover:text-signal-text'
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                 }`}
@@ -34,10 +36,10 @@ export function Navbar() {
             <NavLink
               to="/insights"
               className={({ isActive }) => `relative whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors md:px-4 md:text-sm ${isActive
-                ? isInsights
+                ? isSignalTheme
                   ? 'text-signal-text after:absolute after:inset-x-3 after:-bottom-[17px] after:h-0.5 after:bg-signal-coral md:after:inset-x-4'
                   : 'bg-slate-100 text-slate-800'
-                : isInsights
+                : isSignalTheme
                   ? 'text-signal-muted hover:bg-signal-surface hover:text-signal-text'
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                 }`}

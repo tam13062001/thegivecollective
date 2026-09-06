@@ -208,15 +208,15 @@ export function GA4Card() {
 
   if (loadError) {
     return (
-      <div className="rounded-2xl border border-red-100 bg-red-50/60 p-6 flex items-center gap-3">
-        <AlertTriangle size={18} className="text-red-500 shrink-0" />
+      <div className="rounded-2xl border border-signal-border bg-signal-panel p-6 flex items-center gap-3">
+        <AlertTriangle size={18} className="text-signal-coral shrink-0" />
         <div>
-          <p className="text-sm font-medium text-red-700">Failed to load GA4 stats</p>
-          <p className="text-xs text-red-500 mt-0.5">{loadError}</p>
+          <p className="text-sm font-medium text-signal-text">Failed to load GA4 stats</p>
+          <p className="text-xs text-signal-coral mt-0.5">{loadError}</p>
         </div>
         <button
           onClick={fetchStats}
-          className="ml-auto text-xs font-medium text-red-600 hover:text-red-700 underline"
+          className="ml-auto text-xs font-medium text-signal-coral hover:text-signal-text underline"
         >
           Try again
         </button>
@@ -258,7 +258,7 @@ export function GA4Card() {
                 className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm w-72 focus:outline-none focus:ring-1 focus:ring-blue-300"
                 autoFocus
               />
-              <button onClick={handleSaveWebsite} className="text-xs font-medium text-blue-600 hover:text-blue-700">
+              <button onClick={handleSaveWebsite} className="text-xs font-medium text-signal-cyan hover:text-signal-text">
                 Save
               </button>
               <button
@@ -277,7 +277,7 @@ export function GA4Card() {
                 href={stats.websiteUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-lg font-semibold text-blue-600 hover:underline"
+                className="text-lg font-semibold text-signal-cyan hover:underline"
               >
                 {stats.websiteUrl || 'Website not set'}
               </a>
@@ -309,7 +309,7 @@ export function GA4Card() {
           <button
             onClick={() => handleRefresh()}
             disabled={isRefreshing}
-            className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-slate-300 transition-colors"
+            className="flex items-center gap-2 rounded-full bg-signal-cyan px-4 py-2 text-sm font-medium text-white hover:brightness-95 disabled:bg-signal-slate transition-colors"
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
             {isRefreshing ? 'Updating...' : 'Refresh GA4 Stats'}
@@ -462,7 +462,7 @@ export function GA4Card() {
 
 function StatBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-slate-200/60 px-4 py-3">
+    <div className="rounded-xl bg-signal-track px-4 py-3">
       <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
         {icon}
         <span>{label}</span>

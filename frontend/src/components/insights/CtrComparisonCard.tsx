@@ -16,8 +16,8 @@ import { SIGNAL_CHART } from "../../constants/insights";
 import { useCtrByPlatform } from "../../hooks/insights/useCtrByPlatform";
 import { fmtNum } from "../../utils/insights";
 import type { CtrDatum, Post } from "../../types/insights";
-import { InlineDataState } from "./InlineDataState";
-import { PlatformIcon } from "./PlatformIcon";
+import { InlineDataState } from "../common/InlineDataState";
+import { PlatformIcon } from "../common/PlatformIcon";
 
 function CtrTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;

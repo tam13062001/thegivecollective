@@ -14,7 +14,7 @@ import {
 import { SIGNAL_CHART } from "../../constants/insights";
 import { fmtNum } from "../../utils/insights";
 import type { DemographicRow } from "../../types/insights";
-import { ChartTooltip } from "./ChartTooltip";
+import { ChartTooltip } from "../common/ChartTooltip";
 
 export function DemographicsCard({
   demographics,

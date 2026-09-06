@@ -3,7 +3,7 @@
 import { PLATFORM_THEMES } from "../../constants/insights";
 import { usePostHistoryGrid } from "../../hooks/insights/usePostHistoryGrid";
 import type { Post } from "../../types/insights";
-import { PlatformIcon } from "./PlatformIcon";
+import { PlatformIcon } from "../common/PlatformIcon";
 import { PostHistoryGridView } from "./PostHistoryGridView";
 
 export function BestTimeBigCard({

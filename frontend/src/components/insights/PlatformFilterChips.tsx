@@ -1,6 +1,6 @@
 // src/components/insights/PlatformFilterChips.tsx
 // Used by the engagement comparison panel (no "all platforms" option by design).
-import { PlatformIcon } from "./PlatformIcon";
+import { PlatformIcon } from "../common/PlatformIcon";
 
 export function PlatformFilterChips({
   platforms,

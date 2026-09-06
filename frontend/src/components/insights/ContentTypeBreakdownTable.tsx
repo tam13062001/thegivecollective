@@ -3,7 +3,7 @@
 import { useContentTypeBreakdown } from "../../hooks/insights/useContentTypeBreakdown";
 import { fmtNum } from "../../utils/insights";
 import type { Post } from "../../types/insights";
-import { PlatformIcon } from "./PlatformIcon";
+import { PlatformIcon } from "../common/PlatformIcon";
 
 const HEAD_CELL =
   "px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-signal-muted sm:text-[11px]";
