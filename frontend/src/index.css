@@ -2,17 +2,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-signal-ink: #ffffff;
+  /* The Give Collective brand palette: teal + coral pink from the supplied logo. */
+  --color-signal-ink: #fffafc;
   --color-signal-surface: #ffffff;
-  --color-signal-panel: #ffffff;
-  --color-signal-track: #f1f5f9;
-  --color-signal-text: #172033;
-  --color-signal-muted: #64748b;
-  --color-signal-border: #e2e8f0;
-  --color-signal-cyan: #0891b2;
-  --color-signal-coral: #e11d48;
-  --color-signal-amber: #d97706;
-  --color-signal-slate: #64748b;
+  --color-signal-panel: #fff5f7;
+  --color-signal-track: #e8f4f1;
+  --color-signal-text: #173f3d;
+  --color-signal-muted: #6c807d;
+  --color-signal-border: #d7e8e3;
+  --color-signal-cyan: #2a9d8f;
+  --color-signal-coral: #f27698;
+  --color-signal-amber: #e6aa55;
+  --color-signal-slate: #86a09b;
   --font-signal-display: "Archivo Semi Condensed", sans-serif;
   --font-signal-body: "Source Sans 3", sans-serif;
   --font-signal-mono: "Azeret Mono", monospace;
@@ -37,17 +38,17 @@
 @layer components {
   /* Scoped so the rest of the existing light application keeps its current theme. */
   .signal-atlas {
-    --signal-ink: #ffffff;
+    --signal-ink: #fffafc;
     --signal-surface: #ffffff;
-    --signal-panel: #ffffff;
-    --signal-track: #f1f5f9;
-    --signal-text: #172033;
-    --signal-muted: #64748b;
-    --signal-border: #e2e8f0;
-    --signal-cyan: #0891b2;
-    --signal-coral: #e11d48;
-    --signal-amber: #d97706;
-    --signal-slate: #64748b;
+    --signal-panel: #fff5f7;
+    --signal-track: #e8f4f1;
+    --signal-text: #173f3d;
+    --signal-muted: #6c807d;
+    --signal-border: #d7e8e3;
+    --signal-cyan: #2a9d8f;
+    --signal-coral: #f27698;
+    --signal-amber: #e6aa55;
+    --signal-slate: #86a09b;
 
     background-color: var(--signal-ink) !important;
     color: var(--signal-text) !important;
@@ -272,7 +273,7 @@
 
   .signal-scroll-area {
     overscroll-behavior: contain;
-    scrollbar-color: #94a3b8 transparent;
+    scrollbar-color: #9acfc5 transparent;
     scrollbar-width: thin;
   }
 
@@ -285,11 +286,11 @@
   }
 
   .signal-scroll-area::-webkit-scrollbar-thumb {
-    background: #94a3b8;
+    background: #9acfc5;
     border-radius: 999px;
   }
 
   .signal-scroll-area::-webkit-scrollbar-thumb:hover {
-    background: #64748b;
+    background: #2a9d8f;
   }
 }

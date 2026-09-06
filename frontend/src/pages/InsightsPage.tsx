@@ -176,84 +176,71 @@ type PlatformTheme = {
   heatColors: readonly string[];
 };
 
+const BRAND_HEAT_COLORS = [
+  "#fffafc",
+  "#eff9f6",
+  "#d9f0eb",
+  "#bfe3dc",
+  "#98d2c6",
+  "#6fc0b2",
+  "#2a9d8f",
+  "#1c766e",
+] as const;
+
+const BRAND_PINK_HEAT_COLORS = [
+  "#fffafc",
+  "#fff0f4",
+  "#fddde7",
+  "#f9c2d2",
+  "#f5a4bb",
+  "#f27698",
+  "#d95f82",
+  "#b94769",
+] as const;
+
 const PLATFORM_THEMES: Record<PlatformKey, PlatformTheme> = {
   tiktok: {
-    accent: "#111827",
-    soft: "#f3f4f6",
-    marker: "#00a8a2",
-    heatColors: [
-      "#f3f4f6",
-      "#e5e7eb",
-      "#d1d5db",
-      "#9ca3af",
-      "#6b7280",
-      "#4b5563",
-      "#374151",
-      "#111827",
-    ],
+    accent: "#173f3d",
+    soft: "#e8f4f1",
+    marker: "#f27698",
+    heatColors: BRAND_HEAT_COLORS,
   },
   facebook: {
-    accent: "#1877f2",
-    soft: "#eff6ff",
-    marker: "#1877f2",
-    heatColors: [
-      "#eff6ff",
-      "#dbeafe",
-      "#bfdbfe",
-      "#93c5fd",
-      "#60a5fa",
-      "#3b82f6",
-      "#2563eb",
-      "#1d4ed8",
-    ],
+    accent: "#2a9d8f",
+    soft: "#e8f4f1",
+    marker: "#f27698",
+    heatColors: BRAND_HEAT_COLORS,
   },
   instagram: {
-    accent: "#c13584",
-    soft: "#fdf2f8",
-    marker: "#c13584",
-    heatColors: [
-      "#fff1f2",
-      "#ffe4e6",
-      "#fecdd3",
-      "#fda4af",
-      "#fb7185",
-      "#f43f5e",
-      "#e11d48",
-      "#be123c",
-    ],
+    accent: "#f27698",
+    soft: "#fff5f7",
+    marker: "#2a9d8f",
+    heatColors: BRAND_PINK_HEAT_COLORS,
   },
   youtube: {
-    accent: "#ff0000",
-    soft: "#fff1f2",
-    marker: "#ff0000",
-    heatColors: [
-      "#fff1f2",
-      "#fee2e2",
-      "#fecaca",
-      "#fca5a5",
-      "#f87171",
-      "#ef4444",
-      "#dc2626",
-      "#991b1b",
-    ],
+    accent: "#2a9d8f",
+    soft: "#e8f4f1",
+    marker: "#f27698",
+    heatColors: BRAND_HEAT_COLORS,
   },
 };
 
 const SIGNAL_CHART = {
-  ink: "#172033",
+  // Brand colors sampled visually from The Give Collective logo.
+  ink: "#fffafc",
   panel: "#ffffff",
   surface: "#ffffff",
-  track: "#f1f5f9",
-  text: "#172033",
-  muted: "#64748b",
-  border: "#e2e8f0",
-  cyan: "#0891b2",
-  coral: "#e11d48",
-  amber: "#d97706",
-  slate: "#64748b",
-  female: "#e11d48",
-  male: "#0891b2",
-  undisclosed: "#94a3b8",
+  track: "#e8f4f1",
+  text: "#173f3d",
+  muted: "#6c807d",
+  border: "#d7e8e3",
+  cyan: "#2a9d8f",
+  coral: "#f27698",
+  amber: "#e6aa55",
+  slate: "#86a09b",
+  female: "#f27698",
+  male: "#2a9d8f",
+  undisclosed: "#bfd8d2",
 } as const;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1851,7 +1838,7 @@ function EngagementRateTables({
   const [abovePage, setAbovePage] = useState(1);
   const [belowPage, setBelowPage] = useState(1);
 
-  const ENGAGEMENT_PAGE_SIZE = 5;
+  const ENGAGEMENT_PAGE_SIZE = 10;
 
   // Hiện toàn bộ posts, kể cả views = 0 (ER sẽ tính ra 0% và rơi vào nhóm Below Average)
   const availablePlatforms = useMemo(() => {
@@ -2423,7 +2410,7 @@ export default function InsightsPage() {
                   <div className="signal-scroll-area max-h-[560px] overflow-y-auto pr-1 sm:pr-2">
                     {Object.entries(groupedPosts).map(([platform, posts]) => (
                     <div key={platform} className="border-b border-signal-border last:border-0">
-                      <div className="flex items-center gap-2 border-b border-signal-border pb-3">
+                      <div className="flex items-center gap-2 border-b border-signal-border pt-3 pb-3">
                         <PlatformIcon name={platform} />
                         <h3 className="font-signal-display text-lg font-semibold capitalize text-signal-text">
                           {platform}
