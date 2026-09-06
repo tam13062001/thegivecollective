@@ -1,6 +1,10 @@
 import Metric from '../models/Metric.js';
 import AllPost from '../models/Allpost.js';
-import { fetchTopPostForPlatform, fetchInstagramProfileLinksTaps } from '../services/allpostService.js';
+import {
+  fetchTopPostForPlatform,
+  fetchInstagramProfileLinksTaps,
+  fetchInstagramProfileClicksDailySeries,
+} from '../services/allpostService.js';
 
 const SUPPORTED_PLATFORMS = ['Facebook', 'Instagram', 'Tiktok', 'Youtube'];
 
@@ -150,6 +154,36 @@ export const getInstagramProfileClicks = async (req, res) => {
   } catch (error) {
     console.error('[Instagram] Profile clicks error:', error);
     res.status(500).json({ message: 'Lỗi hệ thống khi lấy profile clicks của Instagram', error: error.message });
+  }
+};
+
+/**
+ * Lịch sử THEO NGÀY của Instagram profile clicks (website_clicks + profile_links_taps),
+ * dùng để vẽ chart daily trên Homepage. Khác với /instagram/profile-clicks (tổng lũy kế),
+ * endpoint này trả về mảng theo từng ngày.
+ * Query: ?days=7|14|30|90 (mặc định 30, tối đa 90)
+ */
+export const getInstagramProfileClicksHistory = async (req, res) => {
+  try {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
+    const { series, error } = await fetchInstagramProfileClicksDailySeries(
+      process.env.META_ACCESS_TOKEN_INSTAGRAM,
+      days,
+    );
+
+    res.status(200).json({
+      platform: 'Instagram',
+      days,
+      data: series,
+      note: 'Website clicks + profile links taps theo ngày (giờ VN), cấp tài khoản — không tách theo từng bài viết.',
+      error,
+    });
+  } catch (error) {
+    console.error('[Instagram] Profile clicks history error:', error);
+    res.status(500).json({
+      message: 'Lỗi hệ thống khi lấy lịch sử profile clicks của Instagram',
+      error: error.message,
+    });
   }
 };
 

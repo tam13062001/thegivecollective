@@ -140,6 +140,105 @@ export const fetchInstagramProfileLinksTaps = async (apiKey, accountId = IG_ACCO
   };
 };
 
+/**
+ * Lấy chuỗi số liệu clicks THEO NGÀY để vẽ chart daily trên Homepage.
+ *
+ * QUAN TRỌNG: `website_clicks` và `profile_links_taps` CHỈ hỗ trợ
+ * `metric_type=total_value` — Graph API trả lỗi (#100) "incompatible with
+ * the metric type (time_series)" nếu dùng metric_type=time_series với 2 metric
+ * này, bất kể period. Vì vậy KHÔNG thể xin Meta trả sẵn time_series cho các
+ * metric này như một số metric khác (vd: impressions cũ có hỗ trợ).
+ *
+ * Cách duy nhất để có số liệu theo ngày là gọi total_value cho TỪNG NGÀY một
+ * (since = 00:00 ngày X, until = 00:00 ngày X+1), rồi ghép các ngày lại.
+ * Điều này tốn nhiều request hơn (1 request / metric / ngày) nhưng là cách
+ * duy nhất API cho phép.
+ *
+ * @returns {Promise<{ series: Array<{date:string, websiteClicks:number, profileLinksTaps:number, total:number}>, days: number, error: string|null }>}
+ */
+export const fetchInstagramProfileClicksDailySeries = async (
+  apiKey,
+  days = 30,
+  accountId = IG_ACCOUNT_ID,
+) => {
+  const BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+  let error = null;
+
+  // Quy các mốc ngày về giờ VN (+7) để khớp cách hiển thị ngày ở chart khác,
+  // rồi tính mốc UTC tương ứng cho since/until gửi lên Graph API.
+  const now = Date.now();
+  const nowVn = now + VN_OFFSET_MS;
+  const todayVnMidnightUtc = Math.floor(nowVn / DAY_MS) * DAY_MS - VN_OFFSET_MS;
+
+  const dayWindows = [];
+  for (let i = Math.max(1, days) - 1; i >= 0; i--) {
+    const dayStartUtcMs = todayVnMidnightUtc - i * DAY_MS;
+    const dayEndUtcMs = dayStartUtcMs + DAY_MS;
+    const dateKey = new Date(dayStartUtcMs + VN_OFFSET_MS).toISOString().slice(0, 10);
+    dayWindows.push({
+      dateKey,
+      since: Math.floor(dayStartUtcMs / 1000),
+      until: Math.floor(dayEndUtcMs / 1000),
+    });
+  }
+
+  const tasks = [];
+  for (const metric of IG_CLICK_METRICS) {
+    for (const w of dayWindows) tasks.push({ metric, ...w });
+  }
+
+  // dateKey -> { websiteClicks, profileLinksTaps }
+  const byDate = new Map(dayWindows.map((w) => [w.dateKey, { websiteClicks: 0, profileLinksTaps: 0 }]));
+
+  for (let i = 0; i < tasks.length; i += IG_LINK_TAPS_CONCURRENCY) {
+    const batch = tasks.slice(i, i + IG_LINK_TAPS_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(async ({ metric, dateKey, since, until }) => {
+        try {
+          // total_value là metric_type DUY NHẤT được hỗ trợ cho 2 metric này.
+          const url =
+            `${BASE}/${accountId}/insights?metric=${metric}&period=day` +
+            `&metric_type=total_value&since=${since}&until=${until}&access_token=${apiKey}`;
+          const res = await fetch(url);
+          const data = await res.json();
+
+          if (data.error) {
+            console.warn(`[Instagram] ${metric} daily (${dateKey}) lỗi:`, data.error.message);
+            return { metric, dateKey, value: 0, errMsg: data.error.message };
+          }
+
+          const entry = data.data?.[0];
+          const value = entry?.total_value?.value ?? entry?.values?.[0]?.value ?? 0;
+          return { metric, dateKey, value: Number(value) || 0, errMsg: null };
+        } catch (err) {
+          console.warn(`[Instagram] ${metric} daily (${dateKey}) exception:`, err.message);
+          return { metric, dateKey, value: 0, errMsg: err.message };
+        }
+      })
+    );
+
+    for (const { metric, dateKey, value, errMsg } of results) {
+      if (errMsg && !error) error = errMsg;
+      const bucket = byDate.get(dateKey);
+      if (!bucket) continue;
+      if (metric === 'website_clicks') bucket.websiteClicks += value;
+      else if (metric === 'profile_links_taps') bucket.profileLinksTaps += value;
+    }
+  }
+
+  const series = dayWindows.map(({ dateKey }) => {
+    const v = byDate.get(dateKey);
+    return {
+      date: dateKey,
+      websiteClicks: v.websiteClicks,
+      profileLinksTaps: v.profileLinksTaps,
+      total: v.websiteClicks + v.profileLinksTaps,
+    };
+  });
+
+  return { series, days, error };
+};
+
 export const fetchInstagramTopPost = async (apiKey) => {
   try {
     const BASE = 'https://graph.facebook.com/v21.0';
