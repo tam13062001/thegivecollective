@@ -38,6 +38,10 @@
       "schedule": "0 0 * * *"
     },
     {
+      "path": "/api/v1/insights/instagram/profile-clicks/history",
+      "schedule": "0 0 * * *"
+    },
+    {
       "path": "/api/v1/ga4-secondary/save-history",
       "schedule": "0 0 * * *"
     },
