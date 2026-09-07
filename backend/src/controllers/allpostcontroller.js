@@ -17,15 +17,15 @@ export const refreshAllPostsFromDb = async (req, res) => {
       youtubeApiKey: process.env.YOUTUBE_API_KEY,
     };
 
-    // Cho phép chỉ refresh 1 platform để test riêng, vd: ?platform=facebook
-    // Không truyền thì mặc định refresh hết như cũ.
+    // Allow refreshing a single platform for testing, e.g. ?platform=facebook
+    // If omitted, refreshes everything as before.
     let targetPlatforms = SUPPORTED_PLATFORMS;
     if (req.query.platform) {
       const requested = req.query.platform.split(',').map(p => p.trim().toLowerCase());
       targetPlatforms = SUPPORTED_PLATFORMS.filter(p => requested.includes(p.toLowerCase()));
       if (targetPlatforms.length === 0) {
         return res.status(400).json({
-          message: `Platform "${req.query.platform}" không hợp lệ. Chỉ hỗ trợ: ${SUPPORTED_PLATFORMS.join(', ')}.`,
+          message: `Platform "${req.query.platform}" is not valid. Supported: ${SUPPORTED_PLATFORMS.join(', ')}.`,
         });
       }
     }
@@ -33,7 +33,7 @@ export const refreshAllPostsFromDb = async (req, res) => {
     const metrics = await Metric.find({ platformName: { $in: targetPlatforms } });
 
     if (metrics.length === 0) {
-      const msg = 'Chưa có kênh nào trong DB (bảng Metric) để lấy top post.';
+      const msg = 'No channels found in DB (Metric collection) to fetch top posts.';
       return res ? res.status(200).json({ message: msg, posts: [] }) : [];
     }
 
@@ -81,25 +81,25 @@ export const refreshAllPostsFromDb = async (req, res) => {
       });
 
       const insertResult = await AllPost.insertMany(allNewPosts, { ordered: false }).catch(err => {
-        console.warn('[AllPosts] Cảnh báo khi lưu DB (Có thể do trùng URL):', err.message);
+        console.warn('[AllPosts] Warning while saving to DB (possibly duplicate URLs):', err.message);
         if (err.writeErrors) {
           err.writeErrors.forEach(e => {
-            console.warn('  → Bài bị skip:', e.err?.op?.url || e.errmsg);
+            console.warn('  → Skipped post:', e.err?.op?.url || e.errmsg);
           });
         }
         return err.insertedDocs || [];
       });
     }
 
-    // Sort theo date mới nhất trước, để xem chi tiết dễ hơn khi test 1 platform
+    // Sort by most recent date first, easier to review when testing a single platform
     const sortedPosts = [...allNewPosts].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Facebook có clicks thật ở cấp bài viết (post_clicks) nên cộng trực tiếp từ posts.
+    // Facebook has real post-level clicks (post_clicks) so we sum them directly from posts.
     const totalClicks = allNewPosts.reduce((sum, p) => sum + (Number(p.clicks) || 0), 0);
     const totalViews = allNewPosts.reduce((sum, p) => sum + (Number(p.views) || 0), 0);
 
-    // Instagram: clicks chỉ tồn tại ở CẤP TÀI KHOẢN (profile clicks), lấy tổng lũy kế
-    // và trả riêng — không gán vào từng bài viết.
+    // Instagram: clicks only exist at the ACCOUNT LEVEL (profile clicks), fetch the
+    // cumulative total and return it separately — not assigned to individual posts.
     let instagramProfileClicks = null;
     if (successfulPlatforms.some(p => String(p).toLowerCase() === 'instagram')) {
       const taps = await fetchInstagramProfileLinksTaps(tokens.metaAccessTokenInstagram);
@@ -112,14 +112,14 @@ export const refreshAllPostsFromDb = async (req, res) => {
     }
 
     const summary = {
-      message: `Cập nhật top posts hoàn tất. Đã lưu ${allNewPosts.length} bài viết mới.`,
+      message: `Top posts update complete. Saved ${allNewPosts.length} new posts.`,
       platformsRequested: targetPlatforms,
       totalPosts: allNewPosts.length,
       totalClicks,
-      // CTR tổng = tổng clicks / tổng views * 100 (%)
+      // Overall CTR = total clicks / total views * 100 (%)
       overallCtr: totalViews > 0 ? Math.round((totalClicks / totalViews) * 10000) / 100 : 0,
       instagramProfileClicks,
-      // Show chi tiết từng bài đầy đủ (title, views, likes, shares, date, url, contentType...)
+      // Show full detail for each post (title, views, likes, shares, date, url, contentType...)
       insertedPosts: sortedPosts,
       errors: failedPosts,
     };
@@ -128,14 +128,14 @@ export const refreshAllPostsFromDb = async (req, res) => {
     return summary;
   } catch (error) {
     console.error('[TopPosts] Refresh error:', error);
-    if (res) res.status(500).json({ message: 'Lỗi hệ thống khi cập nhật top posts' });
+    if (res) res.status(500).json({ message: 'System error while updating top posts' });
   }
 };
 
 /**
- * Trả riêng tổng profile clicks của Instagram (metric cấp tài khoản).
- * Dùng cho frontend hiển thị số clicks IG mà không cần chạy refresh toàn bộ posts.
- * Query: ?since=YYYY-MM-DD (mặc định lấy theo env IG_INSIGHTS_SINCE / 2 năm gần nhất)
+ * Returns Instagram's total profile clicks (account-level metric) on its own.
+ * Used by the frontend to display IG clicks without running a full posts refresh.
+ * Query: ?since=YYYY-MM-DD (defaults to env IG_INSIGHTS_SINCE / last 2 years)
  */
 export const getInstagramProfileClicks = async (req, res) => {
   try {
@@ -148,20 +148,20 @@ export const getInstagramProfileClicks = async (req, res) => {
       profileClicks: taps.total,
       byMetric: taps.byMetric,
       since: taps.since,
-      note: 'Instagram chỉ có clicks ở cấp tài khoản (profile clicks), không có clicks theo từng bài viết.',
+      note: 'Instagram only has clicks at the account level (profile clicks), not per individual post.',
       error: taps.error,
     });
   } catch (error) {
     console.error('[Instagram] Profile clicks error:', error);
-    res.status(500).json({ message: 'Lỗi hệ thống khi lấy profile clicks của Instagram', error: error.message });
+    res.status(500).json({ message: 'System error while fetching Instagram profile clicks', error: error.message });
   }
 };
 
 /**
- * Lịch sử THEO NGÀY của Instagram profile clicks (website_clicks + profile_links_taps),
- * dùng để vẽ chart daily trên Homepage. Khác với /instagram/profile-clicks (tổng lũy kế),
- * endpoint này trả về mảng theo từng ngày.
- * Query: ?days=7|14|30|90 (mặc định 30, tối đa 90)
+ * DAILY history of Instagram profile clicks (website_clicks + profile_links_taps),
+ * used for the Homepage daily chart. Unlike /instagram/profile-clicks (cumulative total),
+ * this endpoint returns an array broken down by day.
+ * Query: ?days=7|14|30|90 (default 30, max 90)
  */
 export const getInstagramProfileClicksHistory = async (req, res) => {
   try {
@@ -175,13 +175,13 @@ export const getInstagramProfileClicksHistory = async (req, res) => {
       platform: 'Instagram',
       days,
       data: series,
-      note: 'Website clicks + profile links taps theo ngày (giờ VN), cấp tài khoản — không tách theo từng bài viết.',
+      note: 'Website clicks + profile links taps by day (Singapore time), account-level — not split per post.',
       error,
     });
   } catch (error) {
     console.error('[Instagram] Profile clicks history error:', error);
     res.status(500).json({
-      message: 'Lỗi hệ thống khi lấy lịch sử profile clicks của Instagram',
+      message: 'System error while fetching Instagram profile clicks history',
       error: error.message,
     });
   }
@@ -206,13 +206,14 @@ export const getCachedAllPosts = async (req, res) => {
 
     const allPosts = await AllPost.find(query).sort({ date: -1 });
 
-    // Chỉ lọc theo ngày khi có days trên query; mặc định lấy full vì field `date`
-    // là String nên không dùng $gte của Mongo được, phải lọc ở tầng application.
+    // Only filter by date when `days` is provided in the query; default is to fetch
+    // everything, since the `date` field is a String so Mongo's $gte can't be used —
+    // filtering has to happen at the application layer.
     const posts = fromDate
       ? allPosts.filter((post) => {
           if (!post.date) return false;
           const parsed = new Date(post.date);
-          if (isNaN(parsed.getTime())) return false; // date không parse được -> bỏ qua
+          if (isNaN(parsed.getTime())) return false; // unparseable date -> skip
           return parsed >= fromDate;
         })
       : allPosts;
@@ -220,8 +221,8 @@ export const getCachedAllPosts = async (req, res) => {
     if (posts.length === 0) {
       return res.status(200).json({
         message: days
-          ? `Không có bài viết nào phù hợp trong ${days} ngày gần nhất${req.query.platform ? ` cho platform "${req.query.platform}"` : ''}.`
-          : `Không có bài viết nào phù hợp${req.query.platform ? ` cho platform "${req.query.platform}"` : ''}.`,
+          ? `No matching posts found in the last ${days} days${req.query.platform ? ` for platform "${req.query.platform}"` : ''}.`
+          : `No matching posts found${req.query.platform ? ` for platform "${req.query.platform}"` : ''}.`,
         total: 0,
         posts: [],
       });
@@ -249,6 +250,6 @@ export const getCachedAllPosts = async (req, res) => {
     });
   } catch (error) {
     console.error('[TopPosts] Get cached error:', error);
-    res.status(500).json({ message: 'Lỗi hệ thống khi lấy top posts', error: error.message });
+    res.status(500).json({ message: 'System error while fetching top posts', error: error.message });
   }
 };
