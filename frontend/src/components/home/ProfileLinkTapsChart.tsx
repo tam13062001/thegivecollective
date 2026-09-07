@@ -31,17 +31,10 @@ export function ProfileLinkTapsChart() {
   const { days, setDays, series, note, loading, error } = useInstagramLinkTaps();
   const gradId = useId();
 
-  const chartData = useMemo(() => {
-    let running = 0;
-    return series.map((d) => {
-      running += d.total;
-      return {
-        ...d,
-        label: fmtDate(d.date),
-        cumulative: running,
-      };
-    });
-  }, [series]);
+  const chartData = useMemo(
+    () => series.map((d) => ({ ...d, label: fmtDate(d.date) })),
+    [series],
+  );
 
   const totalTaps = useMemo(
     () => series.reduce((sum, d) => sum + d.total, 0),
@@ -139,7 +132,7 @@ export function ProfileLinkTapsChart() {
                   />
                   <Area
                     type="monotone"
-                    dataKey="cumulative"
+                    dataKey="total"
                     name="Profile link taps"
                     stroke={SIGNAL_CHART.coral}
                     strokeWidth={2.5}
