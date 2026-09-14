@@ -273,6 +273,153 @@ export const fetchGoogleAnalyticsStatsSecondary = async (days = 30) => {
   }
 };
 
+/**
+ * Lấy GA4 theo TỪNG NGÀY để render chart.
+ *
+ * 7D  => mỗi row là 1 ngày trong 7 ngày
+ * 14D => mỗi row là 1 ngày trong 14 ngày
+ * 30D => mỗi row là 1 ngày trong 30 ngày
+ * 90D => mỗi row là 1 ngày trong 90 ngày
+ */
+export const fetchGoogleAnalyticsDailySecondary = async (days = 30) => {
+  try {
+    const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID_2;
+
+    if (!propertyId) {
+      throw new Error(
+        'Thiếu GOOGLE_ANALYTICS_PROPERTY_ID_2 trong env'
+      );
+    }
+
+    const authClient = getGAAuthClient(
+      'GOOGLE_SERVICE_ACCOUNT_JSON_2'
+    );
+
+    const { token } = await authClient.getAccessToken();
+
+    const safeDays = [7, 14, 30, 90].includes(Number(days))
+      ? Number(days)
+      : 30;
+
+    // Vì GA4 tính inclusive:
+    // today + 29daysAgo = đúng 30 ngày.
+    const startDate =
+      safeDays <= 1
+        ? 'today'
+        : `${safeDays - 1}daysAgo`;
+
+    const rows = await runGA4Report(
+      propertyId,
+      token,
+      {
+        // Override dateRanges mặc định trong runGA4Report
+        dateRanges: [
+          {
+            startDate,
+            endDate: 'today',
+          },
+        ],
+
+        dimensions: [
+          {
+            name: 'date',
+          },
+        ],
+
+        metrics: [
+          {
+            name: 'screenPageViews',
+          },
+          {
+            name: 'activeUsers',
+          },
+          {
+            name: 'newUsers',
+          },
+          {
+            name: 'sessions',
+          },
+          {
+            name: 'keyEvents',
+          },
+          {
+            name: 'engagementRate',
+          },
+          {
+            name: 'bounceRate',
+          },
+          {
+            name: 'averageSessionDuration',
+          },
+        ],
+
+        orderBys: [
+          {
+            dimension: {
+              dimensionName: 'date',
+            },
+          },
+        ],
+      },
+      safeDays
+    );
+
+    return rows.map((row) => {
+      const rawDate =
+        row.dimensionValues?.[0]?.value ?? '';
+
+      // GA4 trả YYYYMMDD
+      // Chuyển thành YYYY-MM-DD
+      const date = rawDate.replace(
+        /^(\d{4})(\d{2})(\d{2})$/,
+        '$1-$2-$3'
+      );
+
+      const metrics = row.metricValues ?? [];
+
+      return {
+        date,
+
+        pageviews:
+          parseInt(metrics[0]?.value, 10) || 0,
+
+        users:
+          parseInt(metrics[1]?.value, 10) || 0,
+
+        newUsers:
+          parseInt(metrics[2]?.value, 10) || 0,
+
+        sessions:
+          parseInt(metrics[3]?.value, 10) || 0,
+
+        totalKeyEvents:
+          Number(metrics[4]?.value) || 0,
+
+        engagementRate:
+          Math.round(
+            (parseFloat(metrics[5]?.value) || 0) * 10000
+          ) / 100,
+
+        bounceRate:
+          Math.round(
+            (parseFloat(metrics[6]?.value) || 0) * 10000
+          ) / 100,
+
+        avgDuration:
+          Math.round(
+            parseFloat(metrics[7]?.value) || 0
+          ),
+      };
+    });
+  } catch (error) {
+    console.error(
+      '[GA4-2 Daily] Fetch error:',
+      error
+    );
+
+    throw error;
+  }
+};
 export const fetchYouTubeStats = async (channelHandle, apiKey) => {
   try {
     const channelResponse = await fetch(

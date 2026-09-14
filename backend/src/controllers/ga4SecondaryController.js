@@ -1,6 +1,9 @@
 import GA4StatSecondary from '../models/GA4StatSecondary.js';
 import GA4History from '../models/GA4History.js';
-import { fetchGoogleAnalyticsStatsSecondary } from '../services/scraperService.js';
+import {
+  fetchGoogleAnalyticsStatsSecondary,
+  fetchGoogleAnalyticsDailySecondary,
+} from '../services/scraperService.js';
 
 // Chỉ track 1 website (secondary) nên dùng 1 document duy nhất (singleton)
 const getSingletonDoc = async () => {
@@ -118,24 +121,33 @@ export const saveDailyGA4History = async (req, res) => {
 };
 
 /**
- * Lấy dữ liệu lịch sử trong khoảng ngày
- * Query: ?days=30 (mặc định 30)
+ * Lấy GA4 theo từng ngày.
+ *
+ * /history?days=7
+ * /history?days=14
+ * /history?days=30
+ * /history?days=90
  */
 export const getGA4History = async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 30;
-    const since = new Date();
-    since.setDate(since.getDate() - days);
-    const sinceStr = since.toISOString().split('T')[0];
+    const parsedDays = parseInt(req.query.days, 10);
 
-    const history = await GA4History.find(
-      { date: { $gte: sinceStr } },
-      { _id: 0, __v: 0, createdAt: 0, updatedAt: 0 }
-    ).sort({ date: 1 });
+    const days = [7, 14, 30, 90].includes(parsedDays)
+      ? parsedDays
+      : 30;
+
+    const history =
+      await fetchGoogleAnalyticsDailySecondary(days);
 
     res.status(200).json(history);
   } catch (error) {
-    console.error('[GA4 History] Get error:', error);
-    res.status(500).json({ message: 'Lỗi lấy lịch sử GA4' });
+    console.error(
+      '[GA4 Daily History] Get error:',
+      error
+    );
+
+    res.status(500).json({
+      message: 'Lỗi lấy lịch sử GA4 theo ngày',
+    });
   }
 };
