@@ -189,67 +189,188 @@ export const getInstagramProfileClicksHistory = async (req, res) => {
 
 export const getCachedAllPosts = async (req, res) => {
   try {
-    const hasDaysFilter = req.query.days !== undefined && Number(req.query.days) > 0;
-    const days = hasDaysFilter ? Number(req.query.days) : null;
+    const hasDaysFilter =
+      req.query.days !== undefined &&
+      Number(req.query.days) > 0;
+
+    const days = hasDaysFilter
+      ? Number(req.query.days)
+      : null;
 
     let fromDate = null;
+
     if (days) {
       fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - days);
     }
 
+    // ============================
+    // PLATFORM FILTER
+    // ============================
+
     const query = {};
+
+    let selectedPlatforms = [];
+
     if (req.query.platform) {
-      const platforms = req.query.platform.split(',').map(p => p.trim());
-      query.platform = platforms.length > 1 ? { $in: platforms } : platforms[0];
+      // URL có thể truyền:
+      // facebook
+      // instagram
+      // facebook,instagram
+
+      const requestedPlatforms = req.query.platform
+        .split(',')
+        .map((p) => p.trim().toLowerCase())
+        .filter(Boolean);
+
+      // Map lowercase -> đúng format đang lưu trong DB
+      selectedPlatforms = SUPPORTED_PLATFORMS.filter(
+        (platform) =>
+          requestedPlatforms.includes(
+            platform.toLowerCase()
+          )
+      );
+
+      if (selectedPlatforms.length === 0) {
+        return res.status(400).json({
+          message: `Platform "${req.query.platform}" is not valid.`,
+          supportedPlatforms: SUPPORTED_PLATFORMS,
+        });
+      }
+
+      query.platform =
+        selectedPlatforms.length > 1
+          ? { $in: selectedPlatforms }
+          : selectedPlatforms[0];
     }
 
-    const allPosts = await AllPost.find(query).sort({ date: -1 });
+    // ============================
+    // GET POSTS
+    // ============================
 
-    // Only filter by date when `days` is provided in the query; default is to fetch
-    // everything, since the `date` field is a String so Mongo's $gte can't be used —
-    // filtering has to happen at the application layer.
+    const allPosts = await AllPost.find(query)
+      .sort({ date: -1 });
+
+    // ============================
+    // FILTER DAYS
+    // ============================
+
     const posts = fromDate
       ? allPosts.filter((post) => {
           if (!post.date) return false;
+
           const parsed = new Date(post.date);
-          if (isNaN(parsed.getTime())) return false; // unparseable date -> skip
+
+          if (isNaN(parsed.getTime())) {
+            return false;
+          }
+
           return parsed >= fromDate;
         })
       : allPosts;
 
+    // ============================
+    // EMPTY RESULT
+    // ============================
+
     if (posts.length === 0) {
       return res.status(200).json({
         message: days
-          ? `No matching posts found in the last ${days} days${req.query.platform ? ` for platform "${req.query.platform}"` : ''}.`
-          : `No matching posts found${req.query.platform ? ` for platform "${req.query.platform}"` : ''}.`,
+          ? `No matching posts found in the last ${days} days${
+              selectedPlatforms.length
+                ? ` for ${selectedPlatforms.join(', ')}`
+                : ''
+            }.`
+          : `No matching posts found${
+              selectedPlatforms.length
+                ? ` for ${selectedPlatforms.join(', ')}`
+                : ''
+            }.`,
+
         total: 0,
         posts: [],
       });
     }
 
-    const groupedPosts = posts.reduce((acc, post) => {
-      if (post.platform) {
-        if (!acc[post.platform]) acc[post.platform] = [];
+    // ============================
+    // GROUP BY PLATFORM
+    // ============================
+
+    const groupedPosts = posts.reduce(
+      (acc, post) => {
+        if (!post.platform) {
+          return acc;
+        }
+
+        if (!acc[post.platform]) {
+          acc[post.platform] = [];
+        }
+
         acc[post.platform].push(post);
-      }
-      return acc;
-    }, {});
 
-    const cachedClicks = posts.reduce((sum, p) => sum + (Number(p.clicks) || 0), 0);
-    const cachedViews = posts.reduce((sum, p) => sum + (Number(p.views) || 0), 0);
+        return acc;
+      },
+      {}
+    );
 
-    res.status(200).json({
+    // ============================
+    // SUMMARY
+    // ============================
+
+    const cachedClicks = posts.reduce(
+      (sum, post) =>
+        sum + (Number(post.clicks) || 0),
+      0
+    );
+
+    const cachedViews = posts.reduce(
+      (sum, post) =>
+        sum + (Number(post.views) || 0),
+      0
+    );
+
+    const overallCtr =
+      cachedViews > 0
+        ? Math.round(
+            (cachedClicks / cachedViews) * 10000
+          ) / 100
+        : 0;
+
+    // ============================
+    // RESPONSE
+    // ============================
+
+    return res.status(200).json({
       total: posts.length,
+
       totalClicks: cachedClicks,
-      overallCtr: cachedViews > 0 ? Math.round((cachedClicks / cachedViews) * 10000) / 100 : 0,
+
+      totalViews: cachedViews,
+
+      overallCtr,
+
       rangeDays: days || 'all',
-      platformFilter: req.query.platform || null,
+
+      platformFilter:
+        selectedPlatforms.length > 0
+          ? selectedPlatforms
+          : null,
+
       posts,
+
       groupedByPlatform: groupedPosts,
     });
   } catch (error) {
-    console.error('[TopPosts] Get cached error:', error);
-    res.status(500).json({ message: 'System error while fetching top posts', error: error.message });
+    console.error(
+      '[AllPosts] Get cached error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'System error while fetching posts',
+
+      error: error.message,
+    });
   }
 };
