@@ -5,6 +5,7 @@ import { GrowthChart } from '../components/GrowthChart';
 import { DemographicsCard } from '../components/insights/DemographicsCard';
 import { TopPostsCard } from '../components/insights/TopPostsCard';
 import { normalizePosts } from '../utils/insights';
+import logo from '../assets/The Give Collective.png';
 import type { Post, DemographicRow } from '../types/insights';
 
 export default function SocialDashboardPage({ token, onUnauthorized }: {
@@ -55,7 +56,13 @@ export default function SocialDashboardPage({ token, onUnauthorized }: {
     <main className={`signal-atlas min-h-screen bg-signal-ink pb-16 font-signal-body text-signal-text ${shared ? '' : 'mt-16'}`}>
       <div className="mx-auto max-w-[1640px] space-y-8 px-4 py-10 sm:px-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <div><p className="text-sm text-signal-muted">The Give Collective</p><h1 className="text-3xl font-bold">Social Dashboard</h1></div>
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="The Give Collective" className="h-8" />
+            <div>
+              <p className="text-sm text-signal-muted">The Give Collective</p>
+              <h1 className="text-3xl font-bold">Social Dashboard</h1>
+            </div>
+          </div>
           {shared ? <button type="button" onClick={onUnauthorized} className="rounded-lg border border-signal-border px-4 py-2">Lock dashboard</button>
             : <button type="button" onClick={copyLink} className="rounded-lg bg-signal-cyan px-4 py-2 font-semibold text-signal-ink">Share dashboard</button>}
         </header>
