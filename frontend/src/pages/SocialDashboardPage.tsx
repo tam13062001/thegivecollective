@@ -59,7 +59,7 @@ export default function SocialDashboardPage({ token, onUnauthorized }: {
           <div className="flex items-center gap-3">
             <img src={logo} alt="The Give Collective" className="h-8" />
             <div>
-              <p className="text-sm text-signal-muted">The Give Collective</p>
+              <p className="text-sm text-signal-muted">TheGiveCollective</p>
               <h1 className="text-3xl font-bold">Social Dashboard</h1>
             </div>
           </div>
