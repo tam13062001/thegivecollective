@@ -1,3 +1,5 @@
+import 'dotenv/config';
+import socialDashboardRoutes from './routes/socialDashboard.js';
 import dotenv from 'dotenv';
 import express from 'express';
 import tasksRoutes from './routes/tasksRoutes.js';
@@ -38,6 +40,7 @@ app.use(express.urlencoded({ extended: true }));
 
 
 // --- 2. KHAI BÁO ROUTER SAU KHI ĐÃ ĐI QUA CÁC MIDDLEWARE ---
+app.use('/api/v1/social-share', socialDashboardRoutes);
 app.use("/api/v1", tasksRoutes);
 app.use("/api/v1", historyRoutes);
 app.use('/api/v1/insights', insightsRoutes);
