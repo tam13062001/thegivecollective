@@ -1,21 +1,24 @@
 // src/App.jsx
 import { useState, useEffect } from "react"
 import { Toaster } from "sonner"
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom"
+import SocialDashboardPage from "./pages/SocialDashboardPage"
+import SocialSharePage from "./pages/SocialSharePage"
 import Homepage from "./pages/Homepage"
 import NotFound from "./pages/404"
 import LockScreen from "./components/LockScreen"
 import { Navbar } from './components/Navbar'
 import InsightsPage from "./pages/InsightsPage" 
 
-function App() {
+function AppRoutes() {
+  const location = useLocation();
+  const isSharePage = location.pathname.replace(/\/+$/, "").toLowerCase() === "/share/social-dashboard";
   const [isAuthenticated, setIsAuthenticated] = useState(null)
 
   useEffect(() => {
-    const token = localStorage.getItem("app_refresh_token")
-    if (token) {
-      setIsAuthenticated(true)
-    } else {
+    try {
+      setIsAuthenticated(Boolean(localStorage.getItem("app_refresh_token")))
+    } catch {
       setIsAuthenticated(false)
     }
   }, [])
@@ -26,9 +29,9 @@ function App() {
 
   return (
     <>
-      <BrowserRouter>
-        <Navbar />
+        {!isSharePage && <Navbar />}
         <Routes>
+          <Route path="/share/social-dashboard" element={<SocialSharePage />} />
           {!isAuthenticated ? (
             <Route path="*" element={<LockScreen onUnlock={() => setIsAuthenticated(true)} />} />
           ) : (
@@ -36,14 +39,16 @@ function App() {
               <Route path="/" element={<Homepage />} />
               {/* Thêm Route cho tab mới */}
               <Route path="/insights" element={<InsightsPage />} />
+              <Route path="/social-dashboard" element={<SocialDashboardPage />} />
               <Route path="*" element={<NotFound />} />
             </>
           )}
         </Routes>
-      </BrowserRouter>
       <Toaster richColors position="top-right" />
     </>
   )
 }
 
-export default App
+export default function App() {
+  return <BrowserRouter><AppRoutes /></BrowserRouter>
+}

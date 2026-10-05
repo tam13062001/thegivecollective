@@ -8,7 +8,7 @@ import {
 } from "../../constants/insights";
 import type { ContentType, Post } from "../../types/insights";
 
-export function useTopPostsGrouping(posts: Post[]) {
+export function useTopPostsGrouping(posts: Post[], limit = TOP_POSTS_PER_PLATFORM) {
   const [activeContentType, setActiveContentType] = useState<
     ContentType | "all"
   >("all");
@@ -34,12 +34,12 @@ export function useTopPostsGrouping(posts: Post[]) {
       },
       {} as Record<string, Post[]>,
     );
-    // Cap at 5 posts / platform (the API may return more if the backend supports it)
+    // Keep the existing default; Social Dashboard requests 10.
     for (const platform of Object.keys(grouped)) {
-      grouped[platform] = grouped[platform].slice(0, TOP_POSTS_PER_PLATFORM);
+      grouped[platform] = grouped[platform].slice(0, limit);
     }
     return grouped;
-  }, [filteredPosts]);
+  }, [filteredPosts, limit]);
 
   return {
     activeContentType,

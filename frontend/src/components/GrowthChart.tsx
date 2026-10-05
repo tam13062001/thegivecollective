@@ -1,4 +1,5 @@
 import { useState, useEffect, useId } from 'react';
+import { API_BASE_URL } from '../api/client';
 import {
   AreaChart, Area,
   XAxis, YAxis,
@@ -23,7 +24,7 @@ interface Platform {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const API = 'https://thegivecollective-backend.vercel.app/api/v1/history';
+const API = `${API_BASE_URL}/history`;
 
 const RANGES = [
   { label: '7D',  days: 7  },
@@ -173,39 +174,59 @@ function ChartPanel({
 
 // ─── Main GrowthChart ─────────────────────────────────────────────────────────
 
-export function GrowthChart() {
+export function GrowthChart({ apiUrl = API, token, onUnauthorized }: {
+  apiUrl?: string;
+  token?: string;
+  onUnauthorized?: () => void;
+} = {}) {
   const [platforms, setPlatforms]   = useState<Platform[]>([]);
   const [selectedId, setSelectedId] = useState<string>('all');
   const [days, setDays]             = useState(30);
   const [data, setData]             = useState<ChartPoint[]>([]);
   const [loading, setLoading]       = useState(false);
 
-  // Load history-enabled platforms & Lọc bỏ GoogleAnalytics
-  useEffect(() => {
-    fetch(`${API}/platforms`)
-      .then((r) => r.json())
-      .then((data: Platform[]) => {
-        // Chỉ lấy những platform khác 'GoogleAnalytics'
-        const filteredPlatforms = data.filter(
-          (p) => p.platformName !== 'GoogleAnalytics'
-        );
-        setPlatforms(filteredPlatforms);
-      })
-      .catch(console.error);
-  }, []);
+  const [error, setError] = useState(false);
+  const [profilesError, setProfilesError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
-  // Fetch chart data on filter change
   useEffect(() => {
+    const controller = new AbortController();
+    setProfilesError(false);
+    fetch(`${apiUrl}/platforms`, {
+      signal: controller.signal,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(async r => {
+      if (r.status === 401) onUnauthorized?.();
+      if (!r.ok) throw new Error('Could not load profiles');
+      return r.json();
+    }).then(rows => {
+      if (!Array.isArray(rows)) throw new Error('Invalid profiles');
+      setPlatforms(rows.filter((p: Platform) => p.platformName !== 'GoogleAnalytics'));
+    }).catch(() => { if (!controller.signal.aborted) setProfilesError(true); });
+    return () => controller.abort();
+  }, [apiUrl, token, onUnauthorized, retry]);
+
+  useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
+    setError(false);
+    setData([]);
     const params = new URLSearchParams({ days: String(days) });
     if (selectedId !== 'all') params.set('taskId', selectedId);
-
-    fetch(`${API}?${params}`)
-      .then((r) => r.json())
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [selectedId, days]);
+    fetch(`${apiUrl}?${params}`, {
+      signal: controller.signal,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(async r => {
+      if (r.status === 401) onUnauthorized?.();
+      if (!r.ok) throw new Error('Could not load history');
+      return r.json();
+    }).then(rows => {
+      if (!Array.isArray(rows)) throw new Error('Invalid history');
+      setData(rows);
+    }).catch(() => { if (!controller.signal.aborted) setError(true); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [selectedId, days, apiUrl, token, onUnauthorized, retry]);
 
   const selectedPlatform = platforms.find((p) => p.taskId === selectedId);
 
@@ -257,8 +278,11 @@ export function GrowthChart() {
         </div>
       </div>
 
+      {profilesError && <p role="alert" className="text-sm text-red-600">Could not load profile filters. <button onClick={() => setRetry(v => v + 1)} className="underline">Try again</button></p>}
       {/* Charts */}
-      {loading ? (
+      {error ? (
+        <p role="alert" className="text-sm text-red-600">Could not load daily growth. <button onClick={() => setRetry(v => v + 1)} className="underline">Try again</button></p>
+      ) : loading ? (
         <div className="h-64 flex items-center justify-center text-slate-400 text-sm">
           <svg className="animate-spin w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>

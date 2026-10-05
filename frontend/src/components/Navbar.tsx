@@ -6,7 +6,7 @@ export function Navbar() {
   const location = useLocation();
   // Both Homepage ('/') and Insights ('/insights') now share the signal-atlas
   // dark theme, so the navbar switches with them.
-  const isSignalTheme = location.pathname === '/' || location.pathname === '/insights';
+  const isSignalTheme = location.pathname === '/' || location.pathname === '/insights' || location.pathname === '/social-dashboard';
 
   return (
     <nav
@@ -45,6 +45,9 @@ export function Navbar() {
                 }`}
             >
               Insights & Top Posts
+            </NavLink>
+            <NavLink to="/social-dashboard" className={({ isActive }) => `whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium md:px-4 md:text-sm ${isActive ? 'text-signal-text bg-signal-surface' : 'text-signal-muted hover:text-signal-text'}`}>
+              Social Dashboard
             </NavLink>
           </div>
         </div>

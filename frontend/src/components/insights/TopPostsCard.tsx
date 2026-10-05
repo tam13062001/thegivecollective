@@ -107,7 +107,9 @@ export function TopPostsCard({
   loading,
   error,
   onRetry,
+  limit = 5,
 }: {
+  limit?: number;
   posts: Post[];
   loading: boolean;
   error: boolean;
@@ -118,7 +120,7 @@ export function TopPostsCard({
     setActiveContentType,
     availableContentTypes,
     groupedPosts,
-  } = useTopPostsGrouping(posts);
+  } = useTopPostsGrouping(posts, limit);
 
   const platformEntries = Object.entries(groupedPosts);
 
@@ -130,7 +132,7 @@ export function TopPostsCard({
             Top posts
           </span>
           <span className="font-signal-mono text-[10px] text-signal-muted sm:text-xs">
-            {loading ? "Loading..." : "Top 5 / platform"}
+            {loading ? "Loading..." : `Top ${limit} / platform`}
           </span>
         </div>
         <ContentTypeFilterChips

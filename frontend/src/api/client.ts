@@ -3,10 +3,10 @@
 
 import axios from "axios";
 
-// NOTE: kept as an explicit absolute default because the dev server has no
-// `/api/v1` proxy configured yet — set VITE_API_BASE_URL only once a proxy
-// (or a local backend origin) is available.
-export const API_BASE_URL = "https://thegivecollective-backend.vercel.app/api/v1";
+// Optional override for local/staging deployments; retain the current production default.
+export const API_BASE_URL = ((import.meta as ImportMeta & {
+  env?: { VITE_API_BASE_URL?: string };
+}).env?.VITE_API_BASE_URL || "https://thegivecollective-backend.vercel.app/api/v1").replace(/\/+$/, "");
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

@@ -20,7 +20,9 @@ export function DemographicsCard({
   demographics,
   loading,
   error,
+  showInsight = true,
 }: {
+  showInsight?: boolean;
   demographics: DemographicRow[];
   loading: boolean;
   error: boolean;
@@ -118,7 +120,7 @@ export function DemographicsCard({
           </ResponsiveContainer>
         </div>
 
-        <div className="mt-4 flex gap-3 border-l-2 border-signal-coral px-3 py-3 sm:px-4">
+        {showInsight && <div className="mt-4 flex gap-3 border-l-2 border-signal-coral px-3 py-3 sm:px-4">
           <Lightbulb
             aria-hidden="true"
             className="mt-0.5 h-4 w-4 shrink-0 text-signal-coral"
@@ -132,7 +134,7 @@ export function DemographicsCard({
               available demographic data.
             </p>
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );
