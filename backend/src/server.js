@@ -1,5 +1,3 @@
-import 'dotenv/config';
-import socialDashboardRoutes from './routes/socialDashboard.js';
 import dotenv from 'dotenv';
 import express from 'express';
 import tasksRoutes from './routes/tasksRoutes.js';
@@ -8,9 +6,11 @@ import insightsRoutes from './routes/Insights.js';
 import topPostsRouter from './routes/ToppostsRoute.js';
 import ga4Routes from './routes/ga4Routes.js';
 import ga4SecondaryRoutes from './routes/ga4SecondaryRoutes.js';
+import adsBoostingRoutes from './routes/adsBoostingRoutes.js';
 import { takeSnapshot } from './jobs/snapshotjob.js';
 import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
 import { connectDB } from './config/db.js';
+import { syncAdsFromSheet } from './services/adsSyncService.js';
 import cors from 'cors';
 import CronLog from './models/CronLog.js';
 
@@ -40,13 +40,13 @@ app.use(express.urlencoded({ extended: true }));
 
 
 // --- 2. KHAI BÁO ROUTER SAU KHI ĐÃ ĐI QUA CÁC MIDDLEWARE ---
-app.use('/api/v1/social-share', socialDashboardRoutes);
 app.use("/api/v1", tasksRoutes);
 app.use("/api/v1", historyRoutes);
 app.use('/api/v1/insights', insightsRoutes);
 app.use('/api/v1/insights', topPostsRouter);
 app.use('/api/v1', ga4Routes);
 app.use('/api/v1', ga4SecondaryRoutes);
+app.use('/api/v1', adsBoostingRoutes); // Ads Boosting: GET /ads-boosting, POST /ads-boosting/sync, GET /cron/ads-sync
 // Gợi ý: Chắc là bạn sẽ cần khai báo sử dụng historyRoutes ở đây
 // app.use("/api/v1/history", historyRoutes); 
 
@@ -90,6 +90,14 @@ app.get('/api/v1/cron/daily-job', async (req, res) => {
 
     await takeSnapshot();
     log.steps.push({ step: 'snapshot', status: 'success', at: new Date() });
+
+    // Đồng bộ Google Sheet ads -> DB (lỗi ở bước này không làm fail cả daily job)
+    try {
+      await syncAdsFromSheet();
+      log.steps.push({ step: 'ads-sheet-sync', status: 'success', at: new Date() });
+    } catch (e) {
+      log.steps.push({ step: 'ads-sheet-sync', status: 'failed', at: new Date() });
+    }
 
     log.status = 'success';
   } catch (error) {
