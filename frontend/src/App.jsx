@@ -9,7 +9,7 @@ import NotFound from "./pages/404"
 import LockScreen from "./components/LockScreen"
 import { Navbar } from './components/Navbar'
 import InsightsPage from "./pages/InsightsPage" 
-
+import AdsBoostingPage from "./pages/AdsBoostingPage"
 function AppRoutes() {
   const location = useLocation();
   const isSharePage = location.pathname.replace(/\/+$/, "").toLowerCase() === "/share/social-dashboard";
@@ -40,6 +40,7 @@ function AppRoutes() {
               {/* Thêm Route cho tab mới */}
               <Route path="/insights" element={<InsightsPage />} />
               <Route path="/social-dashboard" element={<SocialDashboardPage />} />
+              <Route path="/ads-boosting" element={<AdsBoostingPage />} />
               <Route path="*" element={<NotFound />} />
             </>
           )}

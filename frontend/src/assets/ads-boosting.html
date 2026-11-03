@@ -1,0 +1,1229 @@
+<!doctype html><html data-theme="light"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Give Collective Ads Performance</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Mulish:wght@400;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  /* Layout: a mint page like thegivecollective.com, soft pink circles at the corners, dark-green headings, white cards; wide tables scroll inside their cards. */
+  :root {
+    --page: #ffffff; --panel: #ffffff; --ink: #183734; --muted: #536b68; --line: #d9ece9; --head: #0b514d;
+    --teal: #31a69a; --teal-soft: #e2f4f2; --deep: #0b514d;
+    --pink: #ff85a1; --pink-ink: #d9476c; --pink-soft: #ffeef2; --on-pink: #3d0f1d;
+    --good: #1f8a5b; --warn: #b26a12; --bad: #c8414b; --grey: #b9cfcb; --grid: #e6f1ef;
+    --v-scale: #0e7a6e; --v-watch: #6cc7bb; --v-early: #ffc4d3; --v-cut: #e2557a;
+    --shadow: 0 12px 32px rgba(11, 81, 77, 0.07);
+    --display: "Outfit", "Mulish", system-ui, sans-serif;
+    --body: "Mulish", system-ui, sans-serif;
+    --r: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0a1f1d; --panel: #102b28; --ink: #e6f4f2; --muted: #9dbdb8; --line: #20433f; --head: #8fe0d5;
+      --teal: #4cc3b5; --teal-soft: #143a36; --deep: #0b514d;
+      --pink: #ff8fab; --pink-ink: #ff9fb8; --pink-soft: #3b1a26; --on-pink: #3d0f1d;
+      --good: #4fc98d; --warn: #e3a64a; --bad: #ff7a83; --grey: #3e5f5b; --grid: #183a36;
+      --v-scale: #4cc3b5; --v-watch: #2a7f75; --v-early: #7a3c50; --v-cut: #ff7fa0;
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.25); color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0a1f1d; --panel: #102b28; --ink: #e6f4f2; --muted: #9dbdb8; --line: #20433f; --head: #8fe0d5;
+    --teal: #4cc3b5; --teal-soft: #143a36; --deep: #0b514d;
+    --pink: #ff8fab; --pink-ink: #ff9fb8; --pink-soft: #3b1a26; --on-pink: #3d0f1d;
+    --good: #4fc98d; --warn: #e3a64a; --bad: #ff7a83; --grey: #3e5f5b; --grid: #183a36;
+      --v-scale: #4cc3b5; --v-watch: #2a7f75; --v-early: #7a3c50; --v-cut: #ff7fa0;
+    --shadow: 0 12px 32px rgba(0, 0, 0, 0.25); color-scheme: dark;
+  }
+  body { background: var(--page); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+  .band { position: relative; overflow: hidden; }
+  .band::before, .band::after { content: ""; position: absolute; border-radius: 50%; background: var(--pink); opacity: 0.16; pointer-events: none; }
+  .band::before { width: 220px; height: 220px; left: -110px; top: -90px; }
+  .band::after { width: 240px; height: 240px; right: -120px; bottom: -60px; }
+  .band .wrap { position: relative; z-index: 1; }
+  .wrap { max-width: 1180px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; color: var(--head); }
+  button { font: inherit; }
+  button:focus-visible, input:focus-visible, select:focus-visible, canvas:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+
+  .band .wrap { padding-block: 32px 8px; display: flex; flex-direction: column; gap: 20px; }
+  .topline { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .brand { font-family: var(--display); font-weight: 900; font-size: 1.2rem; letter-spacing: -0.01em; color: var(--head); }
+  .brand span { color: var(--pink); }
+  .prepared { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; }
+  .camp { display: flex; flex-direction: column; gap: 10px; max-width: 48rem; }
+  .eyebrow { font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pink-ink); font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pink); flex: none; }
+  .camp h1 { font-weight: 900; font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.04; letter-spacing: -0.025em; }
+  .camp h1::after { content: ""; display: block; width: 88px; height: 7px; border-radius: 4px; background: var(--pink); margin-top: 12px; }
+  .camp p { margin: 0; color: var(--muted); font-size: 1.05rem; max-width: 60ch; }
+  .camp a { color: var(--teal); font-weight: 700; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .seg { display: inline-flex; background: var(--panel); border: 2px solid var(--line); border-radius: 999px; padding: 4px; gap: 2px; flex-wrap: wrap; }
+  .seg button { border: 0; background: transparent; color: var(--ink); padding: 6px 14px; border-radius: 999px; cursor: pointer; font-weight: 800; font-size: 0.85rem; }
+  .seg button[aria-pressed="true"] { background: var(--teal); color: #fff; }
+  .fresh { font-size: 0.82rem; color: var(--muted); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pick select { font: inherit; font-weight: 800; font-size: 0.85rem; color: var(--ink); background: var(--panel); border: 2px solid var(--line); border-radius: 999px; padding: 8px 14px; max-width: 100%; cursor: pointer; }
+  .pick { max-width: 100%; min-width: 0; }
+
+  main.wrap { padding-block: 28px 48px; display: flex; flex-direction: column; gap: 28px; }
+  .hero { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: stretch; }
+  @media (min-width: 880px) { .hero { grid-template-columns: 1.05fr 1.6fr; } }
+  .roas { background: var(--pink-soft); border-radius: var(--r); padding: 24px; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+  .roas .lab { font-weight: 800; color: var(--pink-ink); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .roas .num { font-family: var(--display); font-weight: 900; font-size: clamp(3rem, 8vw, 4.6rem); line-height: 1; color: var(--teal); letter-spacing: -0.03em; }
+  .roas .say { margin: 0; font-size: 1.02rem; max-width: 34ch; }
+  .roas .say b { font-weight: 800; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr)); gap: 12px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .kpi .lab { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+  .kpi.money { border-top: 4px solid var(--pink); }
+  .kpi.cost { border-top: 4px solid var(--teal); }
+  .kpi .val { color: var(--head); font-family: var(--display); font-weight: 800; font-size: 1.7rem; letter-spacing: -0.01em; line-height: 1.15; }
+  .kpi .chg { font-size: 0.78rem; color: var(--muted); }
+  .up { color: var(--good) !important; } .down { color: var(--bad) !important; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: var(--r); padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .card h2 { font-weight: 800; font-size: 1.25rem; letter-spacing: -0.01em; }
+  .card h2::after { content: ""; display: block; width: 32px; height: 4px; border-radius: 2px; background: var(--pink); margin-top: 6px; }
+  .note { margin: 0; color: var(--muted); font-size: 0.86rem; max-width: 72ch; }
+  .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-start; }
+  .grid2 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  @media (min-width: 920px) { .grid2.wide { grid-template-columns: 1.7fr 1fr; } .grid2.half { grid-template-columns: 1fr 1fr; } }
+  .chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 5px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+  .chips button[aria-pressed="true"] { background: var(--pink); border-color: var(--pink); color: var(--on-pink); }
+
+  .actions { border-radius: 22px; padding: 22px; display: flex; flex-direction: column; gap: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .ac-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px 16px; }
+  .ac-head h2 { font-weight: 900; font-size: clamp(1.4rem, 3vw, 1.8rem); letter-spacing: -0.02em; }
+  .ac-head .eyebrow { margin-bottom: 4px; }
+  .ac-meta { display: flex; align-items: center; gap: 12px; font-size: 0.85rem; color: var(--muted); }
+  .ac-meta b { color: var(--head); font-family: var(--display); font-weight: 900; }
+  .linkbtn { border: 0; background: none; color: var(--teal); font-weight: 800; font-size: 0.85rem; cursor: pointer; padding: 4px 0; }
+  .prio { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .prio li { display: grid; grid-template-columns: 2rem 1fr auto auto; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--page); border-left: 5px solid var(--k); }
+  .prio .n { width: 2rem; height: 2rem; border-radius: 50%; display: grid; place-items: center; font-family: var(--display); font-weight: 900; color: #fff; background: var(--k); }
+  .prio .main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .prio .line1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+  .prio .verb { font-family: var(--display); font-weight: 900; color: var(--k); }
+  .prio .what { font-weight: 800; color: var(--head); overflow-wrap: anywhere; }
+  .prio .why { font-size: 0.84rem; color: var(--muted); overflow-wrap: anywhere; }
+  .prio .go { display: inline-flex; align-items: center; gap: 4px; background: var(--k); color: #fff; text-decoration: none; font-weight: 800; font-size: 0.78rem; padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
+  .prio .go:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+  .prio .tick { width: 20px; height: 20px; accent-color: var(--teal); cursor: pointer; }
+  .prio li.is-done { opacity: 0.5; }
+  .prio li.is-done .verb, .prio li.is-done .what { text-decoration: line-through; }
+  .prio .empty { grid-template-columns: 1fr; border-left-color: var(--good); color: var(--muted); }
+  @media (max-width: 560px) { .prio li { grid-template-columns: 2rem 1fr auto; } .prio .go { grid-column: 2; justify-self: start; } .prio .tick { grid-row: 1; grid-column: 3; } }
+  .k-fix, .k-pause { --k: var(--bad); } .k-scale { --k: var(--good); } .k-reopen { --k: var(--pink-ink); } .k-retry { --k: var(--warn); }
+  .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--head); color: var(--page); padding: 10px 16px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; z-index: 10; box-shadow: var(--shadow); }
+
+  .chart { position: relative; min-height: 250px; }
+  .chart svg { display: block; overflow: visible; }
+  .tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(11, 81, 77, 0.16); padding: 8px 10px; font-size: 0.8rem; white-space: nowrap; z-index: 3; }
+  .tip .d { color: var(--muted); }
+  .tip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+
+  .funnel { display: flex; flex-direction: column; gap: 6px; }
+  .frow { display: grid; grid-template-columns: 8.5rem 1fr 3.2rem; gap: 10px; align-items: center; font-size: 0.86rem; font-weight: 600; }
+  .frow b { text-align: right; font-family: var(--display); font-weight: 800; font-size: 1.05rem; }
+  .fbar { position: relative; height: 24px; }
+  .fbar .c { position: absolute; left: 0; top: 0; height: 18px; border-radius: 6px; background: var(--teal); }
+  .fbar .p { position: absolute; left: 0; top: 20px; height: 3px; border-radius: 2px; background: var(--grey); }
+  .fstep { padding-left: 8.5rem; font-size: 0.8rem; color: var(--muted); }
+  .fstep b { color: var(--ink); }
+  .fstep b.worst { color: var(--bad); }
+  @media (max-width: 480px) { .frow { grid-template-columns: 6.5rem 1fr 2.8rem; } .fstep { padding-left: 6.5rem; } }
+
+  .tools { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
+  .search { font: inherit; font-size: 0.86rem; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--page); color: var(--ink); width: 16rem; max-width: 100%; }
+  .scroll { overflow: auto; max-height: 32rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
+  th { position: sticky; top: 0; background: var(--panel); text-align: right; font-weight: 700; color: var(--muted); border-bottom: 2px solid var(--line); white-space: nowrap; padding: 0; z-index: 1; }
+  th:first-child, td:first-child { text-align: left; }
+  th button { border: 0; background: none; color: inherit; font-weight: 700; padding: 8px 10px; cursor: pointer; width: 100%; text-align: inherit; }
+  th[aria-sort="ascending"] button::after { content: " \2191 "; } th[aria-sort="descending"] button::after { content: " \2193 "; }
+  th.plain { padding: 8px 10px; }
+  td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td:first-child { white-space: normal; min-width: 14rem; max-width: 26rem; overflow-wrap: anywhere; }
+  tbody tr.click { cursor: pointer; }
+  tbody tr.click:hover td { background: var(--teal-soft); }
+  tbody tr.sel td { background: var(--pink-soft); }
+  tbody tr.sel td:first-child { box-shadow: inset 4px 0 0 var(--pink); }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 800; font-size: 0.75rem; color: #fff; }
+  .p-Scale { background: var(--good); } .p-Watch { background: var(--warn); } .p-Cut { background: var(--bad); } .p-Too { background: var(--grey); color: var(--ink); }
+  .bar { background-repeat: no-repeat; background-position: right center; }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; font-size: 0.78rem; }
+  .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--grey); }
+  .live.d-Active { color: var(--good); } .live.d-Active::before { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+  .live.d-Paused { color: var(--muted); }
+  .live.d-Issue { color: var(--bad); } .live.d-Issue::before { background: var(--bad); }
+  .act { font-weight: 800; font-size: 0.8rem; white-space: nowrap; }
+  .act.a-good { color: var(--good); } .act.a-bad { color: var(--bad); } .act.a-warn { color: var(--warn); } .act.a-pink { color: var(--pink-ink); } .act.a-muted { color: var(--muted); font-weight: 600; }
+  .filters { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--muted); align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .viewbtns { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .viewbtns button, .picked { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 5px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+  .picked { align-self: flex-start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--pink-soft); border-color: var(--pink); }
+  .scene { position: relative; min-height: 300px; }
+  .scene canvas { display: block; touch-action: pan-y; cursor: grab; }
+
+  footer.wrap { padding-block: 0 40px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 0.82rem; }
+  footer p { margin: 0; max-width: 90ch; }
+  footer a { color: var(--ink); }
+  @media (prefers-reduced-motion: no-preference) {
+    .fbar .c { animation: grow 0.7s cubic-bezier(.2,.8,.2,1); transform-origin: left; }
+    @keyframes grow { from { transform: scaleX(0); } }
+  }
+</style>
+
+<header class="band">
+  <div class="wrap">
+    <div class="topline">
+      <div class="brand">The Give Collective<span>.</span></div>
+      <div class="prepared">Meta ads performance</div>
+    </div>
+    <div class="camp">
+      <div class="eyebrow" id="camp-eyebrow"></div>
+      <h1 id="camp-title"></h1>
+      <p id="camp-sub"></p>
+    </div>
+    <div class="controls">
+      <label class="pick"><span class="sr">Campaign</span><select id="campaign"></select></label>
+      <div class="seg" role="group" aria-label="Period">
+        <button type="button" data-win="all">Since launch</button>
+        <button type="button" data-win="14d">14 days</button>
+        <button type="button" data-win="7d">7 days</button>
+        <button type="button" data-win="3d">3 days</button>
+      </div>
+      <span class="fresh" id="fresh"></span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" aria-label="Headline">
+    <div class="roas">
+      <span class="lab">Return on ad spend</span>
+      <span class="num" id="roas-num">&#x2014;</span>
+      <p class="say" id="roas-say"></p>
+    </div>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section class="card" id="campaigns">
+    <div>
+      <h2>Campaigns</h2>
+      <p class="note" id="camp-note"></p>
+    </div>
+    <div class="scroll">
+      <table id="camptable">
+        <thead><tr>
+          <th class="plain">Campaign</th><th class="plain">Charity</th><th class="plain">Status</th><th class="plain">Spend</th><th class="plain">Purchases</th><th class="plain">Value</th><th class="plain">ROAS</th><th class="plain">Cost/purchase</th><th class="plain">CTR</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="actions" id="recommendations">
+    <div class="ac-head">
+      <div>
+        <div class="eyebrow">Priorities</div>
+        <h2>What to do next</h2>
+        <p class="note" id="rule-note"></p>
+      </div>
+      <div class="ac-meta"><span><b id="ac-done">0</b> of <span id="ac-total">0</span> done</span><button type="button" class="linkbtn" id="copy-list">Copy list</button></div>
+    </div>
+    <ol class="prio" id="prio"></ol>
+    <button type="button" class="linkbtn" id="more" hidden></button>
+  </section>
+  <div class="toast" id="toast" hidden></div>
+
+  <div class="grid2 wide">
+    <section class="card" id="daily">
+      <div class="head">
+        <div>
+          <h2>Day by day</h2>
+          <p class="note">The selected period is shaded. Pick an ad set in the table or 3D view to overlay it.</p>
+        </div>
+        <div class="chips" role="group" aria-label="Measure" data-metric-group></div>
+      </div>
+      <button type="button" class="picked" hidden></button>
+      <div class="chart" id="trend"></div>
+    </section>
+    <section class="card" id="funnel">
+      <div>
+        <h2>Funnel</h2>
+        <p class="note" id="funnel-note"></p>
+      </div>
+      <div class="funnel" id="funnel-body"></div>
+      <p class="note">The weakest step is in red. Thin bars show the period before. Meta can credit more purchases than checkouts it saw, so the last step can pass 100%.</p>
+    </section>
+  </div>
+
+  <section class="card" id="adsets">
+    <div class="tools">
+      <div>
+        <h2>Ad sets</h2>
+        <p class="note">Status is what Meta shows right now; the action weighs it against results for the selected period. Click a heading to sort, or a row to follow that audience in the charts.</p>
+      </div>
+      <div class="filters">
+        <div class="chips" role="group" aria-label="Show ad sets" id="status-filter">
+          <button type="button" data-show="all">All</button>
+          <button type="button" data-show="Active">Active</button>
+          <button type="button" data-show="Paused">Paused</button>
+        </div>
+        <input class="search" id="search" type="search" placeholder="Search audiences" aria-label="Search ad sets">
+      </div>
+    </div>
+    <div class="scroll">
+      <table id="adtable">
+        <thead><tr>
+          <th data-k="adset_name"><button type="button">Ad set</button></th>
+          <th data-k="delivery"><button type="button">Status</button></th>
+          <th data-k="action"><button type="button">Recommended action</button></th>
+          <th data-k="status"><button type="button">Verdict</button></th>
+          <th data-k="spend" aria-sort="descending"><button type="button">Spend</button></th>
+          <th data-k="share_spend"><button type="button">Share</button></th>
+          <th data-k="purchases"><button type="button">Purchases</button></th>
+          <th data-k="revenue"><button type="button">Value</button></th>
+          <th data-k="roas"><button type="button">ROAS</button></th>
+          <th data-k="cpa"><button type="button">Cost/purchase</button></th>
+          <th data-k="ctr"><button type="button">CTR</button></th>
+          <th data-k="cost_lpv"><button type="button">Cost/LPV</button></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="ads">
+    <div>
+      <h2>Ads</h2>
+      <p class="note">Each creative in each ad set. An ad inside a paused ad set counts as paused.</p>
+    </div>
+    <div class="scroll">
+      <table id="adstable">
+        <thead><tr>
+          <th class="plain">Ad</th><th class="plain">Ad set</th><th class="plain">Status</th><th class="plain">Recommended action</th><th class="plain">Spend</th><th class="plain">Purchases</th><th class="plain">Value</th><th class="plain">ROAS</th><th class="plain">CTR</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="explore">
+    <div class="head">
+      <div>
+        <h2>Explore in 3D</h2>
+        <p class="note">Ad sets run across, days run back, bar height is the measure you pick and colour is the verdict. Drag to turn, click in and scroll to zoom, or use the arrow keys. Click a bar to follow that ad set.</p>
+      </div>
+      <div class="chips" role="group" aria-label="3D measure" data-metric-group></div>
+    </div>
+    <div class="tools">
+      <div class="legend"><span><i style="background:var(--v-scale)"></i>Scale</span><span><i style="background:var(--v-watch)"></i>Watch</span><span><i style="background:var(--v-early)"></i>Too early</span><span><i style="background:var(--v-cut)"></i>Cut</span></div>
+      <div class="viewbtns">
+        <button type="button" data-view="left" aria-label="Turn left">&#x27f2;</button>
+        <button type="button" data-view="right" aria-label="Turn right">&#x27f3;</button>
+        <button type="button" data-view="in" aria-label="Zoom in">+</button>
+        <button type="button" data-view="out" aria-label="Zoom out">&#x2212;</button>
+        <button type="button" data-view="reset">Reset view</button>
+      </div>
+    </div>
+    <button type="button" class="picked" hidden></button>
+    <div class="scene" id="scene"></div>
+  </section>
+
+  <div class="grid2 half">
+    <section class="card" id="age">
+      <div><h2>Age</h2><p class="note">Share of spend against share of purchases.</p></div>
+      <div class="scroll"><table id="agetable"><thead><tr>
+        <th class="plain">Age</th><th class="plain">Spend</th><th class="plain">Share of spend</th><th class="plain">Purchases</th><th class="plain">Share of purchases</th><th class="plain">ROAS</th>
+      </tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="card" id="gender">
+      <div><h2>Gender</h2><p class="note">The gender export has no purchase columns yet, so this compares clicks and landing-page views.</p></div>
+      <div class="scroll"><table id="gendertable"><thead><tr>
+        <th class="plain">Gender</th><th class="plain">Spend</th><th class="plain">Share of spend</th><th class="plain">Link clicks</th><th class="plain">CTR</th><th class="plain">Cost/LPV</th>
+      </tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+</main>
+
+<footer class="wrap">
+  <p>Status is Meta's delivery status when the data was pulled. Actions: Pause an active ad set with no purchase after the minimum spend; Raise budget on active winners; Reopen a paused ad set that beat the target ROAS (to test, when it has only one purchase); Retry with new creative when a paused ad set had purchases at a lower ROAS. ROAS is purchase value divided by ad spend. A purchase is the Meta pixel's Purchase event on thegivecollective.com. CTR uses link clicks; LPV is a landing-page view. Periods end on the latest day in the data and compare with the same number of days just before.</p>
+  <p>Source: The Give Collective's Meta ad account Google Sheet DATA_FACEBOOK_TGC_2026 (daily ad, age and gender breakdowns), synced to our database whenever the sheet changes.</p>
+</footer>
+
+<script>
+// ---- Data comes from our backend (Meta Ads API, refreshed hourly) instead of a baked-in snapshot ----
+const API_BASE = '__API_BASE__';
+const showStatus = (msg) => {
+  let el = document.getElementById('ads-status');
+  if (!el) { el = document.createElement('div'); el.id = 'ads-status'; el.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;background:var(--page);color:var(--muted);font:600 15px var(--body);z-index:50'; document.body.appendChild(el); }
+  el.textContent = msg; el.hidden = !msg;
+};
+async function loadSnapshot() {
+  const url = API_BASE + '/ads-boosting';
+  const res = await fetch(url, { cache: 'no-store' });
+  const isJson = (res.headers.get('content-type') || '').includes('json');
+  const body = isJson ? await res.json().catch(() => ({})) : {};
+  if (res.status === 404 && !isJson) throw new Error('backend chưa có API ' + url + ' (chưa deploy code mới, hoặc FE đang trỏ sai backend)');
+  if (!res.ok) throw new Error(body.message || 'HTTP ' + res.status);
+  return body;
+}
+// Every 10 minutes: if the backend has newer data, reload so all numbers update.
+function watchForUpdates(takenAt) {
+  setInterval(async () => {
+    try { const s = await loadSnapshot(); if (s.takenAt && s.takenAt !== takenAt) location.reload(); } catch (e) { /* keep showing current data */ }
+  }, 10 * 60 * 1000);
+}
+(async function boot() {
+showStatus('Loading ads data…');
+let SNAPSHOT;
+try { SNAPSHOT = await loadSnapshot(); }
+catch (e) { showStatus('Could not load ads data: ' + e.message); return; }
+showStatus('');
+watchForUpdates(SNAPSHOT.takenAt);
+
+const C = {};
+const dash = { calc: (id, o) => { C[id] = o; } };
+dash.calc('rules', {
+  inputs: ['utd'],
+  title: 'Verdict thresholds',
+  description: 'The targets verdicts and actions use: Scale at or above the target ROAS with 2+ purchases, Cut at the minimum spend with no purchase; a paused ad set with purchases is worth retrying with new creative from the retry ROAS.',
+  fn: (utd) => [{ target_roas: 4, min_spend: 5, retry_roas: 1.5, currency: 'SGD' }],
+});
+
+dash.calc('kpi', {
+  inputs: ['utd'],
+  title: 'Headline figures by period',
+  description: 'Totals for all days and for the last 14, 7 and 3 days up to the latest date, each with the same-length period just before it and the change between them.',
+  fn: (utd) => {
+    if (!utd.length) return [];
+    const DAY = 864e5, t = (d) => Date.parse(d), iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+    const last = Math.max(...utd.map((r) => t(r.date_start))), first = Math.min(...utd.map((r) => t(r.date_start)));
+    const r2 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 100) / 100);
+    const r4 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 10000) / 10000);
+    const total = (from, to) => {
+      const s = { spend: 0, impressions: 0, link_clicks: 0, lpv: 0, checkouts: 0, purchases: 0, revenue: 0, donations: 0, donation_value: 0 };
+      utd.filter((r) => t(r.date_start) >= from && t(r.date_start) <= to).forEach((r) => {
+        s.spend += r.spend; s.impressions += r.impressions; s.link_clicks += r.inline_link_clicks; s.lpv += r.landing_page_view;
+        s.checkouts += r.initiate_checkout; s.purchases += r.purchase; s.revenue += r.purchase_value;
+        s.donations += r.event_count__donate_total; s.donation_value += r.event_value__donate_total;
+      });
+      return {
+        spend: r2(s.spend), impressions: s.impressions, link_clicks: s.link_clicks, lpv: s.lpv, checkouts: s.checkouts,
+        purchases: s.purchases, revenue: r2(s.revenue), donations: s.donations, donation_value: r2(s.donation_value),
+        roas: r2(s.revenue / s.spend), cpa: r2(s.spend / s.purchases), ctr: r4(s.link_clicks / s.impressions),
+        cpm: r2((s.spend / s.impressions) * 1000), cpc: r2(s.spend / s.link_clicks), cost_lpv: r2(s.spend / s.lpv),
+        aov: r2(s.revenue / s.purchases), lpv_rate: r4(s.lpv / s.link_clicks), checkout_rate: r4(s.checkouts / s.lpv),
+        close_rate: r4(s.purchases / s.checkouts),
+      };
+    };
+    return [['all', null], ['14d', 14], ['7d', 7], ['3d', 3]].map(([window, n]) => {
+      const from = n ? last - (n - 1) * DAY : first;
+      const cur = total(from, last);
+      const hasPrev = n && from - n * DAY >= first;
+      const prev = hasPrev ? total(from - n * DAY, from - DAY) : null;
+      const row = { window, start: iso(from), end: iso(last), days: Math.round((last - from) / DAY) + 1, ...cur };
+      for (const k of ['spend', 'revenue', 'roas', 'purchases', 'cpa', 'ctr', 'cpm', 'link_clicks', 'lpv', 'checkouts']) {
+        row['p_' + k] = prev ? prev[k] : null;
+        row['d_' + k] = prev && prev[k] && cur[k] != null ? r4((cur[k] - prev[k]) / prev[k]) : null;
+      }
+      return row;
+    });
+  },
+});
+
+dash.calc('adsets', {
+  inputs: ['utd', 'kpi', 'rules'],
+  title: 'Ad sets by period',
+  description: 'Each ad set\u2019s totals and ratios for every period, its share of spend, its current delivery status, a verdict from the thresholds and the action that follows from both.',
+  fn: (utd, kpi, rules) => {
+    const { target_roas, min_spend, retry_roas } = rules[0] || {};
+    const r2 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 100) / 100);
+    const r4 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 10000) / 10000);
+    const delivery = (st) => (!st ? 'Unknown' : st === 'ACTIVE' ? 'Active' : st.includes('PAUSED') || st === 'ARCHIVED' ? 'Paused' : 'Issue');
+    const out = [];
+    for (const k of kpi) {
+      const by = new Map();
+      utd.filter((r) => r.date_start >= k.start && r.date_start <= k.end).forEach((r) => {
+        const s = by.get(r.adset_name) || { spend: 0, impressions: 0, link_clicks: 0, lpv: 0, checkouts: 0, purchases: 0, revenue: 0, last: '', st: '' };
+        s.spend += r.spend; s.impressions += r.impressions; s.link_clicks += r.inline_link_clicks; s.lpv += r.landing_page_view;
+        s.checkouts += r.initiate_checkout; s.purchases += r.purchase; s.revenue += r.purchase_value;
+        if (r.date_start >= s.last) { s.last = r.date_start; s.st = r.adset_effective_status; }
+        by.set(r.adset_name, s);
+      });
+      for (const [adset_name, s] of by) {
+        const roas = s.spend ? s.revenue / s.spend : null;
+        const status = s.purchases >= 2 && roas >= target_roas ? 'Scale'
+          : s.purchases === 0 && s.spend >= min_spend ? 'Cut'
+          : s.purchases === 0 ? 'Too early' : 'Watch';
+        const d = delivery(s.st);
+        const action = d === 'Issue' ? 'Fix delivery issue'
+          : d === 'Active' ? { Scale: 'Raise budget', Watch: 'Keep running', Cut: 'Pause', 'Too early': 'Keep testing' }[status]
+          : d === 'Paused' ? (s.purchases >= 2 && roas >= target_roas ? 'Reopen' : s.purchases >= 1 && roas >= target_roas ? 'Reopen to test' : s.purchases >= 1 && roas >= retry_roas ? 'Retry with new creative' : 'Keep paused')
+          : '\u2014';
+        out.push({
+          window: k.window, adset_name, delivery: d, status, action, last_spend: s.last, spend: r2(s.spend), share_spend: r4(k.spend ? s.spend / k.spend : null),
+          impressions: s.impressions, link_clicks: s.link_clicks, lpv: s.lpv, checkouts: s.checkouts, purchases: s.purchases,
+          revenue: r2(s.revenue), roas: r2(roas), cpa: r2(s.spend / s.purchases), ctr: r4(s.link_clicks / s.impressions),
+          cpm: r2((s.spend / s.impressions) * 1000), cost_lpv: r2(s.spend / s.lpv),
+        });
+      }
+    }
+    return out;
+  },
+});
+
+dash.calc('ads', {
+  inputs: ['utd', 'kpi', 'rules'],
+  title: 'Ads by period',
+  description: 'Each ad\u2019s totals for every period with its current delivery status (an ad in a paused ad set counts as paused), a verdict and the action that follows.',
+  fn: (utd, kpi, rules) => {
+    const { target_roas, min_spend, retry_roas } = rules[0] || {};
+    const r2 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 100) / 100);
+    const r4 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 10000) / 10000);
+    const delivery = (st) => (!st ? 'Unknown' : st === 'ACTIVE' ? 'Active' : st.includes('PAUSED') || st === 'ARCHIVED' ? 'Paused' : 'Issue');
+    const out = [];
+    for (const k of kpi) {
+      const by = new Map();
+      utd.filter((r) => r.date_start >= k.start && r.date_start <= k.end).forEach((r) => {
+        const key = r.ad_id || r.adset_name + '|' + r.ad_name;
+        const s = by.get(key) || { ad_name: r.ad_name, adset_name: r.adset_name, spend: 0, impressions: 0, link_clicks: 0, purchases: 0, revenue: 0, last: '', st: '' };
+        s.spend += r.spend; s.impressions += r.impressions; s.link_clicks += r.inline_link_clicks; s.purchases += r.purchase; s.revenue += r.purchase_value;
+        if (r.date_start >= s.last) { s.last = r.date_start; s.st = r.ad_effective_status; }
+        by.set(key, s);
+      });
+      for (const [ad_id, s] of by) {
+        const roas = s.spend ? s.revenue / s.spend : null;
+        const status = s.purchases >= 2 && roas >= target_roas ? 'Scale' : s.purchases === 0 && s.spend >= min_spend ? 'Cut' : s.purchases === 0 ? 'Too early' : 'Watch';
+        const d = delivery(s.st);
+        const action = d === 'Issue' ? 'Fix delivery issue'
+          : d === 'Active' ? { Scale: 'Raise budget', Watch: 'Keep running', Cut: 'Pause', 'Too early': 'Keep testing' }[status]
+          : d === 'Paused' ? (s.purchases >= 2 && roas >= target_roas ? 'Reopen' : s.purchases >= 1 && roas >= target_roas ? 'Reopen to test' : s.purchases >= 1 && roas >= retry_roas ? 'Retry with new creative' : 'Keep paused')
+          : '\u2014';
+        out.push({
+          window: k.window, ad_id, ad_name: s.ad_name, adset_name: s.adset_name, delivery: d, meta_status: s.st, status, action,
+          spend: r2(s.spend), purchases: s.purchases, revenue: r2(s.revenue), roas: r2(roas), cpa: r2(s.spend / s.purchases), ctr: r4(s.link_clicks / s.impressions),
+        });
+      }
+    }
+    return out;
+  },
+});
+
+dash.calc('daily', {
+  inputs: ['utd'],
+  title: 'Results by day',
+  description: 'Spend, purchases and purchase value summed per day, with ROAS and cost per purchase; a day is partial when the statuses were fetched during it.',
+  fn: (utd) => {
+    const r2 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 100) / 100);
+    const by = new Map();
+    utd.forEach((r) => {
+      const s = by.get(r.date_start) || { spend: 0, purchases: 0, revenue: 0, link_clicks: 0, lpv: 0, impressions: 0 };
+      s.spend += r.spend; s.purchases += r.purchase; s.revenue += r.purchase_value;
+      s.link_clicks += r.inline_link_clicks; s.lpv += r.landing_page_view; s.impressions += r.impressions;
+      by.set(r.date_start, s);
+    });
+    const fetched = utd.reduce((m, r) => (r.status_fetched_at > m ? r.status_fetched_at : m), '').slice(0, 10);
+    return [...by].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, s]) => ({
+      date, partial: date === fetched, spend: r2(s.spend), purchases: s.purchases, revenue: r2(s.revenue), impressions: s.impressions,
+      link_clicks: s.link_clicks, lpv: s.lpv, roas: r2(s.revenue / s.spend), cpa: r2(s.spend / s.purchases),
+    }));
+  },
+});
+
+dash.calc('daily_adset', {
+  inputs: ['utd'],
+  title: 'Results by day and ad set',
+  description: 'Spend, purchases and purchase value per ad set per day, with ROAS and cost per purchase.',
+  fn: (utd) => {
+    const r2 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 100) / 100);
+    const by = new Map();
+    utd.forEach((r) => {
+      const key = r.date_start + '|' + r.adset_name;
+      const s = by.get(key) || { date: r.date_start, adset_name: r.adset_name, spend: 0, purchases: 0, revenue: 0 };
+      s.spend += r.spend; s.purchases += r.purchase; s.revenue += r.purchase_value;
+      by.set(key, s);
+    });
+    return [...by.values()].map((s) => ({
+      date: s.date, adset_name: s.adset_name, spend: r2(s.spend), purchases: s.purchases, revenue: r2(s.revenue),
+      roas: r2(s.revenue / s.spend), cpa: r2(s.spend / s.purchases),
+    }));
+  },
+});
+
+dash.calc('ages', {
+  inputs: ['breakdowns', 'kpi'],
+  title: 'Age groups by period',
+  description: 'Spend, purchases and purchase value per age group for every period, with each group\u2019s share of spend and of purchases.',
+  fn: (breakdowns, kpi) => {
+    const r2 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 100) / 100);
+    const r4 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 10000) / 10000);
+    const out = [];
+    for (const k of kpi) {
+      const rows = breakdowns.filter((r) => r.tab === 'age' && r.date_start >= k.start && r.date_start <= k.end);
+      const by = new Map();
+      let spend = 0, purchases = 0;
+      rows.forEach((r) => {
+        const s = by.get(r.segment) || { spend: 0, purchases: 0, revenue: 0, link_clicks: 0, impressions: 0 };
+        s.spend += r.spend; s.purchases += r.purchase || 0; s.revenue += r.purchase_value || 0;
+        s.link_clicks += r.inline_link_clicks; s.impressions += r.impressions;
+        spend += r.spend; purchases += r.purchase || 0;
+        by.set(r.segment, s);
+      });
+      for (const [age, s] of [...by].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+        out.push({
+          window: k.window, age, spend: r2(s.spend), share_spend: r4(spend ? s.spend / spend : null),
+          purchases: s.purchases, share_purchases: r4(purchases ? s.purchases / purchases : null),
+          revenue: r2(s.revenue), roas: r2(s.revenue / s.spend), cpa: r2(s.spend / s.purchases), ctr: r4(s.link_clicks / s.impressions),
+        });
+      }
+    }
+    return out;
+  },
+});
+
+dash.calc('genders', {
+  inputs: ['breakdowns', 'kpi'],
+  title: 'Gender by period',
+  description: 'Spend, link clicks and landing-page views per gender for every period, with share of spend, click-through rate and cost per landing-page view.',
+  fn: (breakdowns, kpi) => {
+    const r2 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 100) / 100);
+    const r4 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 10000) / 10000);
+    const out = [];
+    for (const k of kpi) {
+      const rows = breakdowns.filter((r) => r.tab === 'gender' && r.date_start >= k.start && r.date_start <= k.end);
+      const by = new Map();
+      let spend = 0;
+      rows.forEach((r) => {
+        const s = by.get(r.segment) || { spend: 0, impressions: 0, link_clicks: 0, lpv: 0 };
+        s.spend += r.spend; s.impressions += r.impressions; s.link_clicks += r.inline_link_clicks; s.lpv += r.landing_page_view;
+        spend += r.spend;
+        by.set(r.segment, s);
+      });
+      for (const [gender, s] of [...by].sort((a, b) => b[1].spend - a[1].spend)) {
+        out.push({
+          window: k.window, gender, spend: r2(s.spend), share_spend: r4(spend ? s.spend / spend : null), impressions: s.impressions,
+          link_clicks: s.link_clicks, lpv: s.lpv, ctr: r4(s.link_clicks / s.impressions), cost_lpv: r2(s.spend / s.lpv),
+        });
+      }
+    }
+    return out;
+  },
+});
+
+dash.calc('insights', {
+  inputs: ['kpi', 'adsets', 'daily', 'ages', 'genders', 'rules'],
+  title: 'What to do next',
+  description: 'Plain-language findings for each period: stalled delivery, ad sets to pause, scale or reopen given their current status, the biggest funnel drop and audience skews.',
+  fn: (kpi, adsets, daily, ages, genders, rules) => {
+    const { target_roas, min_spend } = rules[0] || {};
+    const $ = (x) => 'S$' + x.toFixed(2), pct = (x) => Math.round(x * 100) + '%', x2 = (x) => x.toFixed(2) + 'x';
+    const day = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    const sum = (rows, k) => rows.reduce((s, r) => s + (r[k] || 0), 0);
+    const list = (rows, f) => rows.map(f).join('; ');
+    const out = [];
+    const full = daily.filter((d) => !d.partial);
+    const partial = daily.find((d) => d.partial);
+    const lastDay = full[full.length - 1];
+    const before = full.slice(-8, -1);
+    const avg = before.length ? sum(before, 'spend') / before.length : 0;
+    const life = adsets.filter((a) => a.window === 'all');
+    const activeSets = life.filter((a) => a.delivery === 'Active');
+    const issues = life.filter((a) => a.delivery === 'Issue');
+    const reopen = life.filter((a) => a.action === 'Reopen' || a.action === 'Reopen to test' || a.action === 'Retry with new creative').sort((a, b) => b.roas - a.roas);
+    for (const k of kpi) {
+      const w = k.window, items = [];
+      const span = { all: 'since launch', '14d': 'in the last 14 days', '7d': 'in the last 7 days', '3d': 'in the last 3 days' }[w];
+      if (issues.length) items.push({ tone: 'bad', head: 'Fix delivery', text: `Meta reports a problem with ${list(issues, (a) => a.adset_name)}. Open it in Ads Manager to see the review or delivery issue.` });
+      if (lastDay && avg > 0 && lastDay.spend < 0.25 * avg) {
+        items.push(activeSets.length
+          ? { tone: 'bad', head: 'Delivery stalled', text: `Spend fell to ${$(lastDay.spend)} on ${day(lastDay.date)}, against ${$(avg)} a day in the week before, while ${activeSets.length} ad set${activeSets.length > 1 ? 's are' : ' is'} still active. Check budgets, bid caps, the payment method and ad review in Ads Manager.${partial ? ` ${day(partial.date)} is still in progress, so it is left out.` : ''}` }
+          : { tone: 'info', head: 'Everything is paused', text: `No ad set is active, so spend has stopped as expected.` });
+      }
+      if (k.spend > 0 && k.purchases > 0) {
+        const trend = k.d_roas == null ? '' : ` ROAS is ${k.d_roas >= 0 ? 'up' : 'down'} ${pct(Math.abs(k.d_roas))} on the ${k.days} days before.`;
+        items.push({ tone: k.roas >= target_roas ? 'good' : 'bad', head: k.roas >= target_roas ? 'Above target' : 'Below target', text: `Every S$1 spent ${span} brought back ${$(k.roas)} in purchases: ROAS ${x2(k.roas)} on ${$(k.spend)}, ${k.purchases} purchases at ${$(k.cpa)} each, against a ${x2(target_roas)} target.${trend}` });
+      } else if (k.spend > 0) {
+        items.push({ tone: 'bad', head: 'No purchases', text: `${$(k.spend)} spent ${span} with no purchases recorded.` });
+      }
+      const rows = adsets.filter((a) => a.window === w);
+      const pause = rows.filter((a) => a.action === 'Pause');
+      if (pause.length) items.push({ tone: 'bad', head: 'Pause now', text: `${pause.length} active ad set${pause.length > 1 ? 's have' : ' has'} spent ${$(sum(pause, 'spend'))} ${span} with no purchases after ${$(min_spend)} or more each: ${list(pause, (a) => a.adset_name)}. Pause ${pause.length > 1 ? 'them' : 'it'} and move the budget to the winners.` });
+      const scale = rows.filter((a) => a.action === 'Raise budget').sort((a, b) => b.roas - a.roas).slice(0, 2);
+      if (scale.length) items.push({ tone: 'good', head: 'Scale', text: list(scale, (a) => `${a.adset_name} returns ${x2(a.roas)} (${a.purchases} purchases at ${$(a.cpa)})`) + '. Raise budgets in steps of about 20% so delivery stays stable.' });
+      if (reopen.length) items.push({ tone: 'good', head: 'Reopen', text: list(reopen, (a) => `${a.adset_name}: ${a.action.toLowerCase()} (ROAS ${x2(a.roas)} from ${a.purchases} purchase${a.purchases > 1 ? 's' : ''} before it was paused)`) + '. One purchase is a thin signal, so reopen on a small budget and check again after a few days.' });
+      const steps = [['from click to landing page', k.lpv_rate], ['from landing page to checkout', k.checkout_rate], ['from checkout to purchase', k.close_rate]].filter((s) => s[1] != null);
+      if (steps.length) {
+        const worst = steps.reduce((a, b) => (b[1] < a[1] ? b : a));
+        items.push({ tone: 'warn', head: 'Biggest leak', text: `The funnel loses the most people ${worst[0]}: only ${pct(worst[1])} get through. ${worst[0].includes('checkout to') ? 'Test the checkout: payment options, fees shown late, forced sign-up.' : worst[0].includes('landing page to') ? 'Make the landing page match the ad and put the offer and button above the fold.' : 'Pages are loading slowly or people bounce before they load; check page speed on mobile.'}` });
+      }
+      const ag = ages.filter((a) => a.window === w && a.spend > 0);
+      const winners = ag.filter((a) => a.purchases > 0).sort((a, b) => b.roas - a.roas);
+      const zero = ag.filter((a) => a.purchases === 0 && a.spend >= min_spend);
+      if (winners.length) {
+        const b = winners[0];
+        items.push({ tone: zero.length ? 'warn' : 'info', head: 'Audience', text: `${b.age} is the most efficient age group: ROAS ${x2(b.roas)}, ${pct(b.share_purchases)} of purchases on ${pct(b.share_spend)} of spend.` + (zero.length ? ` ${zero.map((a) => a.age).join(', ')} spent ${$(sum(zero, 'spend'))} with no purchases; consider narrowing the age range.` : '') });
+      }
+      const top = genders.filter((g) => g.window === w).sort((a, b) => b.spend - a.spend)[0];
+      if (top && top.share_spend >= 0.6) items.push({ tone: 'info', head: 'Delivery skew', text: `Meta is putting ${pct(top.share_spend)} of spend on ${top.gender} viewers. The Gender tab has no purchase columns yet, so add them before steering by gender.` });
+      items.forEach((item, i) => out.push({ window: w, rank: i + 1, ...item }));
+    }
+    return out;
+  },
+});
+
+// Add each new charity campaign here: Meta campaign name -> charity, campaign title, campaign page.
+const CAMPAIGNS = {
+  'TGC_CONV_LUNI-CIKZIE_OCT26': { charity: 'Luni Singapore', title: "Let's Save Singapore's Homeless Cats from Hunger", url: 'https://thegivecollective.com/campaigns/commcatfeeding/' },
+};
+const info = (name) => CAMPAIGNS[name] || { charity: '\u2014', title: name, url: '' };
+const NAMES = [...new Set(SNAPSHOT.utd.map((r) => r.campaign_name))].sort();
+const runCalcs = (utd, breakdowns) => {
+  const out = { utd, breakdowns };
+  for (const id of ['rules', 'kpi', 'adsets', 'ads', 'daily', 'daily_adset', 'ages', 'genders', 'insights']) out[id] = C[id].fn(...C[id].inputs.map((i) => out[i]));
+  return out;
+};
+const ALL = runCalcs(SNAPSHOT.utd, SNAPSHOT.breakdowns);
+let D = ALL;
+
+const state = { campaign: 'all', win: '7d', metric: 'spend', adset: null, show: 'all', sortKey: 'spend', sortDir: -1 };
+try { const s = JSON.parse(localStorage.getItem('tgc-report') || '{}'); if (s.win) state.win = s.win; if (s.metric) state.metric = s.metric; if (s.campaign && (s.campaign === 'all' || NAMES.includes(s.campaign))) state.campaign = s.campaign; } catch (e) {}
+const save = () => { try { localStorage.setItem('tgc-report', JSON.stringify({ win: state.win, metric: state.metric, campaign: state.campaign })); } catch (e) {} };
+const compute = () => {
+  const c = state.campaign, keep = (r) => c === 'all' || r.campaign_name === c;
+  D = c === 'all' ? ALL : runCalcs(SNAPSHOT.utd.filter(keep), SNAPSHOT.breakdowns.filter(keep));
+};
+compute();
+const pickCampaign = (name) => { state.campaign = name; state.adset = null; save(); compute(); render(); };
+const select = document.getElementById('campaign');
+select.append(new Option('All campaigns', 'all'), ...NAMES.map((n) => new Option(`${info(n).charity} \u00b7 ${info(n).title}`, n)));
+select.addEventListener('change', () => pickCampaign(select.value));
+document.querySelector('#camptable tbody').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr[data-name]');
+  if (tr) pickCampaign(state.campaign === tr.dataset.name ? 'all' : tr.dataset.name);
+});
+
+const money = (v) => 'S$' + d3.format(',.2f')(v);
+const F = {
+  spend: money, revenue: money, cpa: money, cpm: money, cpc: money, cost_lpv: money, aov: money,
+  roas: (v) => d3.format('.2f')(v) + 'x', ctr: d3.format('.2%'), share: d3.format('.0%'), rate: d3.format('.0%'),
+};
+const fmt = (k, v) => (v == null || Number.isNaN(v) ? '\u2014' : (F[k] || d3.format(','))(v));
+const cur = () => D.kpi.find((k) => k.window === state.win);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const winWords = { all: 'since launch', '14d': 'in the last 14 days', '7d': 'in the last 7 days', '3d': 'in the last 3 days' };
+const lowerBetter = new Set(['cpa', 'cpm', 'cpc', 'cost_lpv']);
+const metricName = { spend: 'Spend', revenue: 'Value', purchases: 'Purchases', roas: 'ROAS', cpa: 'Cost/purchase' };
+
+document.querySelectorAll('[data-metric-group]').forEach((g) => {
+  for (const [k, n] of Object.entries(metricName)) {
+    const b = el('button', null, n); b.type = 'button'; b.dataset.metric = k;
+    b.addEventListener('click', () => { state.metric = k; save(); render(); });
+    g.append(b);
+  }
+});
+document.querySelectorAll('[data-win]').forEach((b) => b.addEventListener('click', () => { state.win = b.dataset.win; save(); render(); }));
+document.querySelectorAll('.picked').forEach((b) => b.addEventListener('click', () => { state.adset = null; render(); }));
+
+function renderCampaigns() {
+  const c = state.campaign, inf = info(c);
+  select.value = c;
+  document.getElementById('camp-eyebrow').textContent = c === 'all' ? `${NAMES.length} charity campaign${NAMES.length === 1 ? '' : 's'} \u00b7 Singapore \u00b7 SGD` : `${inf.charity} \u00b7 ${c} \u00b7 SGD`;
+  document.getElementById('camp-title').textContent = c === 'all' ? 'Every campaign at a glance' : inf.title;
+  const sub = document.getElementById('camp-sub');
+  if (c === 'all') sub.textContent = 'Facebook and Instagram ads driving gifts to charity campaigns on thegivecollective.com. Pick a campaign to focus the page on it.';
+  else if (inf.url) { const a = el('a', null, 'the campaign page'); a.href = inf.url; sub.replaceChildren('Facebook and Instagram ads for this campaign. See ', a, ' on thegivecollective.com.'); }
+  else sub.textContent = 'Facebook and Instagram ads for this campaign.';
+  const K = ALL.kpi.find((x) => x.window === state.win);
+  document.getElementById('camp-note').textContent = `Same period for every campaign: ${d3.utcFormat('%b %-d')(new Date(K.start))} to ${d3.utcFormat('%b %-d')(new Date(K.end))}. Click a campaign to focus the page on it; click again to see them all.`;
+  const target = ALL.rules[0].target_roas;
+  const rows = NAMES.map((name) => {
+    const s = { spend: 0, purchases: 0, revenue: 0, clicks: 0, impressions: 0 };
+    SNAPSHOT.utd.filter((r) => r.campaign_name === name && r.date_start >= K.start && r.date_start <= K.end).forEach((r) => {
+      s.spend += r.spend; s.purchases += r.purchase; s.revenue += r.purchase_value; s.clicks += r.inline_link_clicks; s.impressions += r.impressions;
+    });
+    const latest = SNAPSHOT.utd.filter((r) => r.campaign_name === name).reduce((m, r) => (r.date_start >= m.date_start ? r : m));
+    const st = latest.campaign_effective_status;
+    return { name, delivery: !st ? 'Unknown' : st === 'ACTIVE' ? 'Active' : st.includes('PAUSED') || st === 'ARCHIVED' ? 'Paused' : 'Issue', ...s };
+  }).sort((a, b) => b.spend - a.spend);
+  document.querySelector('#camptable tbody').replaceChildren(...rows.map((r) => {
+    const tr = el('tr', 'click' + (r.name === c ? ' sel' : ''));
+    tr.dataset.name = r.name;
+    const roas = r.spend ? r.revenue / r.spend : null;
+    const ro = el('td', null, fmt('roas', roas));
+    if (roas != null) ro.style.color = r.purchases === 0 ? 'var(--bad)' : roas >= target ? 'var(--good)' : 'var(--warn)';
+    const first = el('td'); first.append(el('div', null, info(r.name).title), el('div', 'note', r.name));
+    const stc = el('td'); stc.append(el('span', 'live d-' + r.delivery, r.delivery));
+    tr.append(first, el('td', null, info(r.name).charity), stc, el('td', null, fmt('spend', r.spend)), el('td', null, fmt('n', r.purchases)), el('td', null, fmt('revenue', r.revenue)), ro,
+      el('td', null, fmt('cpa', r.purchases ? r.spend / r.purchases : null)), el('td', null, fmt('ctr', r.impressions ? r.clicks / r.impressions : null)));
+    return tr;
+  }));
+}
+
+let doneMap = {};
+let showAll = false;
+const TOP = 5;
+try { doneMap = JSON.parse(localStorage.getItem('tgc-done') || '{}'); } catch (e) {}
+const saveDone = () => { try { localStorage.setItem('tgc-done', JSON.stringify(doneMap)); } catch (e) {} };
+const ACCOUNT = (SNAPSHOT.utd.find((r) => r.ad_account_id) || {}).ad_account_id || '';
+const adsetId = (name) => (SNAPSHOT.utd.find((r) => r.adset_name === name && r.adset_id) || {}).adset_id || '';
+const amLink = (level, id) => {
+  const act = ACCOUNT.replace(/^act_/, '');
+  if (!act) return 'https://adsmanager.facebook.com/adsmanager/manage/campaigns';
+  return `https://adsmanager.facebook.com/adsmanager/manage/${level}?act=${act}` + (id ? `&selected_${level === 'adsets' ? 'adset' : 'campaign'}_ids=${id}` : '');
+};
+const shortName = (n) => { const i = n.indexOf(' - '); return i > 0 ? n.slice(0, i) : n; };
+const plural = (n, w) => `${fmt('n', n)} ${w}${n === 1 ? '' : 's'}`;
+document.getElementById('more').addEventListener('click', () => { showAll = !showAll; renderActions(); });
+
+function buildActions() {
+  const rows = D.adsets.filter((r) => r.window === state.win);
+  const life = D.adsets.filter((r) => r.window === 'all');
+  const week = new Map(D.adsets.filter((r) => r.window === '7d').map((r) => [r.adset_name, r.spend]));
+  const list = [];
+  const full = D.daily.filter((d) => !d.partial), last = full[full.length - 1], before = full.slice(-8, -1);
+  const avg = before.length ? before.reduce((s, d) => s + d.spend, 0) / before.length : 0;
+  const active = life.filter((a) => a.delivery === 'Active').length;
+  if (last && avg > 0 && last.spend < 0.25 * avg && active) list.push({ kind: 'fix', verb: 'Check delivery', what: 'Spend has almost stopped', why: `${fmt('spend', last.spend)} spent on ${d3.utcFormat('%b %-d')(new Date(last.date))} against ${fmt('spend', avg)} a day before, with ${active} ad sets still on. Check budget, billing and ad review.`, link: amLink('campaigns'), key: 'stalled' });
+  for (const r of life.filter((x) => x.delivery === 'Issue')) list.push({ kind: 'fix', verb: 'Fix', what: shortName(r.adset_name), full: r.adset_name, why: 'Meta reports a review or delivery problem.', link: amLink('adsets', adsetId(r.adset_name)), key: 'issue|' + r.adset_name });
+  for (const r of rows.filter((x) => x.action === 'Pause').sort((a, b) => b.spend - a.spend)) list.push({ kind: 'pause', verb: 'Pause', what: shortName(r.adset_name), full: r.adset_name, why: `No purchase after ${fmt('spend', r.spend)}.${week.get(r.adset_name) ? ` Frees about ${fmt('spend', week.get(r.adset_name))} a week.` : ''}`, link: amLink('adsets', adsetId(r.adset_name)), key: 'Pause|' + r.adset_name });
+  for (const r of rows.filter((x) => x.action === 'Raise budget').sort((a, b) => b.roas - a.roas)) list.push({ kind: 'scale', verb: 'Raise budget', what: shortName(r.adset_name), full: r.adset_name, why: `${fmt('roas', r.roas)} ROAS from ${plural(r.purchases, 'purchase')}. Add about 20%, then wait 2 to 3 days.`, link: amLink('adsets', adsetId(r.adset_name)), key: 'Raise|' + r.adset_name });
+  const rank = { Reopen: 0, 'Reopen to test': 1, 'Retry with new creative': 2 };
+  for (const r of life.filter((x) => x.action in rank).sort((a, b) => rank[a.action] - rank[b.action] || b.roas - a.roas)) list.push({
+    kind: r.action === 'Retry with new creative' ? 'retry' : 'reopen', verb: r.action, what: shortName(r.adset_name), full: r.adset_name,
+    why: r.action === 'Retry with new creative' ? `${fmt('roas', r.roas)} from ${plural(r.purchases, 'purchase')} before pausing. Relaunch with a new creative.`
+      : r.action === 'Reopen' ? `${fmt('roas', r.roas)} from ${plural(r.purchases, 'purchase')} before pausing. Turn it back on.`
+        : `${fmt('roas', r.roas)} from ${plural(r.purchases, 'purchase')} before pausing. Restart on a small budget.`,
+    link: amLink('adsets', adsetId(r.adset_name)), key: r.action + '|' + r.adset_name });
+  const seen = {};
+  list.forEach((x) => { if (x.full) seen[x.what] = (seen[x.what] || 0) + 1; });
+  list.forEach((x) => { if (x.full && seen[x.what] > 1) x.what = x.full; });
+  return list;
+}
+
+function renderActions() {
+  const all = buildActions();
+  const doneKey = (a) => state.campaign + '|' + a.key;
+  const nDone = all.filter((a) => doneMap[doneKey(a)]).length;
+  document.getElementById('ac-done').textContent = nDone;
+  document.getElementById('ac-total').textContent = all.length;
+  const open = all.filter((a) => !doneMap[doneKey(a)]), done = all.filter((a) => doneMap[doneKey(a)]);
+  const shown = showAll ? [...open, ...done] : open.slice(0, TOP);
+  const more = document.getElementById('more');
+  const hiddenCount = all.length - shown.length;
+  more.hidden = !showAll && hiddenCount === 0;
+  more.textContent = showAll ? 'Show fewer' : `Show ${hiddenCount} more${done.length ? ' (including done)' : ''}`;
+  const prio = document.getElementById('prio');
+  if (!all.length) { prio.replaceChildren(el('li', 'empty', 'Nothing to act on for this period. Everything is on track.')); return; }
+  if (!shown.length) { prio.replaceChildren(el('li', 'empty', 'All done for now.')); window.__actions = []; return; }
+  prio.replaceChildren(...shown.map((a) => {
+    const isDone = !!doneMap[doneKey(a)];
+    const li = el('li', `k-${a.kind}${isDone ? ' is-done' : ''}`);
+    const main = el('div', 'main'), l1 = el('div', 'line1');
+    l1.append(el('span', 'verb', a.verb), el('span', 'what', a.what));
+    main.append(l1, el('span', 'why', a.why));
+    if (a.full) main.title = a.full;
+    const go = el('a', 'go', 'Open \u2197'); go.href = a.link; go.target = '_blank'; go.rel = 'noopener'; go.setAttribute('aria-label', `Open ${a.what} in Ads Manager`);
+    const cb = el('input', 'tick'); cb.type = 'checkbox'; cb.checked = isDone; cb.setAttribute('aria-label', `Mark "${a.verb} ${a.what}" done`);
+    cb.addEventListener('change', () => { if (cb.checked) doneMap[doneKey(a)] = Date.now(); else delete doneMap[doneKey(a)]; saveDone(); renderActions(); });
+    li.append(el('span', 'n', String(all.indexOf(a) + 1)), main, go, cb);
+    return li;
+  }));
+  window.__actions = open;
+}
+
+const toast = (msg) => { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 2200); };
+document.getElementById('copy-list').addEventListener('click', () => {
+  const lines = (window.__actions || []).map((a, i) => `${i + 1}. ${a.verb}: ${a.full || a.what}. ${a.why}`);
+  const text = `The Give Collective: Meta ads to-do (${select.options[select.selectedIndex].text})\n` + (lines.length ? lines.join('\n') : 'Nothing open.');
+  const fallback = () => { const ta = el('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.append(ta); ta.select(); try { document.execCommand('copy'); toast('Checklist copied'); } catch (e) { toast('Select and copy the checklist manually'); } ta.remove(); };
+  try { navigator.clipboard.writeText(text).then(() => toast('Checklist copied'), fallback); } catch (e) { fallback(); }
+});
+
+function renderHead() {
+  const k = cur();
+  document.querySelectorAll('[data-win]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.win === state.win)));
+  document.querySelectorAll('[data-metric]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.metric === state.metric)));
+  document.getElementById('fresh').textContent = `${d3.utcFormat('%b %-d')(new Date(k.start))} to ${d3.utcFormat('%b %-d, %Y')(new Date(k.end))} \u00b7 statuses as of ${SNAPSHOT.taken}`;
+  document.getElementById('roas-num').textContent = fmt('roas', k.roas);
+  const say = document.getElementById('roas-say');
+  say.replaceChildren(`Every S$1 spent ${winWords[state.win]} brought back `, el('b', null, fmt('spend', k.roas)), ` in purchases: ${fmt('revenue', k.revenue)} from ${fmt('spend', k.spend)} of ads.`);
+  const tiles = [['revenue', 'Purchase value'], ['purchases', 'Purchases'], ['cpa', 'Cost per purchase'], ['spend', 'Ad spend'], ['ctr', 'Link click-through'], ['lpv', 'Landing-page views']];
+  document.getElementById('kpis').replaceChildren(...tiles.map(([key, lab]) => {
+    const t = el('div', 'kpi ' + (key === 'revenue' || key === 'purchases' ? 'money' : 'cost'));
+    const d = k['d_' + key];
+    const chg = el('span', 'chg', d == null ? (state.win === 'all' || state.win === '14d' ? 'No earlier period to compare' : '\u2014') : `${d > 0 ? '+' : ''}${d3.format('.0%')(d)} vs ${k.days} days before`);
+    if (d != null && key !== 'spend' && d !== 0) chg.classList.add((d > 0) !== lowerBetter.has(key) ? 'up' : 'down');
+    t.append(el('span', 'lab', lab), el('span', 'val', fmt(key, k[key])), chg);
+    return t;
+  }));
+  const r = D.rules[0];
+  document.getElementById('rule-note').textContent = `Most urgent first, based on ${({ all: 'everything since launch', '14d': 'the last 14 days', '7d': 'the last 7 days', '3d': 'the last 3 days' })[state.win]} and a ${fmt('roas', r.target_roas)} target ROAS.`;
+  renderActions();
+  document.querySelectorAll('.picked').forEach((b) => { b.hidden = !state.adset; b.textContent = state.adset ? 'Following: ' + state.adset + '  \u00d7' : ''; });
+}
+
+function renderFunnel() {
+  const k = cur();
+  document.getElementById('funnel-note').textContent = `${d3.format(',')(k.impressions)} impressions ${winWords[state.win]}.`;
+  const keys = [['link_clicks', 'Link clicks'], ['lpv', 'Landing-page views'], ['checkouts', 'Checkouts'], ['purchases', 'Purchases']];
+  const rates = [['lpv_rate', 'reach the landing page'], ['checkout_rate', 'start a checkout'], ['close_rate', 'of checkouts end in a purchase']];
+  const avail = rates.filter(([r]) => k[r] != null);
+  const worst = avail.length ? avail.reduce((a, b) => (k[b[0]] < k[a[0]] ? b : a))[0] : null;
+  const max = Math.max(1, ...keys.map(([x]) => Math.max(k[x] || 0, k['p_' + x] || 0)));
+  const body = document.getElementById('funnel-body');
+  body.replaceChildren();
+  keys.forEach(([key, lab], i) => {
+    const row = el('div', 'frow'), bar = el('div', 'fbar'), c = el('div', 'c');
+    c.style.width = (100 * (k[key] || 0)) / max + '%';
+    if (key === 'purchases' || key === 'checkouts') c.style.background = 'var(--pink)';
+    bar.append(c);
+    if (k['p_' + key] != null) { const p = el('div', 'p'); p.style.width = (100 * k['p_' + key]) / max + '%'; bar.append(p); }
+    row.append(el('span', null, lab), bar, el('b', null, fmt('n', k[key])));
+    body.append(row);
+    if (i < rates.length) {
+      const [rk, words] = rates[i], s = el('div', 'fstep'), b = el('b', rk === worst ? 'worst' : null, fmt('rate', k[rk]));
+      s.append(b, ' ' + words);
+      body.append(s);
+    }
+  });
+}
+
+function renderTrend() {
+  const box = document.getElementById('trend');
+  box.replaceChildren();
+  const days = D.daily, k = cur(), metric = state.metric, isLine = metric === 'roas' || metric === 'cpa';
+  const f = (v) => fmt(metric, v);
+  const per = state.adset ? new Map(D.daily_adset.filter((r) => r.adset_name === state.adset).map((r) => [r.date, r[metric]])) : null;
+  const W = Math.max(280, box.clientWidth), H = 250, mt = 12, mb = 28, mr = 12;
+  const vals = days.map((d) => d[metric]).concat(per ? [...per.values()] : []).filter((v) => v != null);
+  if (metric === 'roas') vals.push(D.rules[0].target_roas);
+  const y = d3.scaleLinear([0, (d3.max(vals) || 1) * 1.08], [H - mb, mt]).nice();
+  const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Daily ' + metricName[metric]);
+  const ticks = y.ticks(4);
+  const probe = svg.append('text').attr('font-size', 12).attr('font-family', 'Mulish, sans-serif');
+  const ml = 10 + d3.max(ticks, (t) => { probe.text(f(t)); return probe.node().getComputedTextLength(); });
+  probe.remove();
+  const x = d3.scaleBand(days.map((d) => d.date), [ml, W - mr]).padding(0.28);
+  const inWin = (d) => d >= k.start && d <= k.end;
+  const inside = days.filter((d) => inWin(d.date));
+  if (inside.length) svg.append('rect').attr('x', x(inside[0].date) - (x.step() * x.paddingInner()) / 2).attr('y', mt).attr('width', x.step() * inside.length).attr('height', H - mb - mt).attr('rx', 8).attr('fill', 'var(--teal-soft)');
+  svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', ml).attr('x2', W - mr).attr('y1', (t) => y(t)).attr('y2', (t) => y(t)).attr('stroke', 'var(--grid)');
+  svg.append('g').selectAll('text').data(ticks).join('text').attr('x', ml - 8).attr('y', (t) => y(t)).attr('dy', '0.32em').attr('text-anchor', 'end').attr('font-size', 12).attr('fill', 'var(--muted)').text(f);
+  const every = Math.max(1, Math.ceil(days.length / Math.max(1, Math.floor((W - ml) / 58))));
+  svg.append('g').selectAll('text').data(days.filter((d, i) => i % every === 0)).join('text').attr('x', (d) => x(d.date) + x.bandwidth() / 2).attr('y', H - 8).attr('text-anchor', 'middle').attr('font-size', 12).attr('fill', 'var(--muted)').text((d) => d3.utcFormat('%b %-d')(new Date(d.date)));
+  if (metric === 'roas') {
+    const ty = y(D.rules[0].target_roas);
+    svg.append('line').attr('x1', ml).attr('x2', W - mr).attr('y1', ty).attr('y2', ty).attr('stroke', 'var(--pink-ink)').attr('stroke-dasharray', '5 4');
+    svg.append('text').attr('x', W - mr).attr('y', ty - 5).attr('text-anchor', 'end').attr('font-size', 12).attr('font-weight', 700).attr('fill', 'var(--pink-ink)').text('target ' + f(D.rules[0].target_roas));
+  }
+  const accent = ['revenue', 'purchases', 'roas'].includes(metric) ? 'var(--pink)' : 'var(--teal)';
+  const main = per ? 'var(--grey)' : accent, hi = accent === 'var(--pink)' ? 'var(--teal)' : 'var(--pink)';
+  const cx = (d) => x(d) + x.bandwidth() / 2;
+  if (!isLine) {
+    svg.append('g').selectAll('rect').data(days).join('rect').attr('x', (d) => x(d.date)).attr('width', x.bandwidth()).attr('y', (d) => y(d[metric] || 0)).attr('height', (d) => y(0) - y(d[metric] || 0)).attr('rx', 4).attr('fill', main).attr('opacity', (d) => (d.partial ? 0.3 : inWin(d.date) ? 1 : 0.4));
+    if (per) svg.append('g').selectAll('rect').data(days).join('rect').attr('x', (d) => x(d.date) + x.bandwidth() * 0.2).attr('width', x.bandwidth() * 0.6).attr('y', (d) => y(per.get(d.date) || 0)).attr('height', (d) => y(0) - y(per.get(d.date) || 0)).attr('rx', 3).attr('fill', hi);
+  } else {
+    const draw = (get, color) => {
+      svg.append('path').datum(days).attr('d', d3.line().defined((d) => get(d) != null).x((d) => cx(d.date)).y((d) => y(get(d)))).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2.5).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+      svg.append('g').selectAll('circle').data(days.filter((d) => get(d) != null)).join('circle').attr('cx', (d) => cx(d.date)).attr('cy', (d) => y(get(d))).attr('r', 3.5).attr('fill', color);
+    };
+    draw((d) => d[metric], main);
+    if (per) draw((d) => per.get(d.date) ?? null, hi);
+  }
+  svg.append('line').attr('x1', ml).attr('x2', W - mr).attr('y1', y(0)).attr('y2', y(0)).attr('stroke', 'var(--line)');
+  const tip = el('div', 'tip'); tip.hidden = true; box.append(tip);
+  svg.append('g').selectAll('rect').data(days).join('rect').attr('x', (d) => x(d.date) - (x.step() * x.paddingInner()) / 2).attr('width', x.step()).attr('y', mt).attr('height', H - mb - mt).attr('fill', 'transparent')
+    .on('mousemove', (event, d) => {
+      const line = (color, name, v) => { const r = el('div'); if (color) { const i = el('i'); i.style.background = color; r.append(i); } r.append(name + ': ' + f(v)); return r; };
+      tip.replaceChildren(el('div', 'd', d3.utcFormat('%a %b %-d')(new Date(d.date)) + (d.partial ? ' (day in progress)' : '')), line(per ? 'var(--grey)' : null, per ? 'All ad sets' : metricName[metric], d[metric]));
+      if (per) tip.append(line(hi, 'This ad set', per.get(d.date) ?? null));
+      tip.hidden = false;
+      const [px, py] = d3.pointer(event, box);
+      tip.style.left = Math.max(0, Math.min(box.clientWidth - tip.offsetWidth, px + 12)) + 'px';
+      tip.style.top = Math.max(0, py - 44) + 'px';
+    })
+    .on('mouseleave', () => { tip.hidden = true; });
+}
+
+const statusOrder = { Scale: 0, Watch: 1, 'Too early': 2, Cut: 3 };
+document.querySelectorAll('#adtable th button').forEach((b) => b.addEventListener('click', () => {
+  const key = b.parentElement.dataset.k;
+  state.sortDir = key === state.sortKey ? -state.sortDir : ['adset_name', 'status', 'action', 'delivery', 'cpa', 'cost_lpv'].includes(key) ? 1 : -1;
+  state.sortKey = key;
+  document.querySelectorAll('#adtable th').forEach((th) => { if (th.dataset.k === key) th.setAttribute('aria-sort', state.sortDir > 0 ? 'ascending' : 'descending'); else th.removeAttribute('aria-sort'); });
+  renderTable();
+}));
+document.getElementById('search').addEventListener('input', () => renderTable());
+document.querySelector('#adtable tbody').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr[data-name]');
+  if (tr) { state.adset = state.adset === tr.dataset.name ? null : tr.dataset.name; render(); }
+});
+const barBg = (color, share) => `linear-gradient(to left, color-mix(in srgb, ${color} 24%, transparent) ${Math.max(0, Math.min(100, 100 * (share || 0)))}%, transparent 0)`;
+
+const actTone = { 'Raise budget': 'a-good', Reopen: 'a-good', 'Reopen to test': 'a-pink', 'Retry with new creative': 'a-warn', Pause: 'a-bad', 'Fix delivery issue': 'a-bad', 'Keep running': '', 'Keep testing': 'a-muted', 'Keep paused': 'a-muted' };
+const liveCell = (d) => { const td = el('td'); td.append(el('span', 'live d-' + d, d)); td.style.textAlign = 'left'; return td; };
+const actCell = (a) => { const td = el('td'); td.append(el('span', 'act ' + (actTone[a] || ''), a)); td.style.textAlign = 'left'; return td; };
+const actOrder = { Pause: 0, 'Fix delivery issue': 0, Reopen: 1, 'Reopen to test': 2, 'Raise budget': 3, 'Retry with new creative': 4, 'Keep running': 5, 'Keep testing': 6, 'Keep paused': 7 };
+document.querySelectorAll('[data-show]').forEach((b) => b.addEventListener('click', () => { state.show = b.dataset.show; renderTable(); renderAds(); }));
+
+function renderAds() {
+  const target = D.rules[0].target_roas;
+  const rows = D.ads.filter((r) => r.window === state.win && (state.show === 'all' || r.delivery === state.show)).sort((a, b) => b.spend - a.spend);
+  document.querySelector('#adstable tbody').replaceChildren(...rows.map((r) => {
+    const tr = el('tr', r.adset_name === state.adset ? 'sel' : null);
+    const ro = el('td', null, fmt('roas', r.roas));
+    if (r.purchases === 0) ro.style.color = 'var(--bad)'; else if (r.roas >= target) ro.style.color = 'var(--good)';
+    const st = liveCell(r.delivery);
+    if (r.meta_status === 'ADSET_PAUSED') st.firstChild.textContent = 'Paused (ad set)';
+    tr.append(el('td', null, r.ad_name), el('td', null, r.adset_name), st, actCell(r.action), el('td', null, fmt('spend', r.spend)), el('td', null, fmt('n', r.purchases)), el('td', null, fmt('revenue', r.revenue)), ro, el('td', null, fmt('ctr', r.ctr)));
+    return tr;
+  }));
+}
+
+function renderTable() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const target = D.rules[0].target_roas;
+  document.querySelectorAll('[data-show]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.show === state.show)));
+  const rows = D.adsets.filter((r) => r.window === state.win && (state.show === 'all' || r.delivery === state.show) && (!q || r.adset_name.toLowerCase().includes(q)));
+  const val = (r) => (state.sortKey === 'status' ? statusOrder[r.status] : state.sortKey === 'action' ? actOrder[r.action] : r[state.sortKey]);
+  rows.sort((a, b) => { const va = val(a), vb = val(b); if (va == null) return 1; if (vb == null) return -1; return (va < vb ? -1 : va > vb ? 1 : 0) * state.sortDir; });
+  const max = d3.max(rows, (r) => r.spend) || 1;
+  document.querySelector('#adtable tbody').replaceChildren(...rows.map((r) => {
+    const tr = el('tr', 'click' + (r.adset_name === state.adset ? ' sel' : ''));
+    tr.dataset.name = r.adset_name;
+    const st = el('td'); st.append(el('span', 'pill p-' + r.status.split(' ')[0], r.status));
+    const sp = el('td', 'bar', fmt('spend', r.spend)); sp.style.backgroundImage = barBg('var(--teal)', r.spend / max);
+    const ro = el('td', null, fmt('roas', r.roas));
+    if (r.purchases === 0) ro.style.color = 'var(--bad)'; else if (r.roas >= target) ro.style.color = 'var(--good)';
+    tr.append(el('td', null, r.adset_name), liveCell(r.delivery), actCell(r.action), st, sp, el('td', null, fmt('share', r.share_spend)), el('td', null, fmt('n', r.purchases)), el('td', null, fmt('revenue', r.revenue)), ro, el('td', null, fmt('cpa', r.cpa)), el('td', null, fmt('ctr', r.ctr)), el('td', null, fmt('cost_lpv', r.cost_lpv)));
+    return tr;
+  }));
+}
+
+function renderSegments() {
+  document.querySelector('#agetable tbody').replaceChildren(...D.ages.filter((r) => r.window === state.win).map((r) => {
+    const tr = el('tr');
+    const ss = el('td', 'bar', fmt('share', r.share_spend)); ss.style.backgroundImage = barBg('var(--teal)', r.share_spend);
+    const sp = el('td', 'bar', fmt('share', r.share_purchases)); sp.style.backgroundImage = barBg('var(--pink)', r.share_purchases);
+    const ro = el('td', null, fmt('roas', r.roas)); if (r.purchases === 0 && r.spend >= 5) ro.style.color = 'var(--bad)';
+    tr.append(el('td', null, r.age), el('td', null, fmt('spend', r.spend)), ss, el('td', null, fmt('n', r.purchases)), sp, ro);
+    return tr;
+  }));
+  document.querySelector('#gendertable tbody').replaceChildren(...D.genders.filter((r) => r.window === state.win).map((r) => {
+    const tr = el('tr');
+    const ss = el('td', 'bar', fmt('share', r.share_spend)); ss.style.backgroundImage = barBg('var(--teal)', r.share_spend);
+    tr.append(el('td', null, r.gender[0].toUpperCase() + r.gender.slice(1)), el('td', null, fmt('spend', r.spend)), ss, el('td', null, fmt('n', r.link_clicks)), el('td', null, fmt('ctr', r.ctr)), el('td', null, fmt('cost_lpv', r.cost_lpv)));
+    return tr;
+  }));
+}
+
+  const VIEW0 = { yaw: -0.65, pitch: 0.55, zoom: 1 };
+  const view3d = { ...VIEW0 };
+  const verdictVar = { Scale: '--v-scale', Watch: '--v-watch', 'Too early': '--v-early', Cut: '--v-cut' };
+
+  const project3d = (p, s) => {
+    const cy = Math.cos(view3d.yaw), sy = Math.sin(view3d.yaw), cp = Math.cos(view3d.pitch), sp = Math.sin(view3d.pitch);
+    const x1 = p[0] * cy - p[2] * sy, z1 = p[0] * sy + p[2] * cy;
+    const y2 = p[1] * cp - z1 * sp, z2 = p[1] * sp + z1 * cp;
+    const k = (s.unit * view3d.zoom * 40) / (40 + z2);
+    return [s.cx + x1 * k, s.cy - y2 * k, z2];
+  };
+
+  const inside3d = (pt, poly) => {
+    let hit = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) hit = !hit;
+    }
+    return hit;
+  };
+
+  const render3d = (el, s) => {
+    const { canvas, ctx } = s;
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.max(280, el.clientWidth), H = Math.round(Math.min(460, Math.max(300, W * 0.55)));
+    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    s.hits = [];
+    const css = getComputedStyle(el);
+    const tok = (n) => css.getPropertyValue(n).trim() || '#888';
+    if (!s.cells || !s.cells.length) return;
+    const nA = s.sets.length, nD = s.days.length;
+    s.cx = W / 2; s.cy = H * 0.6; s.unit = Math.min(W / (nA + 4), H / (nD * 0.55 + 6)) * 0.9;
+    const hMax = 7, bw = 0.32;
+    const ox = (nA - 1) / 2, oz = (nD - 1) / 2;
+    const P = (p) => project3d(p, s);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = tok('--grid');
+    for (let a = 0; a <= nA; a++) { const p = P([a - ox - 0.5, 0, -oz - 0.5]), q = P([a - ox - 0.5, 0, nD - oz - 0.5]); ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); }
+    for (let d = 0; d <= nD; d++) { const p = P([-ox - 0.5, 0, d - oz - 0.5]), q = P([nA - ox - 0.5, 0, d - oz - 0.5]); ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); }
+    const bars = s.cells.map((c) => {
+      const x = c.a - ox, z = c.d - oz, h = Math.max(0.04, (c.v / s.max) * hMax);
+      const v = [[x - bw, 0, z - bw], [x + bw, 0, z - bw], [x + bw, 0, z + bw], [x - bw, 0, z + bw], [x - bw, h, z - bw], [x + bw, h, z - bw], [x + bw, h, z + bw], [x - bw, h, z + bw]].map(P);
+      return { c, v, depth: P([x, h / 2, z])[2] };
+    }).sort((p, q) => q.depth - p.depth);
+    const faces = [[0, 1, 5, 4, 0.42], [1, 2, 6, 5, 0.26], [2, 3, 7, 6, 0.42], [3, 0, 4, 7, 0.26], [4, 5, 6, 7, 0]];
+    const muted = tok('--grey'), fg = tok('--ink');
+    for (const b of bars) {
+      const { c, v } = b;
+      const color = s.picked && c.name !== s.picked ? muted : tok(verdictVar[c.status] || '--grey');
+      ctx.globalAlpha = c.inWin ? 1 : 0.28;
+      const polys = [];
+      for (const [i, j, k2, l, shade] of faces) {
+        const poly = [v[i], v[j], v[k2], v[l]];
+        const area = poly.reduce((t, p, n) => { const q = poly[(n + 1) % 4]; return t + p[0] * q[1] - q[0] * p[1]; }, 0);
+        if (shade && area <= 0) continue;
+        ctx.beginPath(); poly.forEach((p, n) => (n ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath();
+        ctx.fillStyle = color; ctx.fill();
+        if (shade) { ctx.fillStyle = '#000'; ctx.globalAlpha *= shade; ctx.fill(); ctx.globalAlpha = c.inWin ? 1 : 0.28; }
+        polys.push(poly);
+      }
+      if (s.hover && s.hover.c === c) {
+        ctx.globalAlpha = 1; ctx.strokeStyle = fg; ctx.lineWidth = 1.5;
+        polys.forEach((poly) => { ctx.beginPath(); poly.forEach((p, n) => (n ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.stroke(); });
+        ctx.lineWidth = 1;
+      }
+      s.hits.push({ c, polys });
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = tok('--muted');
+    ctx.font = '11px ' + ('Mulish, sans-serif');
+    const placed = [];
+    const label = (text, p, align) => {
+      const w = ctx.measureText(text).width, x = align === 'right' ? p[0] - w : align === 'center' ? p[0] - w / 2 : p[0];
+      const box = [x - 2, p[1] - 9, x + w + 2, p[1] + 3];
+      if (box[0] < 0 || box[2] > W || box[1] < 0 || box[3] > H) return;
+      if (placed.some((o) => box[0] < o[2] && box[2] > o[0] && box[1] < o[3] && box[3] > o[1])) return;
+      placed.push(box); ctx.fillText(text, x, p[1]);
+    };
+    const nearZ = P([0, 0, -oz - 1])[2] < P([0, 0, nD - oz])[2] ? -oz - 0.9 : nD - oz - 0.1;
+    const nearX = P([-ox - 1, 0, 0])[2] < P([nA - ox, 0, 0])[2] ? -ox - 0.9 : nA - ox - 0.1;
+    const sideOf = (p) => (p[0] < s.cx ? 'right' : 'left');
+    s.days.forEach((d, i) => { const p = P([nearX, 0, i - oz]); label(d3.utcFormat('%b %-d')(new Date(d)), p, sideOf(p)); });
+    s.sets.forEach((n, i) => { const p = P([i - ox, 0, nearZ]); label(n.length > 16 ? n.slice(0, 15) + '\u2026' : n, [p[0], p[1] + 10], sideOf(p)); });
+  };
+
+  const pick3d = (s, x, y) => {
+    for (let i = s.hits.length - 1; i >= 0; i--) if (s.hits[i].polys.some((poly) => inside3d([x, y], poly))) return s.hits[i];
+    return null;
+  };
+
+
+const scene = (() => {
+  const box = document.getElementById('scene');
+  const canvas = el('canvas');
+  canvas.tabIndex = 0;
+  canvas.setAttribute('role', 'img');
+  const tip = el('div', 'tip');
+  tip.hidden = true;
+  box.append(canvas, tip);
+  const s = { canvas, ctx: canvas.getContext('2d'), tip, hits: [], drag: null };
+  const showTip = (hit, x, y) => {
+    if (!hit) { tip.hidden = true; return; }
+    const c = hit.c, row = (t, v) => el('div', null, t + ': ' + v);
+    tip.replaceChildren(el('div', 'd', d3.utcFormat('%a %b %-d')(new Date(c.date))), el('div', null, c.name), row(metricName[s.metric], fmt(s.metric, c.v)), row('Verdict', c.status));
+    if (s.metric !== 'spend') tip.append(row('Spend', fmt('spend', c.spend)));
+    if (s.metric !== 'purchases') tip.append(row('Purchases', fmt('n', c.purchases)));
+    tip.hidden = false;
+    tip.style.left = Math.max(0, Math.min(box.clientWidth - tip.offsetWidth, x + 14)) + 'px';
+    tip.style.top = Math.max(0, y - tip.offsetHeight - 8) + 'px';
+  };
+  const pos = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  canvas.addEventListener('pointerdown', (e) => { s.drag = { x: e.clientX, y: e.clientY, moved: false, yaw: view3d.yaw, pitch: view3d.pitch }; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', (e) => {
+    const [x, y] = pos(e);
+    if (s.drag) {
+      const dx = e.clientX - s.drag.x, dy = e.clientY - s.drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) s.drag.moved = true;
+      if (s.drag.moved) {
+        view3d.yaw = s.drag.yaw - dx * 0.008;
+        view3d.pitch = Math.max(0.12, Math.min(1.35, s.drag.pitch + dy * 0.006));
+        tip.hidden = true; s.hover = null; render3d(box, s); return;
+      }
+    }
+    const hit = pick3d(s, x, y);
+    if ((hit && hit.c) !== (s.hover && s.hover.c)) { s.hover = hit; render3d(box, s); }
+    canvas.style.cursor = hit ? 'pointer' : 'grab';
+    showTip(hit, x, y);
+  });
+  const up = (e) => {
+    const d = s.drag; s.drag = null;
+    if (d && !d.moved) {
+      const [x, y] = pos(e), hit = pick3d(s, x, y);
+      if (hit) { state.adset = state.adset === hit.c.name ? null : hit.c.name; render(); }
+    }
+  };
+  canvas.addEventListener('pointerup', up);
+  canvas.addEventListener('pointercancel', up);
+  canvas.addEventListener('pointerleave', () => { if (!s.drag) { tip.hidden = true; s.hover = null; render3d(box, s); } });
+  canvas.addEventListener('wheel', (e) => {
+    if (document.activeElement !== canvas) return;
+    e.preventDefault();
+    view3d.zoom = Math.max(0.5, Math.min(3, view3d.zoom * Math.exp(-e.deltaY * 0.0015)));
+    render3d(box, s);
+  }, { passive: false });
+  canvas.addEventListener('keydown', (e) => {
+    const step = { ArrowLeft: [-0.12, 0], ArrowRight: [0.12, 0], ArrowUp: [0, -0.08], ArrowDown: [0, 0.08] }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    view3d.yaw += step[0]; view3d.pitch = Math.max(0.12, Math.min(1.35, view3d.pitch + step[1]));
+    render3d(box, s);
+  });
+  document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
+    const act = b.dataset.view;
+    if (act === 'reset') Object.assign(view3d, VIEW0);
+    if (act === 'in') view3d.zoom = Math.min(3, view3d.zoom * 1.2);
+    if (act === 'out') view3d.zoom = Math.max(0.5, view3d.zoom / 1.2);
+    if (act === 'left') view3d.yaw -= Math.PI / 8;
+    if (act === 'right') view3d.yaw += Math.PI / 8;
+    render3d(box, s);
+  }));
+  return {
+    redraw: () => render3d(box, s),
+    update: () => {
+      const k = cur();
+      s.metric = state.metric;
+      s.picked = state.adset;
+      const status = new Map(D.adsets.filter((r) => r.window === state.win).map((r) => [r.adset_name, r.status]));
+      const total = d3.rollup(D.daily_adset, (rs) => d3.sum(rs, (r) => r.spend), (r) => r.adset_name);
+      s.sets = [...total.keys()].sort((a, b) => total.get(b) - total.get(a));
+      s.days = [...new Set(D.daily_adset.map((r) => r.date))].sort();
+      const ai = new Map(s.sets.map((n, i) => [n, i])), di = new Map(s.days.map((d, i) => [d, i]));
+      s.cells = D.daily_adset.filter((r) => r[s.metric] != null && r[s.metric] > 0).map((r) => ({
+        a: ai.get(r.adset_name), d: di.get(r.date), v: r[s.metric], name: r.adset_name, date: r.date, spend: r.spend, purchases: r.purchases,
+        status: status.get(r.adset_name) || 'Too early', inWin: r.date >= k.start && r.date <= k.end,
+      }));
+      s.max = d3.max(s.cells, (c) => c.v) || 1;
+      canvas.setAttribute('aria-label', '3D bars of ' + metricName[s.metric] + ' by ad set and day');
+      s.hover = null; tip.hidden = true;
+      render3d(box, s);
+    },
+  };
+})();
+
+
+function render() { renderCampaigns(); renderHead(); renderFunnel(); renderTrend(); renderTable(); renderAds(); renderSegments(); scene.update(); }
+render();
+let rw = 0;
+new ResizeObserver(() => { const w = document.body.clientWidth; if (w !== rw) { rw = w; renderTrend(); scene.redraw(); } }).observe(document.body);
+if (location.hash) { const t = document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView(); }
+})();
+</script>
+
+</body></html>
