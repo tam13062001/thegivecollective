@@ -49,7 +49,7 @@ export function Navbar() {
             <NavLink to="/social-dashboard" className={({ isActive }) => `whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium md:px-4 md:text-sm ${isActive ? 'text-signal-text bg-signal-surface' : 'text-signal-muted hover:text-signal-text'}`}>
               Social Dashboard
             </NavLink>
-            <NavLink
+            {/* <NavLink
               to="/ads-boosting"
               className={({ isActive }) => `relative whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors md:px-4 md:text-sm ${isActive
                 ? isSignalTheme
@@ -61,7 +61,7 @@ export function Navbar() {
                 }`}
             >
               Ads Boosting
-            </NavLink>
+            </NavLink> */}
           </div>
         </div>
       </div>
