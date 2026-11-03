@@ -96,6 +96,30 @@
   .chips button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 5px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
   .chips button[aria-pressed="true"] { background: var(--pink); border-color: var(--pink); color: var(--on-pink); }
 
+  .insights { display: flex; flex-direction: column; gap: 14px; }
+  .ins-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 760px) { .ins-grid { grid-template-columns: 1fr 1fr; } }
+  .ins { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: var(--r); padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; position: relative; overflow: hidden; }
+  .ins::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 5px; background: var(--tone, var(--teal)); }
+  .ins.t-good { --tone: var(--v-scale); } .ins.t-bad { --tone: var(--v-cut); } .ins.t-info { --tone: var(--pink); }
+  .ins .eyebrow { font-size: 0.72rem; }
+  .ins h3 { font-weight: 800; font-size: 1.12rem; line-height: 1.25; letter-spacing: -0.01em; }
+  .ins h3 em { font-style: normal; color: var(--tone, var(--teal)); }
+  .ins .sub { margin: 0; color: var(--muted); font-size: 0.84rem; }
+  .ins svg { width: 100%; height: auto; display: block; margin-top: 4px; overflow: visible; }
+  .ins svg text { font-family: var(--body); fill: var(--muted); font-size: 11px; }
+  .ins svg text.val { fill: var(--ink); font-weight: 800; font-size: 11px; }
+  .ins svg .bar:hover { filter: brightness(1.08); }
+  .ins .key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.78rem; color: var(--muted); }
+  .ins .key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .ins ol.names { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 0.78rem; color: var(--muted); }
+  .ins ol.names li { display: grid; grid-template-columns: 1.4rem 1fr auto; gap: 6px; align-items: baseline; min-width: 0; }
+  .ins ol.names b { color: var(--head); font-family: var(--display); }
+  .ins ol.names span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ins svg .bar { transform-box: fill-box; transform-origin: 50% 100%; animation: rise 0.7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+    @keyframes rise { from { transform: scaleY(0.02); opacity: 0; } to { transform: none; opacity: 1; } }
+  }
   .actions { border-radius: 22px; padding: 22px; display: flex; flex-direction: column; gap: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
   .ac-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px 16px; }
   .ac-head h2 { font-weight: 900; font-size: clamp(1.4rem, 3vw, 1.8rem); letter-spacing: -0.02em; }
@@ -144,7 +168,7 @@
   @media (max-width: 480px) { .frow { grid-template-columns: 6.5rem 1fr 2.8rem; } .fstep { padding-left: 6.5rem; } }
 
   .tools { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
-  .search { font: inherit; font-size: 0.86rem; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--page); color: var(--ink); width: 16rem; max-width: 100%; }
+  .search { font: inherit; font-size: 0.86rem; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink); width: 16rem; max-width: 100%; }
   .scroll { overflow: auto; max-height: 32rem; }
   table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
   th { position: sticky; top: 0; background: var(--panel); text-align: right; font-weight: 700; color: var(--muted); border-bottom: 2px solid var(--line); white-space: nowrap; padding: 0; z-index: 1; }
@@ -219,6 +243,11 @@
       <p class="say" id="roas-say"></p>
     </div>
     <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section class="insights" id="insights" aria-label="Key insights">
+    <div class="ac-head"><div><div class="eyebrow">Key insights</div><h2 style="font-weight:900;font-size:clamp(1.4rem,3vw,1.8rem);letter-spacing:-0.02em">What the numbers are saying</h2></div></div>
+    <div class="ins-grid" id="ins-grid"></div>
   </section>
 
   <section class="card" id="campaigns">
@@ -345,6 +374,13 @@
     <div class="scene" id="scene"></div>
   </section>
 
+  <section class="card" id="placement">
+    <div><h2>Placements</h2><p class="note">Where the ads ran. Compare share of spend with share of purchases: a placement that takes spend but brings no purchases is a candidate to exclude.</p></div>
+    <div class="scroll"><table id="placetable"><thead><tr>
+      <th class="plain">Placement</th><th class="plain">Verdict</th><th class="plain">Spend</th><th class="plain">Share of spend</th><th class="plain">Purchases</th><th class="plain">Share of purchases</th><th class="plain">ROAS</th><th class="plain">Cost/purchase</th><th class="plain">CTR</th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+
   <div class="grid2 half">
     <section class="card" id="age">
       <div><h2>Age</h2><p class="note">Share of spend against share of purchases.</p></div>
@@ -353,9 +389,9 @@
       </tr></thead><tbody></tbody></table></div>
     </section>
     <section class="card" id="gender">
-      <div><h2>Gender</h2><p class="note">The gender export has no purchase columns yet, so this compares clicks and landing-page views.</p></div>
+      <div><h2>Gender</h2><p class="note">Share of spend against share of purchases.</p></div>
       <div class="scroll"><table id="gendertable"><thead><tr>
-        <th class="plain">Gender</th><th class="plain">Spend</th><th class="plain">Share of spend</th><th class="plain">Link clicks</th><th class="plain">CTR</th><th class="plain">Cost/LPV</th>
+        <th class="plain">Gender</th><th class="plain">Spend</th><th class="plain">Share of spend</th><th class="plain">Purchases</th><th class="plain">Share of purchases</th><th class="plain">ROAS</th>
       </tr></thead><tbody></tbody></table></div>
     </section>
   </div>
@@ -363,7 +399,7 @@
 
 <footer class="wrap">
   <p>Status is Meta's delivery status when the data was pulled. Actions: Pause an active ad set with no purchase after the minimum spend; Raise budget on active winners; Reopen a paused ad set that beat the target ROAS (to test, when it has only one purchase); Retry with new creative when a paused ad set had purchases at a lower ROAS. ROAS is purchase value divided by ad spend. A purchase is the Meta pixel's Purchase event on thegivecollective.com. CTR uses link clicks; LPV is a landing-page view. Periods end on the latest day in the data and compare with the same number of days just before.</p>
-  <p>Source: The Give Collective's Meta ad account Google Sheet DATA_FACEBOOK_TGC_2026 (daily ad, age and gender breakdowns), synced to our database whenever the sheet changes.</p>
+  <p>Source: The Give Collective's Meta ad account Google Sheet DATA_FACEBOOK_TGC_2026 (daily ad, placement, age and gender breakdowns), synced to our database whenever the sheet changes.</p>
 </footer>
 
 <script>
@@ -600,7 +636,7 @@ dash.calc('ages', {
 dash.calc('genders', {
   inputs: ['breakdowns', 'kpi'],
   title: 'Gender by period',
-  description: 'Spend, link clicks and landing-page views per gender for every period, with share of spend, click-through rate and cost per landing-page view.',
+  description: 'Spend, clicks, landing-page views and purchases per gender for every period, with share of spend and of purchases, ROAS, click-through rate and cost per landing-page view.',
   fn: (breakdowns, kpi) => {
     const r2 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 100) / 100);
     const r4 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 10000) / 10000);
@@ -608,10 +644,11 @@ dash.calc('genders', {
     for (const k of kpi) {
       const rows = breakdowns.filter((r) => r.tab === 'gender' && r.date_start >= k.start && r.date_start <= k.end);
       const by = new Map();
-      let spend = 0;
+      let spend = 0, purchases = 0;
       rows.forEach((r) => {
-        const s = by.get(r.segment) || { spend: 0, impressions: 0, link_clicks: 0, lpv: 0 };
+        const s = by.get(r.segment) || { spend: 0, impressions: 0, link_clicks: 0, lpv: 0, purchases: 0, revenue: 0, has: false };
         s.spend += r.spend; s.impressions += r.impressions; s.link_clicks += r.inline_link_clicks; s.lpv += r.landing_page_view;
+        if (r.purchase != null) { s.has = true; s.purchases += r.purchase; s.revenue += r.purchase_value || 0; purchases += r.purchase; }
         spend += r.spend;
         by.set(r.segment, s);
       });
@@ -619,6 +656,49 @@ dash.calc('genders', {
         out.push({
           window: k.window, gender, spend: r2(s.spend), share_spend: r4(spend ? s.spend / spend : null), impressions: s.impressions,
           link_clicks: s.link_clicks, lpv: s.lpv, ctr: r4(s.link_clicks / s.impressions), cost_lpv: r2(s.spend / s.lpv),
+          purchases: s.has ? s.purchases : null, share_purchases: s.has ? r4(purchases ? s.purchases / purchases : null) : null, revenue: s.has ? r2(s.revenue) : null, roas: s.has ? r2(s.revenue / s.spend) : null,
+        });
+      }
+    }
+    return out;
+  },
+});
+
+dash.calc('placements', {
+  inputs: ['breakdowns', 'kpi', 'rules'],
+  title: 'Placements by period',
+  description: 'Spend, clicks and purchases per placement (Facebook Feed, Instagram Stories and so on) for every period, with share of spend and of purchases, ROAS, cost per purchase and a verdict against the target ROAS and minimum spend.',
+  fn: (breakdowns, kpi, rules) => {
+    const { target_roas, min_spend } = rules[0] || {};
+    const r2 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 100) / 100);
+    const r4 = (x) => (x == null || !isFinite(x) ? null : Math.round(x * 10000) / 10000);
+    const platforms = { facebook: 'Facebook', instagram: 'Instagram', audience_network: 'Audience Network', messenger: 'Messenger', whatsapp: 'WhatsApp', threads: 'Threads' };
+    const positions = { feed: 'Feed', an_classic: 'Native, banner & interstitial', facebook_profile_feed: 'Profile feed', facebook_reels: 'Reels', facebook_stories: 'Stories', facebook_notification: 'Notifications', instream_video: 'In-stream video', right_hand_column: 'Right column', search: 'Search results', instagram_reels: 'Reels', instagram_stories: 'Stories', instagram_explore: 'Explore', instagram_explore_grid_home: 'Explore home', instagram_profile_feed: 'Profile feed', marketplace: 'Marketplace', video_feeds: 'Video feeds', status: 'Status', rewarded_video: 'Rewarded video', messenger_inbox: 'Inbox', messenger_stories: 'Stories' };
+    const label = (seg) => {
+      const [pf, pos = ''] = String(seg).split(' | ');
+      const p = platforms[pf] || pf.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const q = positions[pos] || pos.replace(new RegExp('^' + pf + '_'), '').replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+      return q ? p + ' ' + q : p;
+    };
+    const out = [];
+    for (const k of kpi) {
+      const rows = breakdowns.filter((r) => r.tab === 'placement' && r.date_start >= k.start && r.date_start <= k.end);
+      const by = new Map();
+      let spend = 0, purchases = 0;
+      rows.forEach((r) => {
+        const s = by.get(r.segment) || { spend: 0, impressions: 0, link_clicks: 0, purchases: 0, revenue: 0 };
+        s.spend += r.spend; s.impressions += r.impressions; s.link_clicks += r.inline_link_clicks; s.purchases += r.purchase || 0; s.revenue += r.purchase_value || 0;
+        spend += r.spend; purchases += r.purchase || 0;
+        by.set(r.segment, s);
+      });
+      for (const [seg, s] of [...by].sort((a, b) => b[1].spend - a[1].spend)) {
+        if (s.spend <= 0 && s.impressions === 0) continue;
+        const roas = s.spend ? s.revenue / s.spend : null;
+        const status = s.purchases >= 2 && roas >= target_roas ? 'Scale' : s.purchases === 0 && s.spend >= min_spend ? 'Cut' : s.purchases === 0 ? 'Too early' : 'Watch';
+        out.push({
+          window: k.window, placement: label(seg), platform: platforms[seg.split(' | ')[0]] || seg.split(' | ')[0], spend: r2(s.spend), share_spend: r4(spend ? s.spend / spend : null),
+          impressions: s.impressions, link_clicks: s.link_clicks, ctr: r4(s.link_clicks / s.impressions),
+          purchases: s.purchases, share_purchases: r4(purchases ? s.purchases / purchases : null), revenue: r2(s.revenue), roas: r2(roas), cpa: r2(s.spend / s.purchases), status,
         });
       }
     }
@@ -627,10 +707,10 @@ dash.calc('genders', {
 });
 
 dash.calc('insights', {
-  inputs: ['kpi', 'adsets', 'daily', 'ages', 'genders', 'rules'],
+  inputs: ['kpi', 'adsets', 'daily', 'ages', 'genders', 'rules', 'placements'],
   title: 'What to do next',
   description: 'Plain-language findings for each period: stalled delivery, ad sets to pause, scale or reopen given their current status, the biggest funnel drop and audience skews.',
-  fn: (kpi, adsets, daily, ages, genders, rules) => {
+  fn: (kpi, adsets, daily, ages, genders, rules, placements = []) => {
     const { target_roas, min_spend } = rules[0] || {};
     const $ = (x) => 'S$' + x.toFixed(2), pct = (x) => Math.round(x * 100) + '%', x2 = (x) => x.toFixed(2) + 'x';
     const day = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -680,7 +760,11 @@ dash.calc('insights', {
         items.push({ tone: zero.length ? 'warn' : 'info', head: 'Audience', text: `${b.age} is the most efficient age group: ROAS ${x2(b.roas)}, ${pct(b.share_purchases)} of purchases on ${pct(b.share_spend)} of spend.` + (zero.length ? ` ${zero.map((a) => a.age).join(', ')} spent ${$(sum(zero, 'spend'))} with no purchases; consider narrowing the age range.` : '') });
       }
       const top = genders.filter((g) => g.window === w).sort((a, b) => b.spend - a.spend)[0];
-      if (top && top.share_spend >= 0.6) items.push({ tone: 'info', head: 'Delivery skew', text: `Meta is putting ${pct(top.share_spend)} of spend on ${top.gender} viewers. The Gender tab has no purchase columns yet, so add them before steering by gender.` });
+      if (top && top.share_spend >= 0.6) items.push({ tone: 'info', head: 'Delivery skew', text: `Meta is putting ${pct(top.share_spend)} of spend on ${top.gender} viewers` + (top.purchases == null ? '. The Gender tab has no purchase columns yet, so add them before steering by gender.' : `, who bring ${pct(top.share_purchases || 0)} of purchases.`) });
+      const pl = placements.filter((p) => p.window === w && p.spend > 0);
+      const bestPl = pl.filter((p) => p.purchases > 0).sort((a, b) => b.roas - a.roas)[0];
+      const deadPl = pl.filter((p) => p.status === 'Cut');
+      if (bestPl || deadPl.length) items.push({ tone: deadPl.length ? 'warn' : 'info', head: 'Placements', text: (bestPl ? `${bestPl.placement} returns the most: ROAS ${x2(bestPl.roas)}, ${pct(bestPl.share_purchases)} of purchases on ${pct(bestPl.share_spend)} of spend.` : '') + (deadPl.length ? ` ${deadPl.map((p) => p.placement).join(', ')} spent ${$(sum(deadPl, 'spend'))} with no purchases; consider excluding ${deadPl.length > 1 ? 'them' : 'it'}.` : '') });
       items.forEach((item, i) => out.push({ window: w, rank: i + 1, ...item }));
     }
     return out;
@@ -695,7 +779,7 @@ const info = (name) => CAMPAIGNS[name] || { charity: '\u2014', title: name, url:
 const NAMES = [...new Set(SNAPSHOT.utd.map((r) => r.campaign_name))].sort();
 const runCalcs = (utd, breakdowns) => {
   const out = { utd, breakdowns };
-  for (const id of ['rules', 'kpi', 'adsets', 'ads', 'daily', 'daily_adset', 'ages', 'genders', 'insights']) out[id] = C[id].fn(...C[id].inputs.map((i) => out[i]));
+  for (const id of ['rules', 'kpi', 'adsets', 'ads', 'daily', 'daily_adset', 'ages', 'genders', 'placements', 'insights']) out[id] = C[id].fn(...C[id].inputs.map((i) => out[i]));
   return out;
 };
 const ALL = runCalcs(SNAPSHOT.utd, SNAPSHOT.breakdowns);
@@ -811,6 +895,9 @@ function buildActions() {
     kind: 'pause', verb: 'Pause', level: 'Ad', what: a.ad_name, full: a.ad_name, adset: a.adset_name, campaign: campaignOf(a.adset_name),
     why: `No purchase after ${fmt('spend', a.spend)}. Keeps the rest of the ad set running.`, link: amLink('ads', /^\d+$/.test(a.ad_id) ? a.ad_id : ''), key: 'PauseAd|' + a.ad_id });
   for (const r of rows.filter((x) => x.action === 'Raise budget').sort((a, b) => b.roas - a.roas)) list.push(asAdset(r, { kind: 'scale', verb: 'Raise budget', why: `${fmt('roas', r.roas)} ROAS from ${plural(r.purchases, 'purchase')}. Add about 20%, then wait 2 to 3 days.`, key: 'Raise|' + r.adset_name }));
+  for (const p of D.placements.filter((x) => x.window === state.win && x.status === 'Cut').sort((a, b) => b.spend - a.spend)) list.push({
+    kind: 'pause', verb: 'Exclude', level: 'Placement', what: p.placement, campaign: state.campaign !== 'all' ? state.campaign : NAMES.length === 1 ? NAMES[0] : '',
+    why: `No purchase after ${fmt('spend', p.spend)} (${fmt('share', p.share_spend)} of spend). In each running ad set, edit Placements and untick it.`, link: amLink('adsets'), key: 'Exclude|' + p.placement });
   const rank = { Reopen: 0, 'Reopen to test': 1, 'Retry with new creative': 2 };
   for (const r of life.filter((x) => x.action in rank).sort((a, b) => rank[a.action] - rank[b.action] || b.roas - a.roas)) list.push(asAdset(r, {
     kind: r.action === 'Retry with new creative' ? 'retry' : 'reopen', verb: r.action,
@@ -1039,9 +1126,148 @@ function renderSegments() {
   document.querySelector('#gendertable tbody').replaceChildren(...D.genders.filter((r) => r.window === state.win).map((r) => {
     const tr = el('tr');
     const ss = el('td', 'bar', fmt('share', r.share_spend)); ss.style.backgroundImage = barBg('var(--teal)', r.share_spend);
-    tr.append(el('td', null, r.gender[0].toUpperCase() + r.gender.slice(1)), el('td', null, fmt('spend', r.spend)), ss, el('td', null, fmt('n', r.link_clicks)), el('td', null, fmt('ctr', r.ctr)), el('td', null, fmt('cost_lpv', r.cost_lpv)));
+    const sp = el('td', 'bar', r.purchases == null ? '\u2014' : fmt('share', r.share_purchases)); sp.style.backgroundImage = barBg('var(--pink)', r.share_purchases);
+    const ro = el('td', null, r.purchases == null ? '\u2014' : fmt('roas', r.roas)); if (r.purchases === 0 && r.spend >= 5) ro.style.color = 'var(--bad)';
+    tr.append(el('td', null, r.gender[0].toUpperCase() + r.gender.slice(1)), el('td', null, fmt('spend', r.spend)), ss, el('td', null, r.purchases == null ? '\u2014' : fmt('n', r.purchases)), sp, ro);
     return tr;
   }));
+  const target = (D.rules[0] || {}).target_roas || 4;
+  document.querySelector('#placetable tbody').replaceChildren(...D.placements.filter((r) => r.window === state.win).map((r) => {
+    const tr = el('tr');
+    const vd = el('td'); vd.append(el('span', 'pill p-' + r.status.split(' ')[0], r.status)); vd.style.textAlign = 'left';
+    const ss = el('td', 'bar', fmt('share', r.share_spend)); ss.style.backgroundImage = barBg('var(--teal)', r.share_spend);
+    const sp = el('td', 'bar', fmt('share', r.share_purchases)); sp.style.backgroundImage = barBg('var(--pink)', r.share_purchases);
+    const ro = el('td', null, fmt('roas', r.roas)); if (r.purchases === 0 && r.spend >= 5) ro.style.color = 'var(--bad)'; else if (r.roas >= target) ro.style.color = 'var(--good)';
+    tr.append(el('td', null, r.placement), vd, el('td', null, fmt('spend', r.spend)), ss, el('td', null, fmt('n', r.purchases)), sp, ro, el('td', null, fmt('cpa', r.cpa)), el('td', null, fmt('ctr', r.ctr)));
+    return tr;
+  }));
+}
+
+// Key insights: four cards, each a headline worked out from the data and a small 3D bar chart drawn as SVG boxes.
+const SVGNS = 'http://www.w3.org/2000/svg';
+const sv = (tag, attrs, text) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
+const shade = (c, p, to) => `color-mix(in srgb, ${c} ${p}%, ${to})`;
+// groups: [{ label, bars: [{ v, color, tip, text }] }]; options: max, target, targetLabel, numbered.
+function iso3d(groups, o = {}) {
+  const W = 360, H = 210, floorY = 172, dx = 16, dy = 10, left = 8, right = W - dx - 8, top = 26;
+  const n = groups.length, per = Math.max(1, ...groups.map((g) => g.bars.length));
+  const slot = (right - left) / Math.max(n, 1), gap = Math.min(10, slot * 0.18);
+  const bw = Math.min(30, (slot - gap) / per - (per > 1 ? 2 : 0));
+  const max = o.max || Math.max(1e-9, ...groups.flatMap((g) => g.bars.map((b) => b.v || 0)), o.target || 0);
+  const hOf = (v) => (Math.max(0, v || 0) / max) * (floorY - top);
+  const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
+  svg.append(sv('path', { d: `M${left} ${floorY} L${right} ${floorY} L${right + dx} ${floorY - dy} L${left + dx} ${floorY - dy} Z`, style: `fill:${shade('var(--teal)', 10, 'transparent')};stroke:var(--line)` }));
+  for (let k = 1; k <= 3; k++) { const y = floorY - (k / 3) * (floorY - top); svg.append(sv('path', { d: `M${left + dx} ${y - dy} L${right + dx} ${y - dy}`, style: 'stroke:var(--grid);stroke-dasharray:2 4' })); }
+  const box = (g, x, y0, h, c, i, tip) => {
+    const b = sv('g', { class: 'bar', style: `--i:${i}` });
+    if (tip) b.append(sv('title', {}, tip));
+    const y = y0 - h;
+    b.append(sv('path', { d: `M${x + bw} ${y0} L${x + bw + dx} ${y0 - dy} L${x + bw + dx} ${y - dy} L${x + bw} ${y} Z`, style: `fill:${shade(c, 70, 'black')}` }));
+    b.append(sv('path', { d: `M${x} ${y} L${x + dx} ${y - dy} L${x + bw + dx} ${y - dy} L${x + bw} ${y} Z`, style: `fill:${shade(c, 65, 'white')}` }));
+    b.append(sv('rect', { x, y, width: bw, height: Math.max(h, 0.01), style: `fill:${c}` }));
+    g.append(b);
+    return b;
+  };
+  const bars = sv('g', {}), tall = [];
+  let i = 0;
+  groups.forEach((gr, gi) => {
+    const x0 = left + gi * slot + (slot - (bw + 2) * gr.bars.length) / 2;
+    gr.bars.forEach((b, bi) => {
+      const x = x0 + bi * (bw + 2), h = hOf(b.v);
+      box(bars, x, floorY, h, b.color, i++, b.tip);
+      if (o.target && b.v > o.target) tall.push([x, b, h]);
+      if (b.text) svg.append(sv('text', { x: x + bw / 2 + dx / 2, y: floorY - h - dy - 4, 'text-anchor': 'middle', class: 'val' }, b.text));
+    });
+    const words = String(gr.label).split(' '), mid = Math.ceil(words.length / 2);
+    const lines = words.length > 1 && gr.label.length > 9 ? [words.slice(0, mid).join(' '), words.slice(mid).join(' ')] : [gr.label];
+    const t = sv('text', { x: left + gi * slot + slot / 2, y: floorY + 14, 'text-anchor': 'middle' });
+    lines.forEach((l, li) => t.append(sv('tspan', { x: left + gi * slot + slot / 2, dy: li ? 12 : 0 }, l)));
+    svg.append(t);
+  });
+  svg.insertBefore(bars, svg.querySelector('text'));
+  if (o.target) {
+    const ty = floorY - hOf(o.target);
+    svg.insertBefore(sv('path', { d: `M${left} ${ty} L${right} ${ty} L${right + dx} ${ty - dy} L${left + dx} ${ty - dy} Z`, style: `fill:${shade('var(--pink)', 22, 'transparent')};stroke:var(--pink-ink);stroke-dasharray:4 3` }), svg.querySelector('text'));
+    for (const [x, b] of tall) box(svg, x, ty, hOf(b.v) - hOf(o.target), b.color, 0).style.animation = 'none';
+    svg.querySelectorAll('text.val').forEach((t) => svg.append(t));
+    svg.append(sv('text', { x: right + dx, y: ty - dy - 4, 'text-anchor': 'end', style: 'fill:var(--pink-ink);font-weight:800' }, o.targetLabel || ''));
+  }
+  return svg;
+}
+
+function renderInsights() {
+  const k = cur(), grid = document.getElementById('ins-grid');
+  const rules = D.rules[0] || {}, target = rules.target_roas || 4;
+  const SP = 'var(--v-scale)', PU = 'var(--pink)';
+  const key = () => { const d = el('div', 'key'); d.innerHTML = `<span><i style="background:${SP}"></i>Share of spend</span><span><i style="background:${PU}"></i>Share of purchases</span>`; return d; };
+  const card = (tone, eyebrow, head, sub, chart, extra) => {
+    const c = el('article', 'ins t-' + tone);
+    const h = el('h3'); h.innerHTML = head;
+    c.append(el('div', 'eyebrow', eyebrow), h);
+    if (sub) c.append(el('p', 'sub', sub));
+    if (chart) c.append(chart);
+    if (extra) c.append(extra);
+    return c;
+  };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+  const cards = [];
+
+  // 1. Placements: share of spend against share of purchases.
+  const pl = D.placements.filter((r) => r.window === state.win && r.spend > 0);
+  if (pl.length) {
+    const top = pl.slice(0, 4), rest = pl.slice(4);
+    const groups = top.map((r) => ({ label: r.placement, bars: [{ v: r.share_spend, color: SP, text: fmt('share', r.share_spend), tip: `${r.placement}: ${fmt('spend', r.spend)}, ${fmt('share', r.share_spend)} of spend` }, { v: r.share_purchases || 0, color: PU, text: fmt('share', r.share_purchases || 0), tip: `${r.placement}: ${fmt('n', r.purchases)} purchases, ROAS ${fmt('roas', r.roas)}` }] }));
+    if (rest.length) { const s = d3.sum(rest, (r) => r.share_spend), p = d3.sum(rest, (r) => r.share_purchases || 0); groups.push({ label: 'Other', bars: [{ v: s, color: SP, text: fmt('share', s), tip: rest.map((r) => r.placement).join(', ') }, { v: p, color: PU, text: fmt('share', p) }] }); }
+    const best = pl.filter((r) => r.purchases > 0).sort((a, b) => b.share_purchases - a.share_purchases)[0];
+    const dead = pl.filter((r) => r.status === 'Cut');
+    cards.push(card(dead.length ? 'bad' : 'good', 'Placements',
+      best ? `<em>${esc(best.placement)}</em> brings ${fmt('share', best.share_purchases)} of purchases on ${fmt('share', best.share_spend)} of spend` : 'No placement has a purchase yet',
+      dead.length ? `${dead.map((r) => r.placement).join(' and ')} spent ${fmt('spend', d3.sum(dead, (r) => r.spend))} with no purchase. Consider excluding ${dead.length > 1 ? 'them' : 'it'}.` : 'Every placement with real spend has a purchase.',
+      iso3d(groups, { max: 1 }), key()));
+  }
+
+  // 2. Ad sets against the ROAS target.
+  const as = D.adsets.filter((r) => r.window === state.win && r.spend > 0).sort((a, b) => b.spend - a.spend).slice(0, 6);
+  if (as.length) {
+    const vc = { Scale: 'var(--v-scale)', Watch: 'var(--v-watch)', 'Too early': 'var(--v-early)', Cut: 'var(--v-cut)' };
+    const beat = as.filter((r) => r.roas >= target).length;
+    const groups = as.map((r, i) => ({ label: String(i + 1), bars: [{ v: Math.max(r.roas || 0, 0.15), color: vc[r.status] || 'var(--grey)', text: fmt('roas', r.roas), tip: `${r.adset_name}\n${r.status} \u00b7 ${r.delivery} \u00b7 spend ${fmt('spend', r.spend)}` }] }));
+    const names = el('ol', 'names');
+    as.forEach((r, i) => { const li = el('li'); li.append(el('b', null, String(i + 1)), el('span', null, r.adset_name), el('span', null, r.delivery)); li.title = r.adset_name; names.append(li); });
+    cards.push(card(beat ? 'good' : 'bad', 'Ad sets vs target',
+      `<em>${beat} of ${as.length}</em> top-spending ad sets beat the ${fmt('roas', target)} target`,
+      'Bar height is ROAS; bars poking through the pink plane are above target. Colour is the verdict.',
+      iso3d(groups, { target, targetLabel: `Target ${fmt('roas', target)}`, max: Math.max(target * 1.25, ...as.map((r) => r.roas || 0)) }), names));
+  }
+
+  // 3. Daily spend, with purchase days in pink.
+  const days = D.daily.filter((d) => d.date >= k.start && d.date <= k.end);
+  if (days.length) {
+    const full = D.daily.filter((d) => !d.partial), last = full[full.length - 1], before = full.slice(-8, -1);
+    const avg = before.length ? d3.mean(before, (d) => d.spend) : 0;
+    const stalled = last && avg > 0 && last.spend < 0.25 * avg;
+    const dfmt = d3.utcFormat('%b %-d'), step = days.length > 8 ? 2 : 1;
+    const groups = days.map((d, i) => ({ label: i % step === (days.length - 1) % step ? dfmt(new Date(d.date)) : '', bars: [{ v: d.spend, color: d.partial ? 'var(--grey)' : d.purchases ? PU : SP, tip: `${dfmt(new Date(d.date))}${d.partial ? ' (so far)' : ''}: ${fmt('spend', d.spend)}, ${fmt('n', d.purchases)} purchases` }] }));
+    const kk = el('div', 'key'); kk.innerHTML = `<span><i style="background:${PU}"></i>Day with a purchase</span><span><i style="background:${SP}"></i>No purchase</span><span><i style="background:var(--grey)"></i>Today so far</span>`;
+    cards.push(card(stalled ? 'bad' : 'good', 'Daily spend',
+      stalled ? `Spend has <em>almost stopped</em>: ${fmt('spend', last.spend)} on ${dfmt(new Date(last.date))}` : `<em>${fmt('spend', k.spend / Math.max(1, k.days))}</em> a day on average`,
+      stalled ? `Against ${fmt('spend', avg)} a day the week before. Check budget, billing and ad review.` : `${fmt('n', days.filter((d) => d.purchases).length)} of ${days.length} days had a purchase.`,
+      iso3d(groups), kk));
+  }
+
+  // 4. Audience: age groups, plus the gender split in the subtitle.
+  const ag = D.ages.filter((r) => r.window === state.win && r.spend > 0);
+  if (ag.length) {
+    const groups = ag.map((r) => ({ label: r.age, bars: [{ v: r.share_spend, color: SP, text: fmt('share', r.share_spend), tip: `${r.age}: ${fmt('spend', r.spend)}` }, { v: r.share_purchases || 0, color: PU, text: fmt('share', r.share_purchases || 0), tip: `${r.age}: ${fmt('n', r.purchases)} purchases, ROAS ${fmt('roas', r.roas)}` }] }));
+    const best = ag.filter((r) => r.purchases > 0).sort((a, b) => b.roas - a.roas)[0];
+    const g = D.genders.filter((r) => r.window === state.win).sort((a, b) => b.spend - a.spend)[0];
+    cards.push(card('info', 'Who donates',
+      best ? `<em>${esc(best.age)}</em> is the most efficient age group at ${fmt('roas', best.roas)} ROAS` : 'No age group has a purchase yet',
+      g ? `${g.gender[0].toUpperCase() + g.gender.slice(1)} viewers get ${fmt('share', g.share_spend)} of spend${g.purchases != null ? ` and bring ${fmt('share', g.share_purchases || 0)} of purchases` : ''}.` : '',
+      iso3d(groups, { max: 1 }), key()));
+  }
+  grid.replaceChildren(...cards);
+  document.getElementById('insights').hidden = !cards.length;
 }
 
   const VIEW0 = { yaw: -0.65, pitch: 0.55, zoom: 1 };
@@ -1233,7 +1459,7 @@ const scene = (() => {
 })();
 
 
-function render() { renderCampaigns(); renderHead(); renderFunnel(); renderTrend(); renderTable(); renderAds(); renderSegments(); scene.update(); }
+function render() { renderCampaigns(); renderHead(); renderInsights(); renderFunnel(); renderTrend(); renderTable(); renderAds(); renderSegments(); scene.update(); }
 render();
 let rw = 0;
 new ResizeObserver(() => { const w = document.body.clientWidth; if (w !== rw) { rw = w; renderTrend(); scene.redraw(); } }).observe(document.body);

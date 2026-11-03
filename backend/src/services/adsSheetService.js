@@ -1,17 +1,18 @@
 // services/adsSheetService.js
-// Đọc Google Sheet DATA_FACEBOOK_TGC_2026 (tab Utd, Age, Gender) bằng service account
+// Đọc Google Sheet DATA_FACEBOOK_TGC_2026 (tab Utd, Age, Gender, Placement) bằng service account
 // và chuẩn hoá thành đúng format dashboard Ads Boosting cần: { utd, breakdowns }.
 //
 // ENV:
 //   ADS_SHEET_ID              mặc định 1Lz8KlhMfAkJSUO6DAJYLfelXLQ27-ZdJ6MR3nCG3ubk
-//   ADS_SHEET_TABS            mặc định "Utd,Age,Gender"  (tên tab: daily theo ad, theo tuổi, theo giới tính)
+//   ADS_SHEET_TABS            mặc định "Utd,Age,Gender,Placement"  (tên tab: daily theo ad, theo tuổi, theo giới tính, theo vị trí hiển thị)
+//                             Tab breakdown nào không có trong sheet thì bỏ qua; riêng tab Utd là bắt buộc.
 //   ADS_SHEET_SA_ENV          tên biến env chứa service account (base64 JSON), mặc định GOOGLE_SERVICE_ACCOUNT_JSON
 //   -> Nhớ share Google Sheet (quyền Viewer) cho email client_email của service account đó.
 import crypto from 'crypto';
-import { JWT } from 'google-auth-library'; 
+import { JWT } from 'google-auth-library';
 
 const SHEET_ID = () => process.env.ADS_SHEET_ID || '1Lz8KlhMfAkJSUO6DAJYLfelXLQ27-ZdJ6MR3nCG3ubk';
-const TABS = () => (process.env.ADS_SHEET_TABS || 'Utd,Age,Gender').split(',').map((s) => s.trim());
+const TABS = () => (process.env.ADS_SHEET_TABS || 'Utd,Age,Gender,Placement').split(',').map((s) => s.trim());
 
 let authClient;
 function getAuth() {
@@ -35,7 +36,7 @@ const num = (v) => {
   const n = typeof v === 'number' ? v : Number(String(v).replace(/,/g, ''));
   return Number.isFinite(n) ? n : 0;
 };
-const r2 = (x) => Math.round(x * 100) / 100;
+
 const str = (v) => (v == null ? '' : String(v).trim());
 
 // Ngày trong sheet có thể là serial number (ô dạng date) hoặc text.
@@ -83,7 +84,7 @@ export function shapeUtd(rows) {
       ad_id: str(r.ad_id),
       ad_effective_status: str(r.ad_effective_status) || null,
       status_fetched_at: toFetchedAt(r.status_fetched_at),
-      spend: r2(num(r.spend)),
+      spend: num(r.spend),
       impressions: num(r.impressions),
       reach: num(r.reach),
       clicks: num(r.clicks),
@@ -91,9 +92,9 @@ export function shapeUtd(rows) {
       landing_page_view: num(r.landing_page_view),
       initiate_checkout: num(r.initiate_checkout),
       purchase: num(r.purchase),
-      purchase_value: r2(num(r.purchase_value)),
+      purchase_value: num(r.purchase_value),
       event_count__donate_total: num(r.event_count__donate_total),
-      event_value__donate_total: r2(num(r.event_value__donate_total)),
+      event_value__donate_total: num(r.event_value__donate_total),
       frequency: num(r.frequency),
     }));
 }
@@ -109,37 +110,58 @@ export function shapeBreakdown(rows, tab) {
       adset_name: str(r.adset_name),
       ad_id: str(r.ad_id),
       ad_name: str(r.ad_name),
-      spend: r2(num(r.spend)),
+      spend: num(r.spend),
       impressions: num(r.impressions),
       inline_link_clicks: num(r.inline_link_clicks),
       landing_page_view: num(r.landing_page_view),
       purchase: num(r.purchase),
-      purchase_value: r2(num(r.purchase_value)),
+      purchase_value: num(r.purchase_value),
     }));
 }
 
-// Từ raw values của 3 tab -> { utd, breakdowns, hash }
-export function shapeSheet({ utd = [], age = [], gender = [] }) {
+// Từ raw values của các tab -> { utd, breakdowns, hash }
+// breakdowns.tab = 'age' | 'gender' | 'placement', segment = giá trị cột cùng tên trong tab đó
+// (Placement dùng cột `placement`, vd "instagram | feed").
+export function shapeSheet({ utd = [], age = [], gender = [], placement = [] }) {
   const out = {
     utd: shapeUtd(toObjects(utd)),
-    breakdowns: [...shapeBreakdown(toObjects(age), 'age'), ...shapeBreakdown(toObjects(gender), 'gender')],
+    breakdowns: [
+      ...shapeBreakdown(toObjects(age), 'age'),
+      ...shapeBreakdown(toObjects(gender), 'gender'),
+      ...shapeBreakdown(toObjects(placement), 'placement'),
+    ],
   };
   out.hash = crypto.createHash('sha1').update(JSON.stringify([out.utd, out.breakdowns])).digest('hex');
   return out;
 }
 
-export async function readAdsSheet() {
-  const { token } = await getAuth().getAccessToken();
-  const [utdTab, ageTab, genderTab] = TABS();
-  const url = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID()}/values:batchGet`);
-  [utdTab, ageTab, genderTab].forEach((t) => url.searchParams.append('ranges', `'${t}'`));
-  url.searchParams.set('valueRenderOption', 'UNFORMATTED_VALUE');
-  url.searchParams.set('dateTimeRenderOption', 'SERIAL_NUMBER');
-
+async function sheetsGet(url, token) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`Google Sheets API: ${body?.error?.message || 'HTTP ' + res.status}`);
+  return body;
+}
 
-  const [utd, age, gender] = (body.valueRanges || []).map((v) => v.values || []);
-  return shapeSheet({ utd, age, gender });
+export async function readAdsSheet() {
+  const { token } = await getAuth().getAccessToken();
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID()}`;
+  const [utdTab, ageTab, genderTab, placementTab] = TABS();
+
+  // Lấy danh sách tab đang có, để tab breakdown bị xoá/đổi tên không làm hỏng cả lần sync.
+  const meta = await sheetsGet(`${base}?fields=sheets.properties.title`, token);
+  const existing = new Set((meta.sheets || []).map((x) => x.properties.title));
+  if (!existing.has(utdTab)) throw new Error(`Không tìm thấy tab "${utdTab}" trong Google Sheet`);
+
+  const wanted = { utd: utdTab, age: ageTab, gender: genderTab, placement: placementTab };
+  const keys = Object.keys(wanted).filter((k) => wanted[k] && existing.has(wanted[k]));
+
+  const url = new URL(`${base}/values:batchGet`);
+  keys.forEach((k) => url.searchParams.append('ranges', `'${wanted[k]}'`));
+  url.searchParams.set('valueRenderOption', 'UNFORMATTED_VALUE');
+  url.searchParams.set('dateTimeRenderOption', 'SERIAL_NUMBER');
+  const body = await sheetsGet(url, token);
+
+  const values = {};
+  keys.forEach((k, i) => { values[k] = body.valueRanges?.[i]?.values || []; });
+  return shapeSheet(values);
 }
