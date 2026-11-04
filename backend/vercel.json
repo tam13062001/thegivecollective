@@ -48,6 +48,9 @@
     {
       "path": "/api/v1/ga4-secondary/refresh",
       "schedule": "0 0 * * *"
+    },
+    { 
+      "path": "/api/v1/cron/ai-todo", "schedule": "40 22 * * *" 
     }
   ]
 }
