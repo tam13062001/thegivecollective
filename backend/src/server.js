@@ -11,6 +11,7 @@ import { takeSnapshot } from './jobs/snapshotjob.js';
 import {triggerAutoScrape} from './jobs/autoScrapeJob.js';
 import { connectDB } from './config/db.js';
 import { syncAdsFromSheet } from './services/adsSyncService.js';
+import { generateAndSaveTodos } from './services/aiTodoService.js';
 import cors from 'cors';
 import CronLog from './models/CronLog.js';
 
@@ -46,7 +47,7 @@ app.use('/api/v1/insights', insightsRoutes);
 app.use('/api/v1/insights', topPostsRouter);
 app.use('/api/v1', ga4Routes);
 app.use('/api/v1', ga4SecondaryRoutes);
-app.use('/api/v1', adsBoostingRoutes); // Ads Boosting: GET /ads-boosting, POST /ads-boosting/sync, GET /cron/ads-sync
+app.use('/api/v1', adsBoostingRoutes); // Ads Boosting: GET /ads-boosting, POST /ads-boosting/sync, GET /cron/ads-sync, AI ToDo: /ads-boosting/todos, GET /cron/ai-todo
 // Gợi ý: Chắc là bạn sẽ cần khai báo sử dụng historyRoutes ở đây
 // app.use("/api/v1/history", historyRoutes); 
 
@@ -97,6 +98,14 @@ app.get('/api/v1/cron/daily-job', async (req, res) => {
       log.steps.push({ step: 'ads-sheet-sync', status: 'success', at: new Date() });
     } catch (e) {
       log.steps.push({ step: 'ads-sheet-sync', status: 'failed', at: new Date() });
+    }
+
+    // Sinh AI ToDo từ dữ liệu ads vừa đồng bộ (lỗi ở bước này cũng không làm fail cả daily job)
+    try {
+      const todo = await generateAndSaveTodos();
+      log.steps.push({ step: 'ai-todo:' + todo.status, status: 'success', at: new Date() });
+    } catch (e) {
+      log.steps.push({ step: 'ai-todo', status: 'failed', at: new Date() });
     }
 
     log.status = 'success';
