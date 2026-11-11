@@ -10,6 +10,7 @@ import LockScreen from "./components/LockScreen"
 import { Navbar } from './components/Navbar'
 import InsightsPage from "./pages/InsightsPage" 
 import AdsBoostingPage from "./pages/AdsBoostingPage"
+import DonorInsightsPage from "./pages/DonorInsightsPage"
 function AppRoutes() {
   const location = useLocation();
   const isSharePage = location.pathname.replace(/\/+$/, "").toLowerCase() === "/share/social-dashboard";
@@ -41,6 +42,7 @@ function AppRoutes() {
               <Route path="/insights" element={<InsightsPage />} />
               <Route path="/social-dashboard" element={<SocialDashboardPage />} />
               <Route path="/ads-boosting" element={<AdsBoostingPage />} />
+              <Route path="/donor-insights" element={<DonorInsightsPage />} />
               <Route path="*" element={<NotFound />} />
             </>
           )}

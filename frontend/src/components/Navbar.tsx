@@ -62,6 +62,19 @@ export function Navbar() {
             >
               Ads Boosting
             </NavLink>
+            <NavLink
+              to="/donor-insights"
+              className={({ isActive }) => `relative whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors md:px-4 md:text-sm ${isActive
+                ? isSignalTheme
+                  ? 'text-signal-text after:absolute after:inset-x-3 after:-bottom-[17px] after:h-0.5 after:bg-signal-coral md:after:inset-x-4'
+                  : 'bg-slate-100 text-slate-800'
+                : isSignalTheme
+                  ? 'text-signal-muted hover:bg-signal-surface hover:text-signal-text'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+            >
+              Donor Insights
+            </NavLink>
           </div>
         </div>
       </div>

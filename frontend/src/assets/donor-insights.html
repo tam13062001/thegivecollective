@@ -1,0 +1,1717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Donor RFM Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Mulish:wght@400;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  /* Layout: The Give Collective's mint page with white cards. Summary tiles, then segments vs revenue, then the R×F grid beside the donor map, then the donor list. */
+  :root {
+    --page: #eef8f7; --panel: #ffffff; --ink: #183734; --muted: #536b68; --line: #d9ece9; --head: #0b514d;
+    --teal: #31a69a; --teal-soft: #e2f4f2; --deep: #0b514d; --pink: #ff85a1; --pink-ink: #c23a5f; --pink-soft: #ffeef2;
+    --on-pink: #3d0f1d; --grid: #e6f1ef; --seq-lo: #e9f6f4; --seq-hi: #0b514d; --on-dark: #ffffff;
+    /* segment palette, brand only: greens = engaged, greys = new and middle, pinks = slipping and lapsed. Adjacent steps checked for colour-blind separation. */
+    --s1: #0b514d; --s2: #2e9a8e; --s3: #8fd3c7; --s4: #5f6f6d; --s5: #cdd6d4;
+    --s6: #8e9e9b; --s7: #ffd3de; --s8: #ff7f9f; --s9: #c42f5b; --s10: #6e1a33; --smaj: #22302e;
+    --shadow: 0 12px 32px rgba(11, 81, 77, 0.07);
+    --display: "Outfit", "Mulish", system-ui, sans-serif;
+    --body: "Mulish", system-ui, sans-serif;
+    --r: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0a1f1d; --panel: #102b28; --ink: #e6f4f2; --muted: #9dbdb8; --line: #20433f; --head: #8fe0d5;
+      --teal: #4cc3b5; --teal-soft: #143a36; --deep: #0b514d; --pink: #ff8fab; --pink-ink: #ff9fb8; --pink-soft: #3b1a26;
+      --on-pink: #3d0f1d; --grid: #183a36; --seq-lo: #15332f; --seq-hi: #8fe0d5; --on-dark: #0a1f1d;
+      --s1: #8fe0d5; --s2: #3fb5a6; --s3: #1f7a70; --s4: #b6c4c1; --s5: #4f625f;
+      --s6: #8a9c99; --s7: #ffd6e0; --s8: #ff7ea0; --s9: #c02c5a; --s10: #6e1c39; --smaj: #e6f4f2;
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.25); color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0a1f1d; --panel: #102b28; --ink: #e6f4f2; --muted: #9dbdb8; --line: #20433f; --head: #8fe0d5;
+    --teal: #4cc3b5; --teal-soft: #143a36; --deep: #0b514d; --pink: #ff8fab; --pink-ink: #ff9fb8; --pink-soft: #3b1a26;
+    --on-pink: #3d0f1d; --grid: #183a36; --seq-lo: #15332f; --seq-hi: #8fe0d5; --on-dark: #0a1f1d;
+    --s1: #8fe0d5; --s2: #3fb5a6; --s3: #1f7a70; --s4: #b6c4c1; --s5: #4f625f;
+    --s6: #8a9c99; --s7: #ffd6e0; --s8: #ff7ea0; --s9: #c02c5a; --s10: #6e1c39; --smaj: #e6f4f2;
+    --shadow: 0 12px 32px rgba(0, 0, 0, 0.25); color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: var(--page); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px; display: grid; gap: 20px; }
+  h1, h2, h3 { font-family: var(--display); color: var(--head); text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 800; letter-spacing: -0.01em; }
+  h2 { font-size: 20px; font-weight: 600; }
+  h3 { font-size: 16px; font-weight: 600; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); padding: 20px; min-width: 0; }
+  .head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; }
+  .head .lede { max-width: 62ch; margin-top: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 700; background: var(--pink-soft); color: var(--pink-ink); }
+  .chip.real { background: var(--teal-soft); color: var(--head); }
+
+  /* data panel */
+  .hdr-actions { justify-content: flex-end; }
+  details.setup { padding-block: 12px; box-shadow: none; }
+  details.setup > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+  details.setup > summary::-webkit-details-marker { display: none; }
+  details.setup > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+  details.setup[open] > summary::before { transform: rotate(90deg); }
+  .setup-t { font-family: var(--display); font-weight: 600; color: var(--head); }
+  #setupSum { flex: 1 1 260px; min-width: 0; }
+  .setup-btn { font-weight: 700; color: var(--head); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; }
+  details.setup .when-open, details.setup[open] .when-closed { display: none; }
+  details.setup[open] .when-open { display: inline; }
+  details.setup[open] { box-shadow: var(--shadow); }
+  details.setup .data { margin-top: 16px; }
+  body.dragging details.setup { outline: 3px dashed var(--teal); outline-offset: 2px; }
+  .data { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; }
+  @media (max-width: 860px) { .data { grid-template-columns: 1fr; } }
+  .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 10px; text-align: center; transition: border-color .15s, background .15s; }
+  .drop.over { border-color: var(--teal); background: var(--teal-soft); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row.center { justify-content: center; }
+  button, .btn { font: inherit; font-weight: 700; font-size: 14px; border-radius: 999px; padding: 7px 16px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button:hover, .btn:hover { border-color: var(--teal); }
+  button.primary, .btn.primary { background: var(--deep); color: #fff; border-color: var(--deep); }
+  button:focus-visible, select:focus-visible, input:focus-visible, .btn:focus-within { outline: 3px solid var(--pink); outline-offset: 2px; }
+  input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  label.f { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); min-width: 0; }
+  select, input[type=text], input[type=date], input[type=number], input[type=search], textarea { font: inherit; font-size: 14px; color: var(--ink); background: var(--page); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; min-width: 0; width: 100%; }
+  textarea { min-height: 90px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .seg-ctl { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg-ctl button { border: 0; border-radius: 0; padding: 5px 12px; font-size: 13px; }
+  .seg-ctl button[aria-pressed=true] { background: var(--deep); color: #fff; }
+  .scoring { display: grid; gap: 12px; }
+  .score-line { display: grid; grid-template-columns: 90px auto; justify-content: start; gap: 6px 10px; align-items: center; }
+  .score-line .cuts { grid-column: 1 / -1; }
+  .score-line .seg-ctl { justify-self: start; }
+  .cuts { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); }
+  .cuts span { white-space: nowrap; }
+  .cuts input { width: 70px; padding: 4px 6px; }
+  .msg { font-size: 13px; border-radius: 10px; padding: 8px 12px; background: var(--teal-soft); color: var(--ink); }
+  .msg.warn { background: var(--pink-soft); }
+
+  /* KPI tiles */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+  @media (min-width: 1000px) { .kpis.five { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+  @media (max-width: 860px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpis.five .kpi:last-child { grid-column: 1 / -1; } }
+  .kpi { display: grid; gap: 2px; align-content: start; }
+  .kpi .v { font-family: var(--display); font-size: clamp(26px, 3.4vw, 34px); font-weight: 800; color: var(--head); line-height: 1.15; }
+  .kpi .v.alert { color: var(--pink-ink); }
+
+  /* segment bars */
+  .segbars { display: grid; gap: 4px; margin-top: 14px; }
+  .sb { display: grid; grid-template-columns: 190px minmax(0, 1fr) 260px; gap: 14px; align-items: center; padding: 8px 10px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; }
+  .sb:hover { background: var(--teal-soft); }
+  .sb.on { border-color: var(--teal); background: var(--teal-soft); }
+  .sb .name { display: flex; gap: 8px; align-items: center; font-weight: 700; min-width: 0; }
+  .sw { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+  .bars { display: grid; gap: 3px; }
+  .bar { height: 10px; border-radius: 0 4px 4px 0; min-width: 2px; }
+  .bar.rev { opacity: 1; }
+  .sb.major { margin-bottom: 8px; border: 1px dashed var(--line); grid-template-columns: 190px minmax(0, 1fr) 260px; }
+  .sb.major.on { border-style: solid; border-color: var(--teal); }
+  .bars .bar.split { display: flex; gap: 1px; background: transparent !important; outline: none !important; }
+  .bar.split span { display: block; height: 100%; min-width: 0; }
+  .bar.split span:last-child { border-radius: 0 4px 4px 0; }
+  .bar.split .rd { background: var(--muted); opacity: .55; }
+  .bar.split .od { background: var(--grid); outline: 1px solid var(--line); outline-offset: -1px; }
+  .bar.split .og { opacity: .38; }
+  .sb .avg .sep { color: var(--line); padding: 0 4px; }
+  .bar.don { background: var(--grid) !important; outline: 1px solid var(--line); }
+  .sb .nums { font-size: 13px; color: var(--muted); text-align: right; }
+  .sb .nums b { color: var(--ink); }
+  @media (max-width: 720px) { .sb { grid-template-columns: 1fr; gap: 6px; } .sb .nums { text-align: left; } }
+  .legend-line { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); align-items: center; }
+  .key { display: inline-block; width: 22px; height: 10px; border-radius: 0 4px 4px 0; vertical-align: middle; margin-right: 6px; }
+
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 20px; }
+  @media (max-width: 960px) { .two { grid-template-columns: 1fr; } }
+  .chart { width: 100%; margin-top: 12px; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .axis text, .lbl { fill: var(--muted); font-size: 12px; font-family: var(--body); }
+  .axis path, .axis line { stroke: var(--line); }
+  .gridline line { stroke: var(--grid); }
+  .gridline path { display: none; }
+  .cell { cursor: pointer; }
+  .cell rect { stroke: var(--panel); stroke-width: 2px; }
+  .cell.on rect { stroke: var(--pink); stroke-width: 3px; }
+  .dot { stroke: var(--panel); stroke-width: 1px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .legend button { padding: 3px 10px 3px 8px; font-size: 12px; display: inline-flex; gap: 6px; align-items: center; font-weight: 600; }
+  .legend button[aria-pressed=true] { border-color: var(--ink); }
+
+  .play { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 20px; align-items: start; }
+  @media (max-width: 760px) { .play { grid-template-columns: 1fr; } }
+  .play .big { font-family: var(--display); font-size: 26px; font-weight: 800; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .stats div { display: grid; }
+  .stats b { font-family: var(--display); font-size: 20px; color: var(--head); }
+  ul.acts { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+
+  .tbl-wrap { overflow-x: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); cursor: pointer; user-select: none; background: var(--panel); position: sticky; top: 0; }
+  th.num, td.num { text-align: right; }
+  th[aria-sort=ascending]::after { content: " ▲"; }
+  th[aria-sort=descending]::after { content: " ▼"; }
+  tbody tr:hover { background: var(--teal-soft); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 2px 10px 2px 6px; border-radius: 999px; border: 1px solid var(--line); }
+  .code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; letter-spacing: 0.05em; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .filters input[type=search] { max-width: 260px; }
+  .tag { display: inline-flex; gap: 6px; align-items: center; background: var(--teal-soft); border-radius: 999px; padding: 3px 6px 3px 12px; font-size: 13px; font-weight: 700; }
+  .tag button { padding: 0 7px; font-size: 13px; border: 0; background: transparent; }
+
+  .charity-bar { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 420px) minmax(0, 1fr); gap: 8px 20px; align-items: end; padding-block: 14px; }
+  .charity-bar select { font-weight: 700; }
+  @media (max-width: 720px) { .charity-bar { grid-template-columns: 1fr; } }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .trend-hover line { stroke: var(--ink); stroke-width: 1px; stroke-dasharray: 3 3; }
+  .up { color: var(--head); font-weight: 700; } .down { color: var(--pink-ink); font-weight: 700; }
+  .ins { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 14px; }
+  @media (min-width: 1100px) { .ins { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+  .ins > div { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; align-content: start; cursor: pointer; }
+  .ins > div:hover { border-color: var(--teal); }
+  .ins > div.warn { background: var(--pink-soft); border-color: transparent; }
+  .ins .nm { font-weight: 700; color: var(--head); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ins .st { font-family: var(--display); font-size: 22px; font-weight: 800; color: var(--head); line-height: 1.1; }
+  .ins .warn .st { color: var(--pink-ink); }
+  #campTbl td.cn { white-space: normal; min-width: 260px; max-width: 380px; font-weight: 700; }
+  #campTbl tbody tr { cursor: pointer; }
+  #campTbl tbody tr.on { background: var(--teal-soft); outline: 2px solid var(--teal); outline-offset: -2px; }
+  .mix { display: flex; height: 12px; width: 150px; border-radius: 0 4px 4px 0; overflow: hidden; gap: 1px; background: var(--panel); }
+  .mix span { display: block; height: 100%; }
+  .rec-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 14px; }
+  .rec-tiles > div { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px; cursor: pointer; align-content: start; }
+  .rec-tiles > div:hover { border-color: var(--teal); }
+  .rec-tiles > div.on { outline: 2px solid var(--teal); outline-offset: -1px; background: var(--teal-soft); }
+  .rec-tiles > div.warn { background: var(--pink-soft); border-color: transparent; }
+  .rec-tiles .st { font-family: var(--display); font-size: 24px; font-weight: 800; color: var(--head); line-height: 1.15; }
+  .rec-tiles .warn .st { color: var(--pink-ink); }
+  .rp { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .rp.Active { background: var(--teal-soft); color: var(--head); }
+  .rp.Missed { background: var(--pink-soft); color: var(--pink-ink); }
+  .rp.Stopped { background: var(--grid); color: var(--muted); }
+  .rp.One-off { color: var(--muted); padding-left: 0; }
+  .plan-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; margin-top: 14px; }
+  .plan-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; align-items: end; }
+  .plan-top h3 { font-size: 18px; }
+  .health { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .health .hv { font-family: var(--display); font-size: 30px; font-weight: 800; color: var(--head); line-height: 1; }
+  .health .arrow { font-weight: 700; }
+  .plan-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .plan-col { display: grid; gap: 8px; align-content: start; }
+  .plan-col h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .act { border-radius: 10px; background: var(--page); padding: 10px 12px; display: grid; gap: 4px; }
+  .act .t { font-weight: 700; color: var(--ink); }
+  .act .m { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 13px; color: var(--muted); }
+  .act .m b { color: var(--head); }
+  .act button { padding: 2px 10px; font-size: 12px; }
+  .plan-foot { border-top: 1px solid var(--line); padding-top: 10px; font-size: 14px; }
+  .plan-more summary { margin-top: 14px; }
+  /* interests */
+  .aff { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); gap: 24px; margin-top: 14px; align-items: start; }
+  @media (max-width: 980px) { .aff { grid-template-columns: 1fr; } }
+  .tbars { display: grid; gap: 2px; }
+  .tb { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 7px 10px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; }
+  .tb:hover { background: var(--teal-soft); }
+  .tb.on { border-color: var(--teal); background: var(--teal-soft); }
+  .tb .lab { font-weight: 700; font-size: 14px; min-width: 0; }
+  .tb .track { grid-column: 1 / -1; height: 10px; background: var(--grid); border-radius: 0 4px 4px 0; }
+  .tb .bar { height: 10px; border-radius: 0 4px 4px 0; background: var(--teal); min-width: 2px; }
+  .tb.untagged .bar { background: var(--muted); opacity: .5; }
+  .mx-wrap { overflow-x: auto; }
+  table.mx { border-collapse: separate; border-spacing: 3px; font-size: 12px; width: 100%; }
+  table.mx th { position: static; cursor: default; text-transform: none; letter-spacing: 0; font-size: 11px; font-weight: 700; white-space: normal; vertical-align: bottom; border: 0; padding: 4px; text-align: center; min-width: 62px; line-height: 1.25; }
+  table.mx th.row { text-align: left; white-space: nowrap; vertical-align: middle; font-size: 12px; color: var(--ink); }
+  table.mx td { text-align: center; border-radius: 6px; padding: 9px 4px; cursor: pointer; border: 0; font-weight: 700; white-space: nowrap; }
+  table.mx td.on { outline: 3px solid var(--pink); outline-offset: -1px; }
+  .lead { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .lead span { background: var(--teal-soft); border-radius: 999px; padding: 3px 10px; font-size: 13px; font-weight: 700; color: var(--head); }
+  .camp-rows { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .camp-row { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 8px; align-items: center; font-size: 13px; }
+  .camp-row span { overflow-wrap: anywhere; }
+  @media (max-width: 520px) { .camp-row { grid-template-columns: 1fr; } }
+  td a { color: var(--head); }
+  /* pink as an accent only: headline numbers and warnings */
+  .ins .st, .rec-tiles .st { color: var(--pink-ink); }
+  .plan-card { border-left: 3px solid var(--pink); }
+  .health .hv { color: var(--pink-ink); }
+  .act .m b { color: var(--pink-ink); }
+  #tip { position: fixed; pointer-events: none; background: var(--panel); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 10px; padding: 8px 12px; font-size: 13px; z-index: 20; max-width: 260px; }
+  #tip b { font-family: var(--display); }
+  details summary { cursor: pointer; font-weight: 700; color: var(--head); }
+  details[open] summary { margin-bottom: 10px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div class="eyebrow">The Give Collective · Donor insight</div>
+      <h1>Donor RFM Studio</h1>
+      <p class="lede muted">Score every donor on how <b>recently</b> they gave, how <b>often</b> they give and how <b>much</b> they've given. Then see who to thank, who to upgrade and who to win back.</p>
+    </div>
+    <div class="row hdr-actions">
+      <span id="srcChip" class="chip">Sample data · fictional donors</span>
+      <button id="clearSaved" type="button" hidden title="Remove the saved CSV from this browser and go back to sample data">Clear saved data</button>
+      <label class="btn primary" for="file">Load CSV<input id="file" type="file" accept=".csv,.txt,text/csv"></label>
+    </div>
+  </header>
+
+  <details class="card setup" id="setup">
+    <summary><span class="setup-t">Data &amp; scoring</span><span class="small muted" id="setupSum"></span><span class="setup-btn small"><span class="when-closed">Change data or scoring</span><span class="when-open">Hide</span></span></summary>
+    <div class="data">
+    <div style="display:grid; gap:14px; min-width:0">
+      <h2>1 · Your gifts</h2>
+      <div id="drop" class="drop">
+        <p><b>Drop a CSV export here</b> <span class="muted">or</span></p>
+        <div class="row center">
+          <label class="btn primary" for="file">Choose file</label>
+          <button id="pasteBtn" type="button">Paste rows</button>
+          <button id="sampleBtn" type="button">Reload sample</button>
+        </div>
+        <p class="small muted">One row per gift (donor, date, amount) or one row per donor (last gift date, number of gifts, total). Your file is read in this browser and never uploaded.</p>
+        <p class="small muted"><b>Demo mode:</b> the last file you analyse is kept in this browser (IndexedDB) so it is still here after a reload, until you press “Clear saved data”. Nothing is sent to a server.</p>
+      </div>
+      <div id="pasteBox" hidden style="display:grid; gap:8px">
+        <textarea id="pasteText" placeholder="donor_id,gift_date,amount&#10;D-1001,2026-10-02,50&#10;D-1002,2026-03-14,120"></textarea>
+        <div class="row"><button id="pasteGo" class="primary" type="button">Analyse pasted rows</button></div>
+      </div>
+      <div id="mapping" hidden style="display:grid; gap:10px">
+        <div class="row"><span class="eyebrow">Each row is</span>
+          <div class="seg-ctl" role="group" aria-label="Row type">
+            <button type="button" id="modeGift" aria-pressed="true">a gift</button>
+            <button type="button" id="modeDonor" aria-pressed="false">a donor</button>
+          </div>
+        </div>
+        <div class="fields" id="mapFields"></div>
+        <div class="row"><button id="applyMap" class="primary" type="button">Run analysis</button></div>
+      </div>
+      <div id="loadMsg" class="msg" hidden></div>
+      <div id="campBox" class="msg" hidden></div>
+    </div>
+
+    <div style="display:grid; gap:14px; min-width:0; align-content:start">
+      <h2>2 · Scoring</h2>
+      <div class="fields">
+        <label class="f">Analysis date<input id="asOf" type="date"></label>
+        <label class="f">Money score uses
+          <select id="mBasis"><option value="total">Total given</option><option value="avg">Average gift</option></select>
+        </label>
+        <label class="f">Currency symbol<input id="cur" type="text" value="$" maxlength="4"></label>
+      </div>
+      <p id="scaleNote" class="msg warn small" hidden></p>
+      <div class="scoring" id="scoring"></div>
+      <div class="msg small" style="display:grid;gap:8px">
+        <label style="display:flex;gap:8px;align-items:center;font-weight:700;cursor:pointer"><input type="checkbox" id="majorOn" checked> Set major donors apart</label>
+        <div class="row" style="gap:6px 8px">
+          <span>Major donor if</span>
+          <select id="majorBasis" aria-label="Major donor rule" style="width:auto"><option value="gift">largest single gift</option><option value="total">lifetime giving</option></select>
+          <span>is at least</span>
+          <input id="majorMin" type="number" min="0" step="100" value="1000" aria-label="Major donor threshold" style="width:110px">
+        </div>
+        <span class="muted" id="majorNote"></span>
+      </div>
+      <div id="recBoostBox" class="msg small" style="display:grid;gap:4px">
+        <label style="display:flex;gap:8px;align-items:center;font-weight:700;cursor:pointer"><input type="checkbox" id="recBoost" checked> Count active monthly donors as frequent givers</label>
+        <span class="muted">An active monthly donor scores at least F4 after 2 gifts and F5 after 3, so steady monthly supporters can reach Loyal donors and Champions. Donors who missed a payment are scored on their gifts only. <span id="recBoostN"></span></span>
+      </div>
+      <details class="small">
+        <summary>How the scores work</summary>
+        <p class="muted">Each donor gets 1–5 on each dimension; 5 is best. <b>Quintiles</b> split donors into five equal-sized groups (ties stay together). <b>Bands</b> use fixed cut-offs, which suit frequency because most donors give only once. Segments come from the R and F scores, the standard nonprofit grid; the M score ranks donors within each segment.</p>
+      </details>
+    </div>
+    </div>
+  </details>
+
+  <section class="card charity-bar" id="charityBar" hidden aria-label="Charity filter">
+    <label class="f" for="charity">Charity
+      <select id="charity"></select>
+    </label>
+    <label class="f" for="campaign">Campaign
+      <select id="campaign"></select>
+    </label>
+    <p class="small muted" id="charityNote"></p>
+  </section>
+
+  <section class="kpis" id="kpis" aria-label="Summary"></section>
+
+  <section class="card" aria-label="Monthly plan">
+    <div class="head">
+      <div>
+        <h2 id="planTitle">Monthly plan</h2>
+        <p class="muted small" id="planNote"></p>
+      </div>
+      <div class="row"><button type="button" id="planCopy">Copy plan</button></div>
+    </div>
+    <textarea id="planCopyFallback" hidden readonly aria-label="Plan text to copy"></textarea>
+    <div id="plan"></div>
+  </section>
+
+  <section class="card" aria-label="Recurring donors">
+    <div class="head">
+      <div>
+        <h2>Recurring donors</h2>
+        <p class="muted small" id="recNote"></p>
+      </div>
+    </div>
+    <div class="rec-tiles" id="recTiles"></div>
+    <div class="tbl-wrap" id="recCampWrap" style="margin-top:14px"><table id="recCamp"><thead></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="card">
+    <div class="head">
+      <div>
+        <h2>Who gives, and who brings in the money</h2>
+        <p class="muted small" id="sbNote">Share of donors against share of total giving, per segment. Click a segment to see its playbook and donors.</p>
+      </div>
+      <div class="seg-ctl" role="group" aria-label="Donor type" id="sbView">
+        <button type="button" data-sv="split" aria-pressed="true">Recurring vs one-off</button>
+        <button type="button" data-sv="all" aria-pressed="false">All</button>
+        <button type="button" data-sv="recur" aria-pressed="false">Recurring only</button>
+        <button type="button" data-sv="oneoff" aria-pressed="false">One-off only</button>
+      </div>
+    </div>
+    <div class="legend-line" id="sbLegend" style="margin-top:10px"></div>
+    <div id="majorRow"></div>
+    <div class="segbars" id="segbars"></div>
+  </section>
+
+  <section class="card" aria-label="Segments over time">
+    <div class="head">
+      <div>
+        <h2>How segments change over time</h2>
+        <p class="muted small" id="trendNote">Each point re-scores every donor using only the gifts made up to that date.</p>
+      </div>
+      <div class="row">
+        <div class="seg-ctl" role="group" aria-label="Trend measure">
+          <button type="button" data-tm="n" aria-pressed="true">Donors</button>
+          <button type="button" data-tm="pct" aria-pressed="false">Share</button>
+          <button type="button" data-tm="amt" aria-pressed="false">Giving</button>
+        </div>
+        <label class="f" style="min-width:130px"><span class="sr">Period</span>
+          <select id="trendUnit" aria-label="Period"><option value="auto">Auto interval</option><option value="7">Every 7 days</option><option value="14">Every 14 days</option><option value="30">Every 30 days</option><option value="60">Every 60 days</option><option value="90">Every 90 days</option><option value="120">Every 120 days</option><option value="180">Every 180 days</option><option value="365">Every 365 days</option></select>
+        </label>
+      </div>
+    </div>
+    <div class="legend" id="trendLegend"></div>
+    <div class="chart" id="trendChart"></div>
+    <div class="tbl-wrap" style="margin-top:14px"><table id="trendTbl"><thead></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="card play" id="play" aria-live="polite"></section>
+
+  <div class="two">
+    <section class="card">
+      <div class="head">
+        <div>
+          <h2>Recency × frequency grid</h2>
+          <p class="muted small">Each cell is a pair of scores. Click one to list those donors.</p>
+        </div>
+        <div class="seg-ctl" role="group" aria-label="Grid metric">
+          <button type="button" data-hm="n" aria-pressed="true">Donors</button>
+          <button type="button" data-hm="total" aria-pressed="false">Giving</button>
+          <button type="button" data-hm="avgM" aria-pressed="false">Per donor</button>
+        </div>
+      </div>
+      <div class="chart" id="heat"></div>
+    </section>
+    <section class="card">
+      <div class="head">
+        <div>
+          <h2>Donor map</h2>
+          <p class="muted small" id="mapNote">Days since last gift against lifetime giving. Dot size is number of gifts.</p>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="chart" id="scatter"></div>
+    </section>
+  </div>
+
+  <section class="card" aria-label="Donor interests">
+    <div class="head">
+      <div>
+        <h2>What donors care about</h2>
+        <p class="muted small" id="affNote">Based on the campaigns each donor gave to. A donor's main interest is where most of their money went.</p>
+      </div>
+      <label class="f" style="min-width:200px">Break down by
+        <select id="tagDim"></select>
+      </label>
+    </div>
+    <div class="aff" id="aff"></div>
+  </section>
+
+  <section class="card" aria-label="Campaign value">
+    <div class="head">
+      <div>
+        <h2>Which campaigns bring the most valuable donors</h2>
+        <p class="muted small" id="campRankNote"></p>
+      </div>
+      <div class="row">
+        <div class="seg-ctl" role="group" aria-label="Credit donors by">
+          <button type="button" data-cm="first" aria-pressed="true">First gift</button>
+          <button type="button" data-cm="any" aria-pressed="false">Any gift</button>
+        </div>
+        <label class="f" style="min-width:150px"><span class="sr">Minimum donors</span>
+          <select id="cMin" aria-label="Minimum donors per campaign"><option value="1">All campaigns</option><option value="5">5+ donors</option><option value="10" selected>10+ donors</option><option value="20">20+ donors</option><option value="50">50+ donors</option></select>
+        </label>
+      </div>
+    </div>
+    <div class="ins" id="campInsights"></div>
+    <div class="tbl-wrap"><table id="campTbl"><thead></thead><tbody></tbody></table></div>
+    <p class="small muted" style="margin-top:8px">Click a campaign to list its donors below. Now valuable = Champions, Loyal donors or Potential loyalists. Slipping = Drifting, At risk, Can't lose them or Lapsed.</p>
+  </section>
+
+  <section class="card">
+    <div class="head">
+      <div>
+        <h2>Donors</h2>
+        <p class="muted small" id="tblNote"></p>
+      </div>
+      <div class="row"><button id="copyCsv" type="button">Copy list as CSV</button></div>
+    </div>
+    <div class="filters">
+      <input id="q" type="search" placeholder="Search name or ID" aria-label="Search donors">
+      <span id="activeFilters" class="row"></span>
+    </div>
+    <textarea id="copyFallback" hidden readonly aria-label="CSV to copy"></textarea>
+    <div class="tbl-wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+    <div class="row center" style="margin-top:12px"><button id="more" type="button">Show more</button></div>
+  </section>
+
+  <section class="card">
+    <details id="campDetails">
+      <summary>Campaign tags · <span id="campCount"></span> campaigns from thegivecollective.com</summary>
+      <p class="small muted">Each campaign page was read and tagged on 10 Nov 2026. Gifts are linked to these by campaign URL, slug or title. Rows marked "likely" or "not named" don't name the charity on the page.</p>
+      <div class="filters"><input id="cq" type="search" placeholder="Search campaigns, charities or tags" aria-label="Search campaigns"></div>
+      <div class="tbl-wrap"><table id="ctbl"><thead><tr><th>Campaign</th><th>Charity</th><th>Interest</th><th>Cause</th><th>Who is helped</th><th>Age</th><th>Location</th><th>Format</th><th>Appeal</th></tr></thead><tbody></tbody></table></div>
+    </details>
+  </section>
+</div>
+<div id="tip" hidden></div>
+
+<script id="tagdata" type="application/json">{"scanned":"2026-11-10","campaigns":[{"s":"supporting-the-seniors-in-need-and-their-caregivers","t":"Supporting the seniors in need and their caregivers","c":"Caregiving Welfare Association","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+); Adults (25-64)","g":"Seniors ageing at home; Family caregivers","l":"Singapore (nationwide)","fu":"Home care, caregiver training and respite","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"supporting-the-seniors-in-need-and-their-caregivers-2026","t":"Supporting the seniors in need and their caregivers 2026 - Monthly","c":"Caregiving Welfare Association","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+); Adults (25-64)","g":"Seniors ageing at home; Family caregivers","l":"Singapore (nationwide)","fu":"Home care, caregiver training and respite","ap":"Recurring support","f":"Monthly giving","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"supporting-the-seniors-in-need-and-their-caregivers-2026-htm","t":"Supporting the seniors in need and their caregivers 2026 - HTM","c":"Caregiving Welfare Association","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+); Adults (25-64)","g":"Seniors ageing at home; Family caregivers","l":"Singapore (nationwide)","fu":"Home care, caregiver training and respite","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"supporting-the-seniors-in-need-and-their-caregivers-2026-hf-a","t":"Supporting the seniors in need and their caregivers 2026 - HF/A","c":"Caregiving Welfare Association","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+); Adults (25-64)","g":"Seniors ageing at home; Family caregivers","l":"Singapore (nationwide)","fu":"Home care, caregiver training and respite","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"supporting-the-seniors-in-need-and-their-caregivers-2026-ot","t":"Supporting the seniors in need and their caregivers 2026 - OT","c":"Caregiving Welfare Association","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+); Adults (25-64)","g":"Seniors ageing at home; Family caregivers","l":"Singapore (nationwide)","fu":"Home care, caregiver training and respite","ap":"Ongoing programme","f":"One-time gift","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"direct-donation","t":"Direct Donation","c":"The Give Collective","i":"General / unrestricted","ca":"General / unrestricted","a":"All ages","g":"All causes on the platform","l":"Singapore (nationwide)","fu":"Unrestricted","ap":"Unrestricted","f":"General donation","st":"Organisation story","sdg":"","sec":"Others"},{"s":"sponsor-dreams-support-youth-mental-health-programs-vf","t":"Sponsor Dreams - Support Youth Mental Health Programs VF","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"sponsor-dreams-support-youth-mental-health-programs-vf-ht","t":"Sponsor Dreams - Support Youth Mental Health Programs VF HT","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"raise-hope-and-sponsor-dreams-support-youth-mental-health-programs-limitless","t":"Raise Hope and Sponsor Dreams - Support Youth Mental Health Programs - Limitless","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"raise-hope-and-sponsor-dreams-support-youth-mental-health-programs","t":"Raise Hope and Sponsor Dreams - Support Youth Mental Health Programs","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"restore-worth-in-youths-struggling-with-mental-illness-vf","t":"Restore Worth - In Youths Struggling with Mental Illness VF","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"raise-hope-and-restore-worth-in-youths-struggling-with-mental-illness-limitless","t":"Raise Hope and Restore Worth in Youths Struggling with Mental Illness - Limitless","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"raise-hope-and-restore-worth-in-youths-struggling-with-mental-illness","t":"Raise Hope and Restore Worth - In Youths Struggling with Mental Illness","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"bring-hope-to-youths-struggling-with-mental-illness-vf","t":"Bring Hope - To Youths Struggling With Mental Illness VF","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"raise-hope-to-youths-struggling-with-mental-illness","t":"Raise Hope To Youths Struggling With Mental Illness - Limitless","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"be-a-sree-narayana-mission-champion-today","t":"Be a Sree Narayana Mission Champion today!","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Nursing care, meals and daily needs","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"be-a-sree-narayana-mission-champion-today-2","t":"Be a Sree Narayana Mission Champion today! (2)","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Nursing care, meals and daily needs","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"be-a-sree-narayana-mission-champion-today-community-support","t":"Be a Sree Narayana Mission Champion today! Community Support","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Community support services for seniors","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"be-a-sree-narayana-mission-champion-today-social-integration","t":"Be a Sree Narayana Mission Champion today! Social Integration","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Social integration activities for seniors","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"be-a-sree-narayana-mission-champion-today-ot","t":"Be a Sree Narayana Mission Champion today! OT","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Nursing care, meals and daily needs","ap":"Ongoing programme","f":"One-time gift","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"the-zen-dylan-koh-fund","t":"The Zen Dylan Koh Fund","c":"The Zen Dylan Koh Fund","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Young people with depression and anxiety","l":"Singapore (nationwide)","fu":"Suicide prevention and mental-health support","ap":"Ongoing programme","f":"Memorial fund","st":"Named beneficiary story","sdg":"SDG 3 Good health","sec":"Health"},{"s":"tip-supports-the-elderly-residents-sree-narayana-mission","t":"TIP Supports The Elderly Residents Sree Narayana Mission","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Nursing care, meals and daily needs","ap":"Ongoing programme","f":"Corporate (TIP)","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"tip-supports-the-beneficiaries-of-caregiving-welfare-association","t":"TIP Supports the Beneficiaries of Caregiving Welfare Association","c":"Caregiving Welfare Association","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+); Adults (25-64)","g":"Seniors ageing at home; Family caregivers","l":"Singapore (nationwide)","fu":"Home care, caregiver training and respite","ap":"Ongoing programme","f":"Corporate (TIP)","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"tip-supports-the-youth-in-need-mental-health-programmes","t":"TIP Supports the Youth in Need - Mental Health Programmes","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Corporate (TIP)","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"care-for-our-caregivers-this-good-friday-and-easter-sunday","t":"Care for Our Caregivers this Good Friday and Easter Sunday","c":"Caregiving Welfare Association","i":"Seniors & caregivers","ca":"Caregiver support","a":"Adults (25-64); Seniors (65+)","g":"Family caregivers (many aged 48-79)","l":"Singapore (nationwide)","fu":"Caregiver support and navigation","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"zhao-yupei-supports-the-lovely-ah-gongs-ah-mas-snm-nursing-home-yishun","t":"Zhao Yupei Supports the lovely ah gongs & ah mas @ SNM Nursing Home Yishun","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Nursing care, meals and daily needs","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"a-warm-meal-a-warmer-heart-support-seniors-at-sree-narayana-mission","t":"A Warm Meal, A Warmer Heart - Support Seniors at Sree Narayana Mission","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Meals and basic necessities","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 2 Zero hunger; SDG 3 Good health","sec":"Social & Welfare"},{"s":"a-warm-meal","t":"A Warm Meal, A Dignified Life - Support Our Seniors at SNM (一餐温暖，一份尊严)","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Meals and basic necessities","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 2 Zero hunger; SDG 3 Good health","sec":"Social & Welfare"},{"s":"a-knock-on-the-door-a-reminder-they-are-not-alone","t":"A Knock on the Door, A Reminder They Are Not Alone (一声敲门，一份牵挂)","c":"Caregiving Welfare Association","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Seniors living alone","l":"Singapore (nationwide)","fu":"Home visits and companionship","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"from-our-family-to-yours-giving-hope-to-youths-in-need","t":"From Our Family to Yours: Giving Hope to Youths in Need (以我们的家庭之心)","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"join-garima-and-abhishek-in-supporting-our-seniors-at-sree-narayana-mission","t":"Join Garima and Abhishek in supporting our seniors at Sree Narayana Mission","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"a-couples-gift-of-care-supporting-our-seniors-at-snm","t":"A Couple's Gift of Care: Supporting Our Seniors at SNM","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Nursing care, meals and daily needs","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"sponsor-dreams-support-youth-mental-health-programs-today","t":"Sponsor Dreams - Support Youth Mental Health Programs Today","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"they-built-the-singapore-we-know-today-lets-care-for-them-today","t":"They Built the Singapore We Know Today. Let's Care for Them Today.","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Nursing care, meals and daily needs","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"seniors-built-our-future-now-lets-care-for-their-tomorrow","t":"Seniors Built Our Future. Now Let's Care for Their Tomorrow","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Nursing care, meals and daily needs","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"help-us-save-community-cats","t":"Help Us Save Singapore's Most Vulnerable Community Cats","c":"LUNI Singapore","i":"Animal welfare","ca":"Animal welfare","a":"Not applicable","g":"Community cats","l":"Singapore (nationwide)","fu":"Cat food, feeding and sterilisation","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"","sec":"Others"},{"s":"please-help-gandalf-to-recover","t":"Please help Gandalf to recover!","c":"Cat rescuer (not named)","i":"Animal welfare","ca":"Animal welfare","a":"Not applicable","g":"Injured or sick rescue cat","l":"Singapore","fu":"Vet treatment and medical boarding","ap":"Urgent personal need","f":"Individual appeal","st":"Named beneficiary story","sdg":"","sec":"Others"},{"s":"please-donate-to-save-lucky","t":"Please donate to save Lucky!","c":"Cat rescuer (not named)","i":"Animal welfare","ca":"Animal welfare","a":"Not applicable","g":"Injured or sick rescue cat","l":"Singapore","fu":"Vet treatment and medical boarding","ap":"Urgent personal need","f":"Individual appeal","st":"Named beneficiary story","sdg":"","sec":"Others"},{"s":"join-kaatam-vidyasagar-in-bringing-comfort-to-our-elderly","t":"Join Kaatam Vidyasagar in Bringing Comfort to Our Elderly","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"hectors-campaign-to-bring-hope-and-comfort-to-our-seniors","t":"Hector's Campaign to Bring Hope and Comfort to Our Seniors","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"donatedominate4limitless","t":"Donate & Dominate: Community Run for Youth Mental Health","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Event","f":"Event (participation)","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"together-with-vaishnavi-suthashanker-%e2%9d%a4%ef%b8%8f-every-smile-matters","t":"Together with Vaishnavi Suthashanker - Every Smile Matters","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"together-with-paul-parez-%e2%9d%a3%ef%b8%8f-a-small-act-of-kindness-a-lasting-impact","t":"Together with Paul Perez - A Small Act of Kindness, A Lasting Impact","c":"Sree Narayana Mission (likely)","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"power-the-platform-helping-singapores-children-low-income-families","t":"Power the Platform Helping Singapore's Children & Low-Income Families","c":"The Give Collective","i":"Children, families & education","ca":"Platform & capacity building","a":"Children (0-12); Adults (25-64)","g":"Low-income families and children","l":"Singapore (nationwide)","fu":"Running The Collective Boost platform for families in crisis","ap":"Ongoing programme","f":"Charity appeal","st":"Named beneficiary story","sdg":"SDG 1 No poverty; SDG 17 Partnerships","sec":"Social & Welfare"},{"s":"power-the-platform-helping-singapores-children-low-income-families-ot","t":"Power the Platform Helping Singapore's Children & Low-Income Families OT","c":"The Give Collective","i":"Children, families & education","ca":"Platform & capacity building","a":"Children (0-12); Adults (25-64)","g":"Low-income families and children","l":"Singapore (nationwide)","fu":"Running The Collective Boost platform for families in crisis","ap":"Ongoing programme","f":"One-time gift","st":"Named beneficiary story","sdg":"SDG 1 No poverty; SDG 17 Partnerships","sec":"Social & Welfare"},{"s":"commcatfeeding","t":"Let's Save Singapore's Homeless Cats from Hunger - LUNI Singapore","c":"LUNI Singapore","i":"Animal welfare","ca":"Animal welfare","a":"Not applicable","g":"Community cats","l":"Singapore (nationwide)","fu":"Cat food, feeding and sterilisation","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"","sec":"Others"},{"s":"help-andre-recover-after-a-devastating-cycling-accident","t":"#GiveAbitCan | Help Andre Recover After a Devastating Cycling Accident","c":"The Collective Boost (individual appeal)","i":"Health & personal crisis","ca":"Health & medical","a":"Adults (25-64)","g":"Migrant worker and his family","l":"Singapore; family in the Philippines","fu":"Accident recovery and family living costs","ap":"Urgent personal need","f":"#GiveABitCan","st":"Named beneficiary story","sdg":"SDG 3 Good health; SDG 1 No poverty","sec":"Social & Welfare"},{"s":"care-for-seniors-support-caregivers","t":"#GiveABitCan | No Caregiver Should Care Alone - Caregiving Welfare Association","c":"Caregiving Welfare Association","i":"Seniors & caregivers","ca":"Caregiver support","a":"Adults (25-64); Seniors (65+)","g":"Family caregivers (many aged 48-79)","l":"Singapore (nationwide)","fu":"Caregiver support and navigation","ap":"Ongoing programme","f":"#GiveABitCan","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"proud-fund","t":"Proud Fund","c":"Proud Spaces","i":"LGBTQ+ community","ca":"LGBTQ+ inclusion","a":"Adults (25-64); Youth (13-24)","g":"LGBTQ+ people","l":"Singapore (nationwide)","fu":"Community programmes, support groups and legal clinics","ap":"Recurring support","f":"Monthly giving","st":"Organisation story","sdg":"SDG 10 Reduced inequalities; SDG 5 Gender equality","sec":"Community"},{"s":"giveabitcan-make-accessibility-possible-k9assistance-assistance-dogs","t":"#GiveABitCan | Make Accessibility Possible - K9Assistance Assistance Dogs","c":"K9Assistance","i":"Disability & accessibility","ca":"Disability & inclusion","a":"Adults (25-64); All ages","g":"Persons with disabilities","l":"Singapore (nationwide)","fu":"Training and placing assistance dogs","ap":"Ongoing programme","f":"#GiveABitCan","st":"Organisation story","sdg":"SDG 10 Reduced inequalities; SDG 3 Good health","sec":"Social & Welfare"},{"s":"giveabitcan-provide-free-counselling-for-youths-limitless","t":"#GiveABitCan | Provide Free Counselling for Youths - Limitless","c":"Limitless","i":"Mental health","ca":"Mental health","a":"Youth (13-24)","g":"Youths aged 12-25 facing mental illness, poverty or exclusion","l":"Singapore (nationwide)","fu":"Free counselling and case work","ap":"Ongoing programme","f":"#GiveABitCan","st":"Organisation story","sdg":"SDG 3 Good health; SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"giveabitcan-every-senior-deserves-to-age-with-dignity-sree-narayana-mission-singapore","t":"#GiveABitCan | Every Senior Deserves to Age with Dignity - Sree Narayana Mission","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Frail and low-income seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Nursing care, meals and daily needs","ap":"Ongoing programme","f":"#GiveABitCan","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"a-little-time-a-big-difference-%e2%9d%a4%ef%b8%8f-melca-acazo-samson-and-samson-jezekaiah-acazo","t":"A Little Time, A Big Difference - Melca Acazo Samson and Samson Jezekaiah Acazo","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"they-just-want-to-feel-remembered-%e2%9d%a4%ef%b8%8f-chandramohan-jina","t":"They Just Want to Feel Remembered - Chandramohan Jina","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"help-bring-life-changing-assistance-dogs-to-singapore","t":"Help Bring Life-Changing Assistance Dogs to Singapore","c":"K9Assistance","i":"Disability & accessibility","ca":"Disability & inclusion","a":"Adults (25-64); All ages","g":"Persons with disabilities","l":"Singapore (nationwide)","fu":"Training and placing assistance dogs","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 10 Reduced inequalities; SDG 3 Good health","sec":"Social & Welfare"},{"s":"give-monthly-to-build-singapores-assistance-dog-future","t":"Give Monthly to Build Singapore's Assistance Dog Future","c":"K9Assistance","i":"Disability & accessibility","ca":"Disability & inclusion","a":"Adults (25-64); All ages","g":"Persons with disabilities","l":"Singapore (nationwide)","fu":"Training and placing assistance dogs","ap":"Recurring support","f":"Monthly giving","st":"Organisation story","sdg":"SDG 10 Reduced inequalities; SDG 3 Good health","sec":"Social & Welfare"},{"s":"support-the-next-stage-of-assistance-dogs-in-singapore","t":"Support the Next Stage of Assistance Dogs in Singapore","c":"K9Assistance","i":"Disability & accessibility","ca":"Disability & inclusion","a":"Adults (25-64); All ages","g":"Persons with disabilities","l":"Singapore (nationwide)","fu":"Training and placing assistance dogs","ap":"Capital / new project","f":"Charity appeal","st":"Organisation story","sdg":"SDG 10 Reduced inequalities; SDG 3 Good health","sec":"Social & Welfare"},{"s":"become-a-sustaining-partner-for-assistance-dogs-in-singapore","t":"Become a Sustaining Partner for Assistance Dogs in Singapore","c":"K9Assistance","i":"Disability & accessibility","ca":"Disability & inclusion","a":"Adults (25-64); All ages","g":"Persons with disabilities","l":"Singapore (nationwide)","fu":"Training and placing assistance dogs","ap":"Recurring support","f":"Monthly giving","st":"Organisation story","sdg":"SDG 10 Reduced inequalities; SDG 3 Good health","sec":"Social & Welfare"},{"s":"giveabitcan-help-a-family-rebuild-after-their-sons-trauma","t":"#GiveAbitCan | Help a Family Rebuild After Their Son's Trauma","c":"The Collective Boost (individual appeal)","i":"Children, families & education","ca":"Children & family welfare","a":"Children (0-12); Youth (13-24); Adults (25-64)","g":"Child survivor and his low-income family","l":"Singapore","fu":"Living expenses, therapy and family support","ap":"Urgent personal need","f":"#GiveABitCan","st":"Named beneficiary story","sdg":"SDG 1 No poverty; SDG 3 Good health","sec":"Social & Welfare"},{"s":"azman-riasha-sayma-akhter-sometimes-just-being-there-means-a-lot-%e2%9d%a4%ef%b8%8f","t":"Azman Riasha & Sayma Akhter - Sometimes, Just Being There Means A Lot","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"help-rahman-finish-building-his-school","t":"Help Rahman Finish Al-Shohag School","c":"The Collective Boost (individual appeal)","i":"Children, families & education","ca":"Education","a":"Children (0-12)","g":"~250 children from low-income farming families","l":"Bangladesh","fu":"Finishing and running a school","ap":"Capital / new project","f":"Individual appeal","st":"Named beneficiary story","sdg":"SDG 4 Quality education; SDG 1 No poverty","sec":"Education"},{"s":"giveabitcan-fulfilling-wishes-celebrating-lives-ambulance-wish-singapore","t":"#GiveAbitCan | Fulfilling Wishes, Celebrating Lives - Ambulance Wish Singapore","c":"Ambulance Wish Singapore","i":"Health & personal crisis","ca":"End-of-life care","a":"Seniors (65+); All ages","g":"Terminally ill patients","l":"Singapore (nationwide)","fu":"Last-wish trips for terminally ill patients","ap":"Ongoing programme","f":"#GiveABitCan","st":"Organisation story","sdg":"SDG 3 Good health","sec":"Health"},{"s":"zaman-riasha-sayma-akhter-sometimes-just-being-there-means-a-lot-%e2%9d%a4%ef%b8%8f","t":"Zaman Riasha & Sayma Akhter - Sometimes, Just Being There Means A Lot","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"meet-your-sqmp","t":"Meet Your SQMP","c":"Proud Spaces","i":"LGBTQ+ community","ca":"LGBTQ+ inclusion","a":"Adults (25-64); Youth (13-24)","g":"LGBTQ+ people","l":"Singapore (nationwide)","fu":"Queer history storytelling workshops (Singapore Queer Museum Project)","ap":"Event","f":"Event (ticketed)","st":"Organisation story","sdg":"SDG 10 Reduced inequalities","sec":"Community"},{"s":"tip-supports-k9assistance","t":"TIP Supports K9Assistance","c":"K9Assistance","i":"Disability & accessibility","ca":"Disability & inclusion","a":"Adults (25-64); All ages","g":"Persons with disabilities","l":"Singapore (nationwide)","fu":"Training and placing assistance dogs","ap":"Ongoing programme","f":"Corporate (TIP)","st":"Organisation story","sdg":"SDG 10 Reduced inequalities; SDG 3 Good health","sec":"Social & Welfare"},{"s":"a-little-care-a-lot-of-meaning-%e2%9d%a4%ef%b8%8f-with-chung-ren-fatt","t":"A Little Care, A Lot of Meaning - With Chung Ren Fatt","c":"Sree Narayana Mission (likely)","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"chaos-colours","t":"Chaos, Colours And Compassion: The Art Of Self-Kindness","c":"Proud Spaces","i":"LGBTQ+ community","ca":"LGBTQ+ inclusion","a":"Adults (25-64); Youth (13-24)","g":"LGBTQ+ people","l":"Singapore (nationwide)","fu":"Art workshop on self-kindness","ap":"Event","f":"Event (ticketed)","st":"Organisation story","sdg":"SDG 10 Reduced inequalities","sec":"Community"},{"s":"pizza-pool-party","t":"Pizza Pool Party: A Pizza-Making & Poetry Social","c":"Proud Spaces","i":"LGBTQ+ community","ca":"LGBTQ+ inclusion","a":"Adults (25-64); Youth (13-24)","g":"LGBTQ+ people","l":"Singapore (nationwide)","fu":"Community event and belonging","ap":"Event","f":"Event (ticketed)","st":"Organisation story","sdg":"SDG 10 Reduced inequalities","sec":"Community"},{"s":"the-weight-of-the-unspoken","t":"The Weight Of The Unspoken: Caregiver Grief In The LGBTQ+ Community","c":"Proud Spaces","i":"LGBTQ+ community","ca":"LGBTQ+ inclusion","a":"Adults (25-64); Youth (13-24)","g":"LGBTQ+ caregivers of ageing parents","l":"Singapore (nationwide)","fu":"Talk and peer support on caregiver grief","ap":"Event","f":"Event (ticketed)","st":"Organisation story","sdg":"SDG 10 Reduced inequalities","sec":"Community"},{"s":"semeja","t":"SEMEJA - At The Table","c":"Proud Spaces","i":"LGBTQ+ community","ca":"LGBTQ+ inclusion","a":"Adults (25-64); Youth (13-24)","g":"LGBTQ+ people and affirming parents","l":"Singapore (nationwide)","fu":"Family-acceptance gathering with SAFE and Sendok Rakyat","ap":"Event","f":"Event (ticketed)","st":"Organisation story","sdg":"SDG 10 Reduced inequalities","sec":"Community"},{"s":"bridging-conversations-in-transit","t":"Bridging Conversations - In Transit","c":"Proud Spaces","i":"LGBTQ+ community","ca":"LGBTQ+ inclusion","a":"Adults (25-64); Youth (13-24)","g":"Trans people; Helping professionals","l":"Singapore (nationwide)","fu":"Training helping professionals on trans lives","ap":"Event","f":"Event (ticketed)","st":"Organisation story","sdg":"SDG 10 Reduced inequalities","sec":"Community"},{"s":"a-little-time-a-meaningful-connection-%e2%9d%a4%ef%b8%8f-with-noman-abdullah-al","t":"A Little Time, A Meaningful Connection - with Noman Abdullah Al","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"help-cik-zie-feed-community-cats","t":"#GiveAbitCan | Help Cik Zie Continue Feeding Singapore's Community Cats","c":"The Collective Boost (individual appeal)","i":"Animal welfare","ca":"Animal welfare","a":"Not applicable","g":"Community cats","l":"Singapore (nationwide)","fu":"Cat food for an independent feeder","ap":"Ongoing programme","f":"#GiveABitCan","st":"Named beneficiary story","sdg":"","sec":"Others"},{"s":"a-new-experience-a-meaningful-moment-%e2%9d%a4%ef%b8%8f-karuppaiya-saragarajan","t":"A New Experience, A Meaningful Moment - Karuppaiya Sarangarajan","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"a-little-support-a-meaningful-difference-%e2%9d%a4%ef%b8%8f-ei-ei-mon","t":"A Little Support, A Meaningful Difference - Ei Ei Mon","c":"Sree Narayana Mission","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"help-her-move-forward","t":"Help Her Move Forward","c":"Image Mission Ltd","i":"Community & livelihoods","ca":"Employment & livelihoods","a":"Adults (25-64)","g":"Women facing barriers to employment","l":"Singapore (nationwide)","fu":"Career coaching and skills","ap":"Ongoing programme","f":"Charity appeal","st":"Organisation story","sdg":"SDG 5 Gender equality; SDG 8 Decent work","sec":"Social & Welfare"},{"s":"a-moment-ill-remember-%e2%9d%a4%ef%b8%8f-alex-martin-mariaprakasam","t":"A Moment I'll Remember - Alex Martin Mariaprakasam","c":"Sree Narayana Mission (likely)","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"a-little-kindness-goes-a-long-way-with-shanmugam-vasanthakumar-%e2%9d%a4%ef%b8%8f","t":"A Little Kindness Goes a Long Way With Shanmugam Vasanthakumar","c":"Sree Narayana Mission (likely)","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"community-integration-programme-vision","t":"Community Integration Programme - Vision","c":"Singapore Red Cross","i":"Disability & accessibility","ca":"Disability & inclusion","a":"All ages","g":"Persons with disabilities; Vulnerable families","l":"Singapore (nationwide)","fu":"Community integration programme","ap":"Recurring support","f":"Monthly giving","st":"Organisation story","sdg":"SDG 10 Reduced inequalities","sec":"Social & Welfare"},{"s":"service-to-humanity-%e2%9d%a4%ef%b8%8f-with-al-mamun-abdul","t":"Service to Humanity - With Al Mamun Abdul","c":"Sree Narayana Mission (likely)","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"a-little-kindness-can-make-someone-smile-%e2%9d%a4%ef%b8%8f-with-ramos-rusty-ramones","t":"A Little Kindness Can Make Someone Smile - with Ramos Rusty Ramones","c":"Sree Narayana Mission (likely)","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"giving-back-to-the-community-%e2%9d%a4%ef%b8%8f-with-solai-divya","t":"Giving Back to the Community - With Solai Divya","c":"Sree Narayana Mission (likely)","i":"Seniors & caregivers","ca":"Elderly care","a":"Seniors (65+)","g":"Nursing-home residents; Lonely seniors","l":"Singapore - Yishun (SNM Nursing Home @ Chong Pang)","fu":"Care and companionship for residents","ap":"Ongoing programme","f":"Volunteer peer-to-peer","st":"Fundraiser's own story","sdg":"SDG 3 Good health","sec":"Social & Welfare"},{"s":"help-suresh-through-grief-surgery-and-recovery","t":"Help Suresh Through Grief, Surgery and Recovery","c":"The Collective Boost (individual appeal)","i":"Health & personal crisis","ca":"Health & medical","a":"Adults (25-64)","g":"Bereaved former caregiver (brother had cerebral palsy)","l":"Singapore","fu":"Surgery, recovery and living costs","ap":"Urgent personal need","f":"Individual appeal","st":"Named beneficiary story","sdg":"SDG 3 Good health; SDG 1 No poverty","sec":"Social & Welfare"},{"s":"comedy-outing","t":"Comedy Outing: A Proud Spaces FUNraiser","c":"Proud Spaces","i":"LGBTQ+ community","ca":"LGBTQ+ inclusion","a":"Adults (25-64); Youth (13-24)","g":"LGBTQ+ people","l":"Singapore (nationwide)","fu":"Community event and belonging","ap":"Event","f":"Event (ticketed)","st":"Organisation story","sdg":"SDG 10 Reduced inequalities","sec":"Community"},{"s":"help-adrian-fund-3000-masks","t":"Help Adrian Bring 10,000 Masks to the Community","c":"SG As One","i":"Community & livelihoods","ca":"Public health & environment","a":"All ages; Seniors (65+)","g":"Households and seniors during haze","l":"Singapore (nationwide)","fu":"Masks delivered to doorsteps","ap":"Urgent personal need","f":"Individual appeal","st":"Fundraiser's own story","sdg":"SDG 3 Good health; SDG 11 Sustainable communities","sec":"Community"},{"s":"fms-restore-fight-for-stability","t":"RESTORE: Fight for Stability","c":"Fellowship of Men Singapore","i":"Mental health","ca":"Poverty & basic needs","a":"Adults (25-64)","g":"Men in crisis","l":"Singapore (nationwide)","fu":"Short-stay shelter, food and mentoring","ap":"Capital / new project","f":"Charity appeal","st":"Organisation story","sdg":"SDG 1 No poverty; SDG 3 Good health; SDG 11 Sustainable communities","sec":"Social & Welfare"},{"s":"fms-restore-stability","t":"RESTORE: Every Man Deserves Stability","c":"Fellowship of Men Singapore","i":"Mental health","ca":"Poverty & basic needs","a":"Adults (25-64)","g":"Men in crisis","l":"Singapore (nationwide)","fu":"Short-stay shelter, food and mentoring","ap":"Capital / new project","f":"Charity appeal","st":"Organisation story","sdg":"SDG 1 No poverty; SDG 3 Good health; SDG 11 Sustainable communities","sec":"Social & Welfare"},{"s":"rescue-food-nourish-lives","t":"Rescue Food, Nourish Lives","c":"Food rescue group (not named)","i":"Community & livelihoods","ca":"Poverty & basic needs","a":"All ages","g":"Low-income households; Migrant workers","l":"Singapore - Little India","fu":"Rescuing and redistributing surplus food","ap":"Capital / new project","f":"Charity appeal","st":"Named beneficiary story","sdg":"SDG 2 Zero hunger; SDG 12 Responsible consumption","sec":"Community"}]}</script>
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const DAY = 864e5;
+
+/* ---------- segments ---------- */
+const SEGS = [
+  { id: "champ", name: "Champions", c: "--s1", what: "Gave recently and give often.",
+    acts: ["Thank them personally: a call or a handwritten note from leadership.", "Invite them to give monthly, join a giving circle or consider a gift in their will.", "Ask them to fundraise among friends; they are your best advocates."] },
+  { id: "loyal", name: "Loyal donors", c: "--s2", what: "Give often and still active.",
+    acts: ["Send impact reports that show what their giving achieved.", "Propose a modest upgrade, around 15–20% on their usual gift.", "Recognise their streak: years of giving, number of gifts."] },
+  { id: "potential", name: "Potential loyalists", c: "--s3", what: "Recent donors with a few gifts.",
+    acts: ["Move them toward monthly giving while they are engaged.", "Run a third-gift journey: story, impact, then a specific ask.", "Keep asks small and frequent; don't jump to a major ask yet."] },
+  { id: "new", name: "New donors", c: "--s4", what: "First gift, made recently.",
+    acts: ["Welcome email or call within 48 hours of the gift.", "Show exactly where the first gift went.", "Make a second ask at 60–90 days; this is the biggest retention lever."] },
+  { id: "promising", name: "Promising", c: "--s5", what: "One gift, a few months ago.",
+    acts: ["Send an impact update before they cool off.", "Make a soft second ask tied to a specific project.", "Offer a low-effort way back in, such as a small recurring gift."] },
+  { id: "attention", name: "Needs attention", c: "--s6", what: "Middle of the pack on both.",
+    acts: ["Re-engage with one clear campaign rather than general news.", "Ask for feedback: why they give, what they want to hear.", "Test channels; some respond to SMS or events, not email."] },
+  { id: "drifting", name: "Drifting", c: "--s7", what: "Few gifts, getting quieter.",
+    acts: ["Use low-cost touches: a story email, a short survey.", "Remind them of their first gift and what it did.", "Don't spend print or phone budget until they respond."] },
+  { id: "risk", name: "At risk", c: "--s8", what: "Used to give often, not lately.",
+    acts: ["Reach out personally and ask what changed.", "Send a reactivation appeal that names their past support.", "Offer a lighter commitment if their circumstances changed."] },
+  { id: "cantlose", name: "Can't lose them", c: "--s9", what: "Your most frequent givers, gone quiet.",
+    acts: ["Phone call from a senior person this month.", "Prepare a tailored proposal or private briefing.", "Check for service issues: lapsed card, wrong address, bad experience."] },
+  { id: "lapsed", name: "Lapsed", c: "--s10", what: "Long silent, few gifts.",
+    acts: ["Include in one annual win-back appeal only.", "Suppress from costly mailings to protect budget.", "Clean the data: deceased, moved, duplicate records."] },
+];
+const SEG = Object.fromEntries(SEGS.map(s => [s.id, s]));
+SEG.major = { id: "major", name: "Major donors", c: "--smaj", what: "Gave a gift above your major-gift threshold. Set apart from the scores.",
+  acts: ["Assign each one a named relationship owner within a week of the gift.", "Thank them personally: a call from leadership and a tailored impact report.", "Invite them to see the work first-hand: a site visit or a briefing.", "Plan the next conversation around a specific project, not a general appeal."] };
+function segOf(r, f) {
+  if (r <= 2) return f <= 2 ? "lapsed" : f <= 4 ? "risk" : "cantlose";
+  if (r === 3) return f <= 2 ? "drifting" : f === 3 ? "attention" : "loyal";
+  if (r === 4) return f === 1 ? "promising" : f <= 3 ? "potential" : "loyal";
+  return f === 1 ? "new" : f <= 3 ? "potential" : "champ";
+}
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const segColor = id => cssVar(SEG[id].c);
+
+/* ---------- state ---------- */
+const st = {
+  donors: [],        // {id,name,last:Date,count,total}
+  source: "sample",
+  asOf: null,
+  mBasis: "total",
+  cur: "$",
+  dims: {
+    R: { method: "bands", cuts: [90, 180, 365, 730] },
+    F: { method: "bands", cuts: [1, 2, 4, 9] },
+    M: { method: "quintiles", cuts: null },
+  },
+  selSeg: null, selCell: null, hl: null, q: "", sort: { key: "rfm", dir: -1 }, shown: 100, hm: "n",
+  rows: null, csv: null, mode: "gift",
+  planIds: null, planLabel: "", selRec: null, sbView: "split", recBoost: true, majorOn: true, majorBasis: "gift", majorMin: 1000, majors: [], allDonors: [],
+  charity: "", campaign: "", cMode: "first", cMin: 10, cSort: { key: "avg", dir: -1 }, selCamp: null, selCampMode: "first",
+  viewGifts: null, trendUnit: "auto", trendMode: "n", trend: null, trendHl: null,
+  tagDim: "i", selTag: null, affTop: [], hasCamp: false, gifts: null, manual: {},
+};
+
+/* ---------- campaign tags ---------- */
+const TAGDATA = (() => { try { return JSON.parse(document.getElementById("tagdata").textContent); } catch { return {}; } })();
+const TAGS = TAGDATA.campaigns || [];
+const CAMP_BASE = "https://thegivecollective.com/campaigns/";
+const TDIMS = [
+  { k: "i", l: "Interest" }, { k: "ca", l: "Cause" }, { k: "a", l: "Beneficiary age" }, { k: "l", l: "Location" },
+  { k: "ap", l: "Appeal type" }, { k: "f", l: "How they gave" }, { k: "st", l: "Story style" }, { k: "c", l: "Charity" },
+];
+const INTERESTS = ["Seniors & caregivers", "Mental health", "Animal welfare", "Disability & accessibility", "LGBTQ+ community",
+  "Health & personal crisis", "Children, families & education", "Community & livelihoods", "General / unrestricted"];
+const splitV = v => String(v || "").split(/;\s*/).map(s => s.trim()).filter(Boolean);
+const normT = s => String(s || "").toLowerCase().replace(/[^a-z0-9一-鿿]+/g, " ").trim();
+const decode = s => { try { return decodeURIComponent(s); } catch { return s; } };
+const decEnt = s => { if (!/&[#a-z0-9]+;/i.test(s)) return s; const t = document.createElement("textarea"); t.innerHTML = s; return t.value; };
+const toks = s => new Set(normT(s).split(" ").filter(w => w.length > 2 && !["the", "and", "for", "with", "our", "your", "help", "support", "campaign", "campaigns"].includes(w)));
+const bySlug = new Map(), byTitle = new Map();
+TAGS.forEach(t => { bySlug.set(t.s, t); bySlug.set(decode(t.s).toLowerCase(), t); byTitle.set(normT(t.t), t); t.tok = toks(decode(t.s).replace(/-/g, " ") + " " + t.t); });
+// backend /event-campaign/ slugs that differ from the public /campaigns/ slug
+const ALIAS = {
+  "help-us-save-singapores-most-vulnerable-community-cats": "help-us-save-community-cats",
+  "giveabitcan-help-cik-zie-continue-feeding-singapores-community-cats": "help-cik-zie-feed-community-cats",
+  "he-could-have-rebuilt-his-own-life-he-built-a-school-instead": "help-rahman-finish-building-his-school",
+  "help-adrian-bring-10000-masks-to-the-community": "help-adrian-fund-3000-masks",
+  "restore-fight-for-stability": "fms-restore-fight-for-stability", "restore-every-man-deserves-stability": "fms-restore-stability",
+  "comedy-outing-a-proud-spaces-funraiser": "comedy-outing", "chaos-colours-and-compassion-the-art-of-self-kindness": "chaos-colours",
+  "pizza-pool-party-a-pizza-making-poetry-social": "pizza-pool-party", "the-weight-of-the-unspoken-caregiver-grief-in-the-lgbtq-community": "the-weight-of-the-unspoken",
+  "semeja-at-the-table": "semeja", "cip-vision": "community-integration-programme-vision", "rescue-food-nourish-lives-2": "rescue-food-nourish-lives",
+  "giveabitcan-fulfilling-wishes-celebrating-lives-ambulance-wish-singapore-2": "giveabitcan-fulfilling-wishes-celebrating-lives-ambulance-wish-singapore",
+  "giveabitcan-fulfilling-wishes-celebrating-lives-ambulance-wish-singapore-3": "giveabitcan-fulfilling-wishes-celebrating-lives-ambulance-wish-singapore",
+  "supporting-the-seniors-in-need-and-their-caregivers-2": "supporting-the-seniors-in-need-and-their-caregivers",
+};
+const RULES = [
+  [/fellowship-of-men|fellowship of men|mens-mental-health/, "fms-restore-fight-for-stability"],
+  [/limitless-run|run-for-limitless|donate-dominate|donate & dominate/, "donatedominate4limitless"],
+  [/一餐温暖|a-warm-meal-a-di/, "a-warm-meal"], [/一声敲门/, "a-knock-on-the-door-a-reminder-they-are-not-alone"],
+  [/以我们的家庭之心/, "from-our-family-to-yours-giving-hope-to-youths-in-need"],
+  [/al-shohag|al shohag/, "help-rahman-finish-building-his-school"],
+];
+const resCache = new Map();
+function resolveCampaign(raw) {
+  const key = String(raw ?? "").trim(); if (!key) return null;
+  if (st.manual[key]) return { i: st.manual[key], manual: true };
+  if (resCache.has(key)) return resCache.get(key);
+  const s = decode(decEnt(key)).toLowerCase();
+  const m = s.match(/(?:campaigns|event-campaign)\/([^\/?#]+)/);
+  const slug = (m ? m[1] : s).replace(/\/+$/, "").trim();
+  let t = bySlug.get(slug) || byTitle.get(normT(decEnt(key))) || (ALIAS[slug] && bySlug.get(ALIAS[slug]));
+  if (!t) for (const [re, to] of RULES) if (re.test(slug)) { t = bySlug.get(to); break; }
+  if (!t) {
+    const tk = toks(slug.replace(/-/g, " ")); let best = 0, hit = null;
+    if (tk.size >= 2) for (const c of TAGS) { let n = 0; tk.forEach(w => { if (c.tok.has(w)) n++; }); const j = n / (tk.size + c.tok.size - n); if (j > best) { best = j; hit = c; } }
+    if (best >= 0.45) t = hit;
+  }
+  resCache.set(key, t || null); return t || null;
+}
+
+/* ---------- sample data ---------- */
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function sample() {
+  const rnd = mulberry(20261110);
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const FN = ["Ava","Liam","Mia","Noah","Isla","Leo","Zara","Ethan","Chloe","Oscar","Ruby","Hugo","Grace","Kai","Ella","Theo","Maya","Finn","Ivy","Arlo","Nina","Sam","Priya","Tom","Lina","Raj","Sofia","Ben","Hana","Luca","Amara","Jack","Mei","Omar","Lucy","Dev","Rosa","Eli","Tara","Max"];
+  const LN = ["Nguyen","Smith","Patel","Brown","Tran","Wilson","Lee","Taylor","Khan","Martin","Garcia","Chen","Walker","Ali","Kelly","Singh","Hall","Young","Park","Wright","Lopez","King","Scott","Le","Green","Baker","Adams","Hill","Moore","Clarke"];
+  const end = new Date(2026, 10, 9).getTime(), start = end - 6 * 365 * DAY;
+  const BYI = {}; TAGS.forEach(t => { if (t.i !== "General / unrestricted") (BYI[t.i] = BYI[t.i] || []).push(t); });
+  const W = [["Seniors & caregivers", .38], ["Mental health", .2], ["Animal welfare", .11], ["Disability & accessibility", .08], ["LGBTQ+ community", .07],
+    ["Health & personal crisis", .06], ["Children, families & education", .06], ["Community & livelihoods", .04]].filter(([k]) => BYI[k]);
+  const wsum = d3.sum(W, w => w[1]);
+  const wpick = () => { let u = rnd() * wsum; for (const [k, w] of W) { if ((u -= w) <= 0) return k; } return W[0] ? W[0][0] : null; };
+  const gifts = [];
+  for (let i = 0; i < 1400; i++) {
+    const id = "D-" + (10001 + i), name = pick(FN) + " " + pick(LN);
+    const u = rnd();
+    const first = start + rnd() * (end - start);
+    const prim = wpick(), sec = rnd() < 0.35 ? wpick() : prim;
+    const camp = () => { const list = BYI[rnd() < 0.75 ? prim : sec]; return CAMP_BASE + list[Math.floor(rnd() * list.length)].s + "/"; };
+    const push = (t, a, c) => { if (t <= end) gifts.push({ id, name, date: new Date(t), amount: Math.round(a), camp: c || (BYI[prim] ? camp() : "") }); };
+    if (u < 0.12) {                        // monthly givers, some stopped
+      const amt = pick([10, 20, 25, 30, 50]);
+      const stop = rnd() < 0.45 ? first + rnd() * (end - first) : end;
+      const mc = BYI[prim] ? camp() : "";
+      for (let t = first; t <= stop; t += 30.4 * DAY) push(t, amt, mc);
+    } else if (u < 0.40) {                 // annual / appeal givers
+      const base = 40 + rnd() * 160, n = 2 + Math.floor(rnd() * 6), gap = 300 + rnd() * 160;
+      const lapse = rnd() < 0.35;
+      for (let k = 0, t = first; k < n; k++, t += gap * (0.8 + rnd() * 0.4)) { if (lapse && t > end - 500 * DAY) break; push(t, base * (0.8 + rnd() * 0.6)); }
+    } else if (u < 0.45) {                 // major donors
+      const n = 1 + Math.floor(rnd() * 4);
+      for (let k = 0, t = first; k < n; k++, t += (200 + rnd() * 500) * DAY) push(t, 1000 + rnd() * 9000);
+    } else if (u < 0.60) {                 // sporadic
+      const n = 2 + Math.floor(rnd() * 3);
+      for (let k = 0, t = first; k < n; k++, t += (60 + rnd() * 600) * DAY) push(t, 20 + rnd() * 120);
+    } else {                               // one-off, skewed recent (campaigns)
+      const t = end - Math.pow(rnd(), 1.6) * (end - start);
+      push(t, pick([15, 25, 30, 50, 50, 75, 100, 100, 150, 250]));
+    }
+  }
+  return gifts;
+}
+
+/* ---------- aggregation & scoring ---------- */
+function aggregate(gifts) {
+  const m = new Map(); let hasCamp = false;
+  for (const g of gifts) {
+    let d = m.get(g.id);
+    if (!d) { d = { id: g.id, name: g.name || "", last: g.date, first: g.date, count: 0, total: 0, tag: {}, firstCamp: g.cn, firstCh: g.ch, cset: new Set(), gd: [], rf: false }; TDIMS.forEach(x => d.tag[x.k] = {}); m.set(g.id, d); }
+    d.count++; d.total += g.amount; d.maxGift = Math.max(d.maxGift || 0, g.amount);
+    if (g.cn) d.cset.add(g.cn);
+    d.gd.push(g); if (g.rec) d.rf = true;
+    if (g.date > d.last) d.last = g.date;
+    if (g.date < d.first) { d.first = g.date; d.firstCamp = g.cn; d.firstCh = g.ch; }
+    if (!d.name && g.name) d.name = g.name;
+    if (g.camp) hasCamp = true;
+    const rec = g.camp ? resolveCampaign(g.camp) : null;
+    for (const x of TDIMS) {   // a gift tagged with several values (e.g. two age bands) is split evenly between them
+      const vals = rec && rec[x.k] ? splitV(rec[x.k]) : ["Untagged"], share = g.amount / vals.length;
+      for (const v of vals) d.tag[x.k][v] = (d.tag[x.k][v] || 0) + share;
+    }
+  }
+  const out = [...m.values()];
+  for (const d of out) {
+    d.main = {};
+    for (const x of TDIMS) { let bv = "Untagged", ba = -1; for (const [v, a] of Object.entries(d.tag[x.k])) if (v !== "Untagged" && a > ba) { ba = a; bv = v; } d.main[x.k] = bv; }
+    d.nInt = Object.keys(d.tag.i).filter(v => v !== "Untagged").length;
+    detectRecurring(d);
+  }
+  out.hasCamp = hasCamp;
+  return out;
+}
+// Recurring = flagged by the payment system, or the same amount to the same campaign every 20-45 days (2+ gifts).
+const REC_GAP = [20, 45], REC_GRACE = 35, REC_STOP = 95;
+function detectRecurring(d) {
+  const G = d.gd.slice().sort((a, b) => a.date - b.date); d.gd = null;
+  let pattern = false;
+  if (G.length >= 2) {
+    const a0 = Math.round(G[0].amount * 100), c0 = G[0].cn || "";
+    pattern = G.every(g => Math.round(g.amount * 100) === a0 && (g.cn || "") === c0);
+    for (let i = 1; pattern && i < G.length; i++) { const gap = (G[i].date - G[i - 1].date) / DAY; if (gap < REC_GAP[0] || gap > REC_GAP[1]) pattern = false; }
+  }
+  d.recur = pattern || d.rf;
+  d.recurBy = d.rf && pattern ? "flag + pattern" : d.rf ? "payment flag" : pattern ? "pattern" : "";
+  const lastG = G[G.length - 1];
+  d.monthly = d.recur ? lastG.amount : 0; d.recCamp = d.recur ? (lastG.cn || "") : "";
+}
+function quintile(values, higherBetter) {
+  const idx = values.map((v, i) => i).sort((a, b) => values[a] - values[b]);
+  const out = new Array(values.length), n = values.length;
+  for (let i = 0; i < n;) {
+    let j = i; while (j + 1 < n && values[idx[j + 1]] === values[idx[i]]) j++;
+    const mid = ((i + j) / 2 + 0.5) / n;
+    let s = Math.min(5, Math.floor(mid * 5) + 1);
+    if (!higherBetter) s = 6 - s;
+    for (let k = i; k <= j; k++) out[idx[k]] = s;
+    i = j + 1;
+  }
+  return out;
+}
+function band(v, cuts, higherBetter) {
+  let s = 1; for (const c of cuts) if (v > c) s++;      // 1..5 ascending with value
+  return higherBetter ? s : 6 - s;
+}
+function niceQuints(values) {
+  const s = [...values].sort((a, b) => a - b);
+  return [0.2, 0.4, 0.6, 0.8].map(p => { const v = d3.quantileSorted(s, p); const mag = Math.pow(10, Math.max(0, Math.floor(Math.log10(v || 1)) - 1)); return Math.round(v / mag) * mag; });
+}
+function score() {
+  const D = st.donors, asOf = st.asOf.getTime();
+  for (const d of D.concat(st.majors)) {
+    d.days = Math.max(0, Math.floor((asOf - d.last.getTime()) / DAY));
+    d.recStatus = d.recur === undefined ? undefined : !d.recur ? "One-off" : d.days > REC_STOP ? "Stopped" : d.days > REC_GRACE ? "Missed" : "Active";
+    d.nextDue = d.recur ? new Date(d.last.getTime() + 30.4 * DAY) : null;
+  }
+  assignScores(D);
+  for (const d of st.majors) { d.R = d.F = d.M = 0; d.code = "★"; d.seg = "major"; d.avg = d.total / d.count; d.mv = d.total; d.fBoost = false; }
+}
+function assignScores(D) {   // needs d.days, d.count, d.total on each row
+  for (const d of D) { d.avg = d.total / d.count; d.mv = st.mBasis === "avg" ? d.avg : d.total; }
+  const dims = st.dims;
+  const R = dims.R.method === "bands" ? D.map(d => band(d.days, dims.R.cuts, false)) : quintile(D.map(d => d.days), false);
+  const F = dims.F.method === "bands" ? D.map(d => band(d.count, dims.F.cuts, true)) : quintile(D.map(d => d.count), true);
+  const M = dims.M.method === "bands" ? D.map(d => band(d.mv, dims.M.cuts, true)) : quintile(D.map(d => d.mv), true);
+  D.forEach((d, i) => {
+    d.R = R[i]; d.F = F[i]; d.M = M[i];
+    d.fBoost = false;   // an active monthly commitment counts as frequent giving, even in a short export
+    if (st.recBoost && d.recStatus === "Active") { const f = Math.max(d.F, d.count >= 3 ? 5 : 4); d.fBoost = f > d.F; d.F = f; }
+    d.code = "" + d.R + d.F + d.M; d.seg = segOf(d.R, d.F);
+  });
+}
+
+/* ---------- formatting ---------- */
+const fmtInt = d3.format(",");
+const money = v => st.cur + (v >= 1e6 ? d3.format(".2s")(v).replace("G", "B") : v >= 1e4 ? d3.format(",.0f")(v) : d3.format(",.0f")(v));
+const moneyShort = v => st.cur + (v >= 1e3 ? d3.format(".3~s")(v).replace("G", "B") : d3.format(",.0f")(v));
+const pct = v => (v * 100 < 10 ? d3.format(".1f")(v * 100) : d3.format(".0f")(v * 100)) + "%";
+const dfmt = d3.timeFormat("%-d %b %Y");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* ---------- tooltip ---------- */
+const tip = $("#tip");
+function showTip(e, html) { tip.innerHTML = html; tip.hidden = false; moveTip(e); }
+function moveTip(e) { const w = tip.offsetWidth, h = tip.offsetHeight; let x = e.clientX + 14, y = e.clientY + 14; if (x + w > innerWidth - 8) x = e.clientX - w - 14; if (y + h > innerHeight - 8) y = e.clientY - h - 14; tip.style.left = x + "px"; tip.style.top = y + "px"; }
+function hideTip() { tip.hidden = true; }
+
+/* ---------- scoring controls ---------- */
+const DIMLABEL = { R: ["Recency", "days since last gift", "≤"], F: ["Frequency", "gifts", "≤"], M: ["Money", "amount", "≤"] };
+function renderScoring() {
+  const box = $("#scoring"); box.innerHTML = "";
+  for (const k of ["R", "F", "M"]) {
+    const d = st.dims[k];
+    const line = document.createElement("div"); line.className = "score-line";
+    line.innerHTML = `<b>${DIMLABEL[k][0]}</b>
+      <div class="seg-ctl" role="group" aria-label="${DIMLABEL[k][0]} method">
+        <button type="button" data-k="${k}" data-m="quintiles" aria-pressed="${d.method === "quintiles"}">Quintiles</button>
+        <button type="button" data-k="${k}" data-m="bands" aria-pressed="${d.method === "bands"}">Bands</button>
+      </div><div class="cuts"></div>`;
+    const cuts = line.querySelector(".cuts");
+    if (d.method === "bands") {
+      if (!d.cuts) d.cuts = niceQuints(st.donors.map(x => k === "M" ? x.mv : k === "F" ? x.count : x.days));
+      const lab = k === "R" ? ["5", "4", "3", "2"] : ["1", "2", "3", "4"];
+      d.cuts.forEach((c, i) => {
+        const s = document.createElement("span");
+        s.innerHTML = `${lab[i]}: ≤ <input type="number" min="0" id="cut-${k}-${i}" value="${c}" aria-label="${DIMLABEL[k][0]} score ${lab[i]} cut-off">`;
+        cuts.appendChild(s);
+      });
+      const tail = document.createElement("span"); tail.textContent = `${k === "R" ? "1" : "5"}: above · ${DIMLABEL[k][1]}`; cuts.appendChild(tail);
+    } else {
+      cuts.textContent = k === "R" ? "Most recent fifth scores 5" : "Top fifth scores 5";
+    }
+    box.appendChild(line);
+  }
+  box.querySelectorAll("button[data-k]").forEach(b => b.onclick = () => { st.dims[b.dataset.k].method = b.dataset.m; renderScoring(); run(); });
+  box.querySelectorAll("input[type=number]").forEach(inp => inp.onchange = () => {
+    const [, k, i] = inp.id.split("-"); const v = +inp.value; if (!isFinite(v)) return;
+    st.dims[k].cuts[+i] = v; st.dims[k].cuts.sort((a, b) => a - b); renderScoring(); run();
+  });
+}
+
+/* ---------- KPIs ---------- */
+function renderKpis() {
+  const D = st.donors, total = d3.sum(D, d => d.total), gifts = d3.sum(D, d => d.count);
+  const active = D.filter(d => d.days <= 365).length;
+  const riskSum = d3.sum(D.filter(d => d.seg === "risk" || d.seg === "cantlose"), d => d.total);
+  const riskN = D.filter(d => d.seg === "risk" || d.seg === "cantlose").length;
+  const tiles = [
+    ["Donors", fmtInt(D.length), `${fmtInt(gifts)} gifts in total${st.majors.length ? ` · +${fmtInt(st.majors.length)} major donor${st.majors.length === 1 ? "" : "s"} set apart` : ""}`],
+    ["Total given", moneyShort(total), `${money(total / gifts)} average gift${st.majors.length ? ` · +${moneyShort(d3.sum(st.majors, d => d.total))} from major donors` : ""}`],
+    ["Gave in last 12 months", pct(active / D.length), `${fmtInt(active)} donors active`],
+    ["Giving at risk", moneyShort(riskSum), `lifetime giving from ${fmtInt(riskN)} at-risk and can't-lose donors`, true],
+  ];
+  if (st.viewGifts) {
+    const act = D.filter(d => d.recStatus === "Active"), mis = D.filter(d => d.recStatus === "Missed");
+    tiles.push(["Monthly giving", `${moneyShort(d3.sum(act, d => d.monthly))}<span class="small muted" style="font-family:var(--body);font-weight:600"> /mo</span>`, `${fmtInt(act.length)} active recurring donors${mis.length ? ` · ${fmtInt(mis.length)} missed a payment` : ""}`]);
+  }
+  $("#kpis").classList.toggle("five", tiles.length === 5);
+  $("#kpis").innerHTML = tiles.map(([l, v, s, a]) => `<div class="card kpi"><span class="eyebrow">${l}</span><span class="v${a ? " alert" : ""}">${v}</span><span class="small muted">${s}</span></div>`).join("");
+}
+
+/* ---------- segment summary ---------- */
+function segStats(D = st.donors) {
+  const N = D.length || 1, T = d3.sum(D, d => d.total) || 1;
+  return SEGS.map(s => {
+    const g = D.filter(d => d.seg === s.id);
+    return { ...s, n: g.length, total: d3.sum(g, d => d.total), shareN: g.length / N, shareT: d3.sum(g, d => d.total) / T,
+      medDays: g.length ? d3.median(g, d => d.days) : 0, avgGifts: g.length ? d3.mean(g, d => d.count) : 0, avgTotal: g.length ? d3.mean(g, d => d.total) : 0, avgGift: g.length ? d3.sum(g, d => d.total) / d3.sum(g, d => d.count) : 0 };
+  });
+}
+function renderMajorRow() {
+  const box = $("#majorRow"), M = st.majors;
+  if (!M.length) { box.innerHTML = st.majorOn ? "" : ""; return; }
+  const all = st.allDonors, T = d3.sum(all, d => d.total) || 1, tot = d3.sum(M, d => d.total), gifts = d3.sum(M, d => d.count);
+  const rule = `${st.majorBasis === "gift" ? "a single gift" : "lifetime giving"} of ${money(st.majorMin)} or more`;
+  box.innerHTML = `<div class="sb major${st.selSeg === "major" ? " on" : ""}" role="button" tabindex="0" aria-pressed="${st.selSeg === "major"}">
+      <div class="name"><span class="sw" style="background:var(--smaj)"></span>★ Major donors</div>
+      <div class="small">${fmtInt(M.length)} donor${M.length === 1 ? "" : "s"} with ${rule} · <b>${money(tot)}</b> given, <b>${pct(tot / T)}</b> of all giving · biggest gift ${money(d3.max(M, d => d.maxGift ?? d.total))}<br><span class="muted">Left out of the segments, charts and shares below so their gifts don't skew the scores.</span></div>
+      <div class="nums"><b>${pct(M.length / (all.length || 1))}</b> of donors<br><span class="avg">Avg donation <b>${money(tot / (gifts || 1))}</b></span></div>
+    </div>`;
+  const el = box.firstElementChild, go = () => { st.selSeg = st.selSeg === "major" ? null : "major"; st.selCell = null; st.hl = null; st.shown = 100; renderInteractive(); };
+  el.onclick = go; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+}
+function renderSegbars(statsAll) {
+  renderMajorRow();
+  const hasRec = !!st.viewGifts;
+  $("#sbView").hidden = !hasRec;
+  const view = hasRec ? st.sbView : "all";
+  document.querySelectorAll("[data-sv]").forEach(b => b.setAttribute("aria-pressed", b.dataset.sv === view));
+  const pool = view === "recur" ? st.donors.filter(d => d.recur) : view === "oneoff" ? st.donors.filter(d => !d.recur) : st.donors;
+  const stats = view === "recur" || view === "oneoff" ? segStats(pool) : statsAll;
+  const N = st.donors.length || 1, T = d3.sum(st.donors, d => d.total) || 1;
+  const avgG = a => a.length ? d3.sum(a, d => d.total) / d3.sum(a, d => d.count) : 0;
+  const split = view === "split" ? Object.fromEntries(SEGS.map(sg => {
+    const g = st.donors.filter(d => d.seg === sg.id), r = g.filter(d => d.recur), o = g.filter(d => !d.recur);
+    return [sg.id, { rN: r.length / N, oN: o.length / N, rT: d3.sum(r, d => d.total) / T, oT: d3.sum(o, d => d.total) / T, rn: r.length, on: o.length, ra: avgG(r), oa: avgG(o) }];
+  })) : null;
+  const totR = st.donors.filter(d => d.recur);
+  $("#sbNote").textContent = view === "split"
+    ? `Each bar is split into recurring donors (solid) and one-off donors (faded). Recurring donors are ${pct(totR.length / N)} of donors and give ${pct(d3.sum(totR, d => d.total) / T)} of the money.`
+    : view === "recur" ? `Recurring donors only (${fmtInt(pool.length)}). Shares are of recurring donors and their giving.`
+    : view === "oneoff" ? `One-off donors only (${fmtInt(pool.length)}). Shares are of one-off donors and their giving.`
+    : "Share of donors against share of total giving, per segment. Click a segment to see its playbook and donors.";
+  $("#sbLegend").innerHTML = view === "split"
+    ? `<span><span class="key" style="background:var(--muted);opacity:.55"></span>Recurring donors</span><span><span class="key" style="background:var(--grid);outline:1px solid var(--line)"></span>One-off donors</span><span><span class="key" style="background:var(--s1)"></span>Recurring giving</span><span><span class="key" style="background:var(--s1);opacity:.38"></span>One-off giving</span>`
+    : `<span><span class="key" style="background:var(--grid);outline:1px solid var(--line)"></span>Share of donors</span><span><span class="key" style="background:var(--s3)"></span>Share of giving (segment colour)</span>`;
+  const max = d3.max(stats, x => Math.max(x.shareN, x.shareT)) || 1;
+  const w = v => `${(v / max) * 100}%`;
+  $("#segbars").innerHTML = stats.map(x => {
+    const sp = split && split[x.id];
+    const bars = sp
+      ? `<div class="bar don split" style="width:${w(x.shareN)}"><span class="rd" style="flex:${sp.rN}"></span><span class="od" style="flex:${sp.oN}"></span></div>
+         <div class="bar rev split" style="width:${w(x.shareT)}"><span style="flex:${sp.rT};background:var(${x.c})"></span><span class="og" style="flex:${sp.oT};background:var(${x.c})"></span></div>`
+      : `<div class="bar don" style="width:${w(x.shareN)}"></div><div class="bar rev" style="width:${w(x.shareT)}; background:var(${x.c})"></div>`;
+    const sub = sp
+      ? `<span class="avg">Recurring <b>${fmtInt(sp.rn)}</b>${sp.rn ? ` · ${money(sp.ra)}` : ""}<span class="sep">|</span>One-off <b>${fmtInt(sp.on)}</b>${sp.on ? ` · ${money(sp.oa)}` : ""}</span>`
+      : `<span class="avg">Avg donation <b>${x.n ? money(x.avgGift) : "–"}</b></span>`;
+    return `<div class="sb${st.selSeg === x.id ? " on" : ""}" data-seg="${x.id}" role="button" tabindex="0" aria-pressed="${st.selSeg === x.id}">
+      <div class="name"><span class="sw" style="background:var(${x.c})"></span>${x.name}</div>
+      <div class="bars">${bars}</div>
+      <div class="nums"><b>${pct(x.shareN)}</b> of donors · <b>${pct(x.shareT)}</b> of giving<br>${sub}</div>
+    </div>`;
+  }).join("");
+  $("#segbars").querySelectorAll(".sb").forEach(el => {
+    const go = () => {
+      st.selSeg = st.selSeg === el.dataset.seg ? null : el.dataset.seg; st.selCell = null; st.hl = st.selSeg; st.shown = 100;
+      if (view === "recur") st.selRec = st.selSeg ? "recur" : null; else if (view === "oneoff") st.selRec = st.selSeg ? "One-off" : null;
+      renderInteractive();
+    };
+    el.onclick = go; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+    const x = stats.find(y => y.id === el.dataset.seg), sp = split && split[x.id];
+    el.onmousemove = e => showTip(e, `<b>${x.name}</b><br>${fmtInt(x.n)} donors · ${money(x.total)} lifetime giving${sp ? `<br>Recurring: ${fmtInt(sp.rn)} donors · ${pct(sp.rT / ((sp.rT + sp.oT) || 1))} of this segment's giving<br>One-off: ${fmtInt(sp.on)} donors` : ""}<br>${x.what}`);
+    el.onmouseleave = hideTip;
+  });
+}
+document.querySelectorAll("[data-sv]").forEach(b => b.onclick = () => { st.sbView = b.dataset.sv; renderSegbars(segStats()); });
+function leadWith(segId) {
+  if (!st.hasCamp) return "";
+  const g = (segId === "major" ? st.majors : st.donors).filter(d => d.seg === segId); if (!g.length) return "";
+  const c = d3.rollups(g.filter(d => d.main.i !== "Untagged"), v => v.length, d => d.main.i).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  if (!c.length) return "";
+  const fmt = d3.rollups(g.filter(d => d.main.f !== "Untagged"), v => v.length, d => d.main.f).sort((a, b) => b[1] - a[1])[0];
+  return `<h3 style="margin-top:14px">Lead with what they care about</h3>
+    <div class="lead">${c.map(([v, n]) => `<span>${esc(v)} · ${pct(n / g.length)}</span>`).join("")}</div>
+    ${fmt ? `<p class="small muted" style="margin-top:6px">Most came in through <b>${esc(fmt[0])}</b> (${pct(fmt[1] / g.length)}). Use the same channel for the next ask.</p>` : ""}`;
+}
+function majorStats() {
+  const g = st.majors;
+  return { ...SEG.major, n: g.length, total: d3.sum(g, d => d.total), medDays: g.length ? d3.median(g, d => d.days) : 0,
+    avgGifts: g.length ? d3.mean(g, d => d.count) : 0, avgTotal: g.length ? d3.mean(g, d => d.total) : 0 };
+}
+function renderPlay(stats) {
+  let s = st.selSeg === "major" ? majorStats() : stats.find(x => x.id === st.selSeg);
+  if (!s) s = stats.slice().sort((a, b) => b.total - a.total).find(x => x.id === "cantlose" && x.n) || stats.find(x => x.id === "champ");
+  const picked = !!st.selSeg;
+  $("#play").innerHTML = `
+    <div>
+      <span class="eyebrow">${picked ? "Selected segment" : "Start here"}</span>
+      <div class="row" style="margin-top:6px"><span class="sw" style="width:16px;height:16px;background:var(${s.c})"></span><span class="big" style="color:var(--head)">${s.name}</span></div>
+      <p class="muted">${s.what}</p>
+      <div class="stats">
+        <div><b>${fmtInt(s.n)}</b><span class="small muted">donors</span></div>
+        <div><b>${moneyShort(s.total)}</b><span class="small muted">lifetime giving</span></div>
+        <div><b>${fmtInt(Math.round(s.medDays))}</b><span class="small muted">median days since last gift</span></div>
+      </div>
+    </div>
+    <div>
+      <h3>What to do next</h3>
+      <ul class="acts">${s.acts.map(a => `<li>${a}</li>`).join("")}</ul>
+      ${leadWith(s.id)}
+      <p class="small muted" style="margin-top:10px">${picked ? "The donor list below is filtered to this segment." : "Click any segment above to open its playbook."} Average ${s.avgGifts.toFixed(1)} gifts and ${money(s.avgTotal)} given per donor.</p>
+    </div>`;
+}
+
+/* ---------- heatmap ---------- */
+function renderHeat() {
+  const el = $("#heat"), W = Math.max(300, el.clientWidth), m = { t: 8, r: 8, b: 44, l: 44 };
+  const cw = (W - m.l - m.r) / 5, ch = Math.min(cw * 0.78, 74), H = m.t + m.b + ch * 5;
+  const cells = [];
+  for (let r = 5; r >= 1; r--) for (let f = 1; f <= 5; f++) {
+    const g = st.donors.filter(d => d.R === r && d.F === f);
+    cells.push({ r, f, n: g.length, total: d3.sum(g, d => d.total), avgM: g.length ? d3.mean(g, d => d.total) : 0, seg: segOf(r, f) });
+  }
+  const key = st.hm, max = d3.max(cells, c => c[key]) || 1;
+  const col = d3.scaleSequentialSqrt(d3.interpolateRgb(cssVar("--seq-lo"), cssVar("--seq-hi"))).domain([0, max]);
+  const fmtV = key === "n" ? fmtInt : moneyShort;
+  const svg = d3.create("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("role", "img").attr("aria-label", "Recency by frequency grid");
+  const g = svg.append("g").attr("transform", `translate(${m.l},${m.t})`);
+  const cg = g.selectAll("g").data(cells).join("g").attr("class", c => "cell" + (st.selCell && st.selCell.r === c.r && st.selCell.f === c.f ? " on" : ""))
+    .attr("transform", c => `translate(${(c.f - 1) * cw},${(5 - c.r) * ch})`);
+  cg.append("rect").attr("width", cw).attr("height", ch).attr("rx", 6).attr("fill", c => c.n ? col(c[key]) : cssVar("--panel"));
+  const dark = c => c.n && col(c[key]) && d3.lab(col(c[key])).l < 62;
+  cg.append("text").attr("x", cw / 2).attr("y", ch / 2 - 2).attr("text-anchor", "middle").attr("font-family", "Outfit, sans-serif").attr("font-weight", 800).attr("font-size", Math.min(18, cw / 4))
+    .attr("fill", c => !c.n ? cssVar("--ink") : dark(c) ? "#ffffff" : "#0b2a27").text(c => fmtV(c[key]));
+  cg.append("text").attr("x", cw / 2).attr("y", ch / 2 + 15).attr("text-anchor", "middle").attr("font-size", Math.min(11, cw / 7)).attr("font-family", "Mulish, sans-serif")
+    .attr("fill", c => !c.n ? cssVar("--muted") : dark(c) ? "#ffffffcc" : "#0b2a27cc").text(c => cw > 64 ? SEG[c.seg].name.replace("Potential loyalists", "Potential").replace("Can't lose them", "Can't lose").replace("Needs attention", "Attention") : "");
+  cg.on("mousemove", (e, c) => showTip(e, `<b>R${c.r} · F${c.f}</b> · ${SEG[c.seg].name}<br>${fmtInt(c.n)} donors · ${money(c.total)} given<br>${money(c.avgM)} per donor`))
+    .on("mouseleave", hideTip)
+    .on("click", (e, c) => { const same = st.selCell && st.selCell.r === c.r && st.selCell.f === c.f; st.selCell = same ? null : { r: c.r, f: c.f }; st.selSeg = null; st.hl = same ? null : c.seg; st.shown = 100; renderInteractive(); });
+  for (let i = 1; i <= 5; i++) {
+    g.append("text").attr("class", "lbl").attr("x", (i - 0.5) * cw).attr("y", ch * 5 + 18).attr("text-anchor", "middle").text("F" + i);
+    g.append("text").attr("class", "lbl").attr("x", -10).attr("y", (5 - i + 0.5) * ch + 4).attr("text-anchor", "end").text("R" + i);
+  }
+  g.append("text").attr("class", "lbl").attr("x", cw * 2.5).attr("y", ch * 5 + 38).attr("text-anchor", "middle").text("Frequency score → gives more often");
+  el.replaceChildren(svg.node());
+}
+
+/* ---------- scatter ---------- */
+function renderLegend() {
+  $("#legend").innerHTML = SEGS.map(s => `<button type="button" data-seg="${s.id}" aria-pressed="${st.hl === s.id}"><span class="sw" style="background:var(${s.c})"></span>${s.name}</button>`).join("");
+  $("#legend").querySelectorAll("button").forEach(b => b.onclick = () => { st.hl = st.hl === b.dataset.seg ? null : b.dataset.seg; renderLegend(); renderScatter(); });
+}
+function renderScatter() {
+  const el = $("#scatter"), W = Math.max(300, el.clientWidth), H = Math.round(Math.min(420, Math.max(280, W * 0.62)));
+  const m = { t: 10, r: 14, b: 44, l: 58 };
+  let D = st.donors; const cap = 4000;
+  if (D.length > cap) { const step = D.length / cap; D = d3.range(cap).map(i => D[Math.floor(i * step)]); }
+  $("#mapNote").textContent = `Days since last gift against lifetime giving. Dot size is number of gifts.${st.donors.length > cap ? ` Showing an even ${fmtInt(cap)} of ${fmtInt(st.donors.length)} donors.` : ""}`;
+  const x = d3.scaleLinear().domain([0, d3.max(D, d => d.days) || 1]).nice().range([m.l, W - m.r]);
+  const y = d3.scaleLog().domain([Math.max(1, d3.min(D, d => d.total)), d3.max(D, d => d.total) || 10]).nice().range([H - m.b, m.t]);
+  const [y0, y1] = y.domain(); const yt = [1, 3, 10, 30, 100, 300, 1e3, 3e3, 1e4, 3e4, 1e5, 3e5, 1e6, 3e6, 1e7].filter(v => v >= y0 && v <= y1);
+  const r = d3.scaleSqrt().domain([1, d3.max(D, d => d.count) || 1]).range([3, 11]);
+  const svg = d3.create("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("role", "img").attr("aria-label", "Donor scatter plot");
+  svg.append("g").attr("class", "gridline").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues(yt).tickSize(-(W - m.l - m.r)).tickFormat(""));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(Math.max(3, Math.floor(W / 90))).tickSizeOuter(0));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues(yt).tickFormat(v => moneyShort(v)).tickSizeOuter(0)).call(g => g.select(".domain").remove());
+  svg.append("text").attr("class", "lbl").attr("x", (m.l + W - m.r) / 2).attr("y", H - 8).attr("text-anchor", "middle").text("Days since last gift (recent on the left)");
+  const order = D.slice().sort((a, b) => (a.seg === st.hl) - (b.seg === st.hl) || b.count - a.count);
+  const colors = Object.fromEntries(SEGS.map(s => [s.id, segColor(s.id)]));
+  svg.append("g").selectAll("circle").data(order).join("circle").attr("class", "dot")
+    .attr("cx", d => x(d.days)).attr("cy", d => y(Math.max(1, d.total))).attr("r", d => r(d.count))
+    .attr("fill", d => colors[d.seg]).attr("fill-opacity", d => !st.hl || d.seg === st.hl ? 0.85 : 0.08)
+    .attr("stroke-opacity", d => !st.hl || d.seg === st.hl ? 1 : 0.1)
+    .on("mousemove", (e, d) => showTip(e, `<b>${esc(d.name || d.id)}</b> <span class="code">${d.code}</span><br>${SEG[d.seg].name}<br>Last gift ${dfmt(d.last)} (${fmtInt(d.days)} days)<br>${fmtInt(d.count)} gifts · ${money(d.total)} total`))
+    .on("mouseleave", hideTip);
+  el.replaceChildren(svg.node());
+}
+
+/* ---------- segments over time ---------- */
+const thin = (arr, max) => {
+  const k = Math.max(1, Math.ceil(arr.length / max));
+  const out = arr.filter((v, i) => i % k === 0 || i === arr.length - 1);
+  if (out.length > 2) { const n = out.length, gap = out[n - 1] - out[n - 2], step = out[1] - out[0]; if (gap < step * 0.6) out.splice(n - 2, 1); }
+  return out;
+};
+function trendStep(spanDays) { return st.trendUnit !== "auto" ? +st.trendUnit : spanDays <= 400 ? 30 : spanDays <= 1100 ? 90 : 180; }
+function computeTrend() {
+  st.trend = null;
+  const G = st.viewGifts && st.majors.length ? st.viewGifts.filter(g => !st.majorIds.has(g.id)) : st.viewGifts; if (!G || G.length < 2) return;
+  const g0 = d3.min(G, g => g.date), start = new Date(g0.getFullYear(), g0.getMonth(), g0.getDate()), end = st.asOf;
+  const span = Math.round((end - start) / DAY), step = trendStep(span);
+  const dates = []; for (let k = step; k < span - Math.max(2, step * 0.15) && dates.length < 400; k += step) dates.push(d3.timeDay.offset(start, k));
+  dates.push(end);
+  const sorted = G.slice().sort((a, b) => a.date - b.date), acc = new Map(), series = [];
+  let gi = 0;
+  for (const t of dates) {
+    while (gi < sorted.length && sorted[gi].date < t) {
+      const g = sorted[gi++]; let a = acc.get(g.id);
+      if (!a) { a = { last: g.date, count: 0, total: 0, amt: Math.round(g.amount * 100), cn: g.cn || "", pat: true, rf: false }; acc.set(g.id, a); }
+      else { const gap = (g.date - a.last) / DAY; if (Math.round(g.amount * 100) !== a.amt || (g.cn || "") !== a.cn || gap < REC_GAP[0] || gap > REC_GAP[1]) a.pat = false; }
+      a.count++; a.total += g.amount; if (g.rec) a.rf = true; if (g.date > a.last) a.last = g.date;
+    }
+    const D = [...acc.values()].map(a => {
+      const days = Math.max(0, Math.floor((t - a.last) / DAY)), recur = (a.count >= 2 && a.pat) || a.rf;
+      return { days, count: a.count, total: a.total, recStatus: !recur ? "One-off" : days > REC_STOP ? "Stopped" : days > REC_GRACE ? "Missed" : "Active" };
+    });
+    if (D.length) assignScores(D);
+    const row = { t, day: Math.round((t - start) / DAY), n: D.length, amt: d3.sum(D, d => d.total) };
+    SEGS.forEach(s => { row[s.id] = 0; row["$" + s.id] = 0; });
+    D.forEach(d => { row[d.seg]++; row["$" + d.seg] += d.total; });
+    series.push(row);
+  }
+  st.trend = { step, start, span, series };
+}
+function drawTrend() {
+  const el = $("#trendChart"), tb = $("#trendTbl");
+  const T = st.trend;
+  if (!T || T.series.length < 2) {
+    el.innerHTML = `<div class="msg">${st.viewGifts ? (T ? `Your gifts cover ${fmtInt(T.span)} days, so an interval of ${T.step} days gives only one checkpoint. Pick a shorter interval.` : "Needs gifts on at least two different days.") :"Needs one row per gift with dates. A donor-level file only has each donor's latest gift."}</div>`;
+    $("#trendLegend").innerHTML = ""; tb.querySelector("thead").innerHTML = ""; tb.querySelector("tbody").innerHTML = ""; return;
+  }
+  const S = T.series, mode = st.trendMode, hl = st.trendHl || st.hl;
+  const dayLbl = r => r.day === T.span ? `Day ${r.day} (now)` : `Day ${r.day}`;
+  $("#trendNote").textContent = `Day 0 is the first gift, ${dfmt(T.start)}. Every ${T.step} days the tool re-scores every donor using only the gifts made up to that day. ${mode === "amt" ? "Giving is each segment's lifetime giving to date." : "Donors join the chart after their first gift."}`;
+  const keys = SEGS.map(s => s.id);
+  const val = (r, k) => mode === "amt" ? r["$" + k] : r[k];
+  const rows = S.map(r => Object.fromEntries([["t", r.day], ...keys.map(k => [k, val(r, k)])]));
+  const stack = d3.stack().keys(keys).offset(mode === "pct" ? d3.stackOffsetExpand : d3.stackOffsetNone)(rows);
+  const W = Math.max(300, el.clientWidth), H = Math.round(Math.min(380, Math.max(260, W * 0.42))), m = { t: 10, r: 14, b: 30, l: 56 };
+  const x = d3.scaleLinear().domain([S[0].day, S[S.length - 1].day]).range([m.l, W - m.r]);
+  const y = d3.scaleLinear().domain([0, mode === "pct" ? 1 : d3.max(stack[stack.length - 1], d => d[1]) || 1]).nice().range([H - m.b, m.t]);
+  const fmtY = mode === "pct" ? d3.format(".0%") : mode === "amt" ? v => moneyShort(v) : d3.format("~s");
+  const svg = d3.create("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("role", "img").attr("aria-label", "Segment sizes over time");
+  svg.append("g").attr("class", "gridline").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickSize(-(W - m.l - m.r)).tickFormat(""));
+  const area = d3.area().x(d => x(d.data.t)).y0(d => y(d[0])).y1(d => y(d[1])).curve(d3.curveMonotoneX);
+  svg.append("g").selectAll("path").data(stack).join("path").attr("d", area)
+    .attr("fill", d => cssVar(SEG[d.key].c)).attr("fill-opacity", d => !hl || d.key === hl ? 0.92 : 0.12)
+    .attr("stroke", cssVar("--panel")).attr("stroke-width", 1);
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues(thin(S.map(r => r.day), Math.max(3, Math.floor(W / 70)))).tickFormat(d => `Day ${d}`).tickSizeOuter(0));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(fmtY).tickSizeOuter(0)).call(g => g.select(".domain").remove());
+  const hov = svg.append("g").attr("class", "trend-hover").style("display", "none");
+  hov.append("line").attr("y1", m.t).attr("y2", H - m.b);
+  const dots = hov.append("g");
+  const bis = d3.bisector(r => r.day).center;
+  svg.append("rect").attr("x", m.l).attr("y", m.t).attr("width", W - m.l - m.r).attr("height", H - m.t - m.b).attr("fill", "transparent")
+    .on("mousemove", e => {
+      const [px] = d3.pointer(e), i = bis(S, x.invert(px)), r = S[i], X = x(r.day);
+      hov.style("display", null); hov.select("line").attr("x1", X).attr("x2", X);
+      dots.selectAll("circle").data(stack.filter(s => s[i][1] > s[i][0])).join("circle").attr("cx", X).attr("cy", s => y(s[i][1])).attr("r", 3.5)
+        .attr("fill", s => cssVar(SEG[s.key].c)).attr("stroke", cssVar("--panel")).attr("stroke-width", 1.5);
+      const tot = mode === "amt" ? r.amt : r.n;
+      const lines = SEGS.slice().filter(s => val(r, s.id) > 0).map(s => `<span class="row" style="gap:6px;flex-wrap:nowrap"><span class="sw" style="background:var(${s.c})"></span>${s.name}: <b>${mode === "amt" ? money(val(r, s.id)) : fmtInt(val(r, s.id))}</b> <span class="muted">${pct(val(r, s.id) / (tot || 1))}</span></span>`).join("");
+      showTip(e, `<b>${dayLbl(r)}</b> · gifts up to ${dfmt(d3.timeDay.offset(r.t, -1))}<br>${fmtInt(r.n)} donors · ${money(r.amt)}<div style="display:grid;gap:2px;margin-top:4px">${lines}</div>`);
+    })
+    .on("mouseleave", () => { hov.style("display", "none"); hideTip(); });
+  el.replaceChildren(svg.node());
+
+  $("#trendLegend").innerHTML = SEGS.map(s => `<button type="button" data-seg="${s.id}" aria-pressed="${hl === s.id}"><span class="sw" style="background:var(${s.c})"></span>${s.name}</button>`).join("");
+  $("#trendLegend").querySelectorAll("button").forEach(b => b.onclick = () => { st.trendHl = (st.trendHl || st.hl) === b.dataset.seg ? null : b.dataset.seg; if (!st.trendHl) st.hl = null; drawTrend(); });
+
+  const cols = S.length > 8 ? S.slice(-8) : S, a = cols[0], p = S[S.length - 2], z = S[S.length - 1], f = v => mode === "amt" ? money(v) : fmtInt(v);
+  const delta = (now, then) => { const d = now - then; if (!d) return `<span class="muted">no change</span>`; return `<span class="${d > 0 ? "up" : "down"}">${d > 0 ? "+" : "−"}${f(Math.abs(d))}</span>`; };
+  const v2 = (r, k) => mode === "amt" ? r["$" + k] : r[k];
+  tb.querySelector("thead").innerHTML = `<tr><th>Segment</th>${cols.map(r => `<th class="num" title="Gifts up to ${dfmt(d3.timeDay.offset(r.t, -1))}">${dayLbl(r)}</th>`).join("")}<th class="num">Last ${T.step} days</th><th class="num">Since ${dayLbl(a)}</th></tr>`;
+  tb.querySelector("tbody").innerHTML = SEGS.map(s => `<tr><td><span class="pill"><span class="sw" style="background:var(${s.c})"></span>${s.name}</span></td>
+    ${cols.map(r => `<td class="num">${r === z ? "<b>" + f(v2(r, s.id)) + "</b>" : f(v2(r, s.id))}</td>`).join("")}<td class="num">${delta(v2(z, s.id), v2(p, s.id))}</td><td class="num">${delta(v2(z, s.id), v2(a, s.id))}</td></tr>`).join("")
+    + `<tr><td><b>All donors</b></td>${cols.map(r => `<td class="num"><b>${f(mode === "amt" ? r.amt : r.n)}</b></td>`).join("")}<td class="num">${delta(mode === "amt" ? z.amt : z.n, mode === "amt" ? p.amt : p.n)}</td><td class="num">${delta(mode === "amt" ? z.amt : z.n, mode === "amt" ? a.amt : a.n)}</td></tr>`;
+}
+$("#trendUnit").onchange = e => { st.trendUnit = e.target.value; computeTrend(); drawTrend(); };
+document.querySelectorAll("[data-tm]").forEach(b => b.onclick = () => { st.trendMode = b.dataset.tm; document.querySelectorAll("[data-tm]").forEach(x => x.setAttribute("aria-pressed", x === b)); drawTrend(); });
+
+/* ---------- charity filter ---------- */
+function campName(raw) {
+  if (!raw) return "No campaign";
+  const dec = decEnt(String(raw)).replace(/\s+/g, " ").trim();
+  if (/^https?:\/\//i.test(dec) || dec.includes("/") || /^[a-z0-9%_-]+$/i.test(dec)) { const r = resolveCampaign(raw); if (r && r.t) return r.t; }
+  return dec;
+}
+function fillCharity(gifts) {
+  for (const g of gifts) {
+    if (!g.ch) { const r = g.camp ? resolveCampaign(g.camp) : null; g.ch = r && r.c ? r.c : "Not specified"; }
+    if (!g.cn) g.cn = campName(g.camp);
+  }
+}
+function renderCharityFilter() {
+  const bar = $("#charityBar"), sel = $("#charity");
+  if (!st.gifts || !st.gifts.length) { bar.hidden = true; return; }
+  const by = d3.rollups(st.gifts, v => ({ amt: d3.sum(v, g => g.amount), n: new Set(v.map(g => g.id)).size }), g => g.ch).sort((a, b) => b[1].amt - a[1].amt);
+  if (by.length < 2 && new Set(st.gifts.map(g => g.cn)).size < 2) { bar.hidden = true; return; }
+  bar.hidden = false;
+  sel.innerHTML = `<option value="">All charities (${by.length})</option>` +
+    by.map(([c, v]) => `<option value="${esc(c)}"${st.charity === c ? " selected" : ""}>${esc(c)} · ${fmtInt(v.n)} donor${v.n === 1 ? "" : "s"} · ${moneyShort(v.amt)}</option>`).join("");
+  const inCh = st.gifts.filter(g => !st.charity || g.ch === st.charity);
+  const cb = d3.rollups(inCh, v => ({ amt: d3.sum(v, g => g.amount), n: new Set(v.map(g => g.id)).size }), g => g.cn).sort((a, b) => b[1].amt - a[1].amt);
+  $("#campaign").innerHTML = `<option value="">All campaigns (${cb.length})</option>` +
+    cb.map(([c, v]) => `<option value="${esc(c)}"${st.campaign === c ? " selected" : ""}>${esc(c.length > 70 ? c.slice(0, 68) + "…" : c)} · ${fmtInt(v.n)} donor${v.n === 1 ? "" : "s"} · ${moneyShort(v.amt)}</option>`).join("");
+  const what = [st.charity, st.campaign].filter(Boolean).join(" · ");
+  $("#charityNote").textContent = what
+    ? `Showing only gifts to ${what}. Scores, segments and interests are recalculated from those gifts; the analysis date stays the same.`
+    : "Pick a charity or a campaign to score donors on their gifts to it only.";
+}
+const viewFilter = G => G.filter(g => (!st.charity || g.ch === st.charity) && (!st.campaign || g.cn === st.campaign));
+function applyCharity() {
+  const gifts = viewFilter(st.gifts);
+  loadDonors(aggregate(gifts), st.source === "file" ? (st.fileName || "Your data") : null);
+  renderCharityFilter();
+}
+$("#charity").onchange = e => { st.charity = e.target.value; st.campaign = ""; applyCharity(); };
+$("#campaign").onchange = e => { st.campaign = e.target.value; applyCharity(); };
+
+/* ---------- monthly plan ---------- */
+function scoreSet(D, asOf) {
+  for (const d of D) {
+    d.days = Math.max(0, Math.floor((asOf - d.last.getTime()) / DAY));
+    d.recStatus = !d.recur ? "One-off" : d.days > REC_STOP ? "Stopped" : d.days > REC_GRACE ? "Missed" : "Active";
+  }
+  if (D.length) assignScores(D);
+  return D;
+}
+const health = D => D.length ? d3.mean(D, d => (d.R + d.F + d.M) / 3) : 0;
+// Score a donor as if they gave once more today (and, for monthly actions, became an active monthly donor).
+function afterGift(d, monthly) {
+  const count = d.count + 1, rs = monthly ? "Active" : d.recStatus;
+  const R = st.dims.R.method === "bands" ? band(0, st.dims.R.cuts, false) : 5;
+  let F = st.dims.F.method === "bands" ? band(count, st.dims.F.cuts, true) : Math.min(5, d.F + 1);
+  if (st.recBoost && rs === "Active") F = Math.max(F, count >= 3 ? 5 : 4);
+  return (R + Math.max(F, d.F) + d.M) / 3;
+}
+function planFor(ch) {
+  const G = st.gifts.filter(g => g.ch === ch && !st.majorIds.has(g.id));
+  const D = scoreSet(aggregate(G), st.asOf.getTime());
+  const prevAsOf = st.asOf.getTime() - 30 * DAY, Gp = G.filter(g => g.date < prevAsOf);
+  const P = Gp.length ? scoreSet(aggregate(Gp), prevAsOf) : [];
+  const majors = new Set(st.gifts.filter(g => g.ch === ch && st.majorIds.has(g.id)).map(g => g.id));
+  const avg = a => a.length ? d3.sum(a, d => d.total) / d3.sum(a, d => d.count) : 0;
+  const top = (a, k) => a.slice().sort((x, y) => y.total - x.total).slice(0, k);
+  const acts = [];
+  const add = (model, title, how, group, rate, per, unit, opts = {}) => {
+    if (!group.length) return;
+    const k = Math.max(1, Math.round(group.length * rate));
+    acts.push({ model, title, how, group, n: group.length, k, rate, value: k * per, unit, picks: opts.noGift ? [] : top(group, k), monthly: !!opts.monthly });
+  };
+  const by = f => D.filter(f);
+  const mis = by(d => d.recStatus === "Missed" || d.recStatus === "Stopped");
+  const act = by(d => d.recStatus === "Active");
+  const upg = act.filter(d => d.count >= 3);
+  const conv = by(d => !d.recur && d.count >= 2 && d.R >= 4 && !["champ", "loyal"].includes(d.seg));
+  const champ1 = by(d => !d.recur && ["champ", "loyal"].includes(d.seg));
+  const newD = by(d => d.seg === "new"), mid = by(d => ["promising", "drifting", "attention"].includes(d.seg)), lap = by(d => ["lapsed", "risk", "cantlose"].includes(d.seg));
+  add("Recurring", "Recover missed monthly payments", "Email within 3 days, then call: “your monthly gift didn’t come through”. Offer a quick card update.", mis, 0.5, d3.mean(mis, d => d.monthly) || 0, "/mo", { monthly: true });
+  add("Recurring", "Ask steady monthly donors to upgrade", "Thank them for 3+ months, show one concrete result, ask to add S$10 a month.", upg, 0.1, 10, "/mo", { noGift: true });
+  add("Recurring", "Turn repeat one-off donors into monthly", "Invite them to make it monthly, leading with the campaign they already support.", conv, 0.1, avg(conv), "/mo", { monthly: true });
+  add("Recurring", "Invite one-off Champions and Loyal donors to give monthly", "Personal note from the charity lead; offer a giving circle or monthly option.", champ1, 0.15, avg(champ1), "/mo", { monthly: true });
+  add("One-off", "Get a second gift from new donors", "Impact story at day 14, a specific ask at day 45–60. This is the biggest retention lever.", newD, 0.25, avg(newD), "");
+  add("One-off", "Re-engage Promising and Drifting donors", "Update on the campaign they gave to, with a small, specific ask.", mid, 0.15, avg(mid), "");
+  add("One-off", "Win back lapsed donors", "One low-cost email with a new story. Keep them out of print and phone lists.", lap, 0.05, avg(lap), "");
+  const picks = new Map(); for (const a of acts) for (const d of a.picks) if (!picks.has(d) || a.monthly) picks.set(d, a.monthly);
+  const now = health(D), prev = P.length ? health(P) : null;
+  const proj = D.length ? d3.mean(D, d => picks.has(d) ? Math.max(afterGift(d, picks.get(d)), (d.R + d.F + d.M) / 3) : (d.R + d.F + d.M) / 3) : 0;
+  return { ch, D, now, prev, proj, acts, majors: majors.size,
+    giving: d3.sum(D, d => d.total), activeMo: d3.sum(act, d => d.monthly), nAct: act.length, nMis: mis.length,
+    addMo: d3.sum(acts.filter(a => a.unit === "/mo"), a => a.value), addOne: d3.sum(acts.filter(a => a.unit === ""), a => a.value) };
+}
+let planCache = [];
+function renderPlan() {
+  const box = $("#plan");
+  const month = d3.timeFormat("%B %Y")(new Date(st.asOf.getTime() + 15 * DAY));
+  $("#planTitle").textContent = `Monthly plan · ${month}`;
+  if (!st.gifts || !st.viewGifts) { $("#planNote").textContent = ""; box.innerHTML = `<div class="msg">The monthly plan needs one row per gift with a charity or campaign column.</div>`; planCache = []; return; }
+  const chs = d3.rollups(st.gifts.filter(g => !st.majorIds.has(g.id)), v => new Set(v.map(g => g.id)).size, g => g.ch).filter(([c, n]) => (!st.charity || c === st.charity) && n >= 10).map(([c]) => c);
+  planCache = chs.map(planFor).filter(p => p.D.length).sort((a, b) => b.giving - a.giving);
+  $("#planNote").textContent = `For each charity: its collective RFM health (the average of every donor's R, F and M scores, out of 5), the change from 30 days earlier, and this month's actions. Targets are realistic response rates (e.g. 25% of new donors give again), each with the money it brings and the health score if met. Major donors are planned separately. Charities with fewer than 10 donors are left out.`;
+  if (!planCache.length) { box.innerHTML = `<div class="msg">No charity has 10 or more donors in this view.</div>`; return; }
+  const delta = p => p.prev == null ? '<span class="muted small">no data 30 days ago</span>' : (() => { const d = p.now - p.prev; return `<span class="arrow ${d >= 0 ? "up" : "down"}">${d >= 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(2)}</span><span class="muted small">vs 30 days ago (${p.prev.toFixed(2)})</span>`; })();
+  const actHtml = (p, a, i) => `<div class="act"><span class="t">${a.title}</span><span class="small">${a.how}</span>
+    <span class="m"><span><b>${fmtInt(a.n)}</b> donor${a.n === 1 ? "" : "s"}</span><span>target <b>${fmtInt(a.k)}</b> (${Math.round(a.rate * 100)}%)</span><span><b>+${money(a.value)}${a.unit}</b></span><button type="button" data-p="${esc(p.ch)}" data-a="${i}">List donors</button></span></div>`;
+  const card = p => {
+    const rec = p.acts.map((a, i) => [a, i]).filter(([a]) => a.model === "Recurring").sort((x, y) => y[0].value - x[0].value);
+    const one = p.acts.map((a, i) => [a, i]).filter(([a]) => a.model === "One-off").sort((x, y) => y[0].value - x[0].value);
+    return `<div class="plan-card">
+      <div class="plan-top"><div><h3>${esc(p.ch)}</h3><span class="small muted">${fmtInt(p.D.length)} donors · ${moneyShort(p.giving)} given · ${fmtInt(p.nAct)} active monthly (${money(p.activeMo)}/mo)${p.nMis ? ` · ${fmtInt(p.nMis)} missed` : ""}</span></div>
+        <div class="health"><span class="eyebrow">RFM health</span><span class="hv">${p.now.toFixed(2)}</span>${delta(p)}</div></div>
+      <div class="plan-cols">
+        <div class="plan-col"><h4>Recurring model</h4>${rec.map(([a, i]) => actHtml(p, a, i)).join("") || '<span class="small muted">No recurring actions this month.</span>'}</div>
+        <div class="plan-col"><h4>One-off model</h4>${one.map(([a, i]) => actHtml(p, a, i)).join("") || '<span class="small muted">No one-off actions this month.</span>'}</div>
+      </div>
+      ${p.majors ? `<div class="act"><span class="t">★ ${fmtInt(p.majors)} major donor${p.majors === 1 ? "" : "s"}</span><span class="small">Give each a named owner and a personal call this month; invite them to see the work. Click ★ Major donors above to list them.</span></div>` : ""}
+      <div class="plan-foot">If these targets are met: RFM health <b>${p.now.toFixed(2)} → ${p.proj.toFixed(2)}</b> · <b>+${money(p.addMo)}</b> a month in recurring gifts · <b>+${money(p.addOne)}</b> in one-off gifts.</div>
+    </div>`;
+  };
+  const first = planCache.slice(0, 4), rest = planCache.slice(4);
+  box.innerHTML = first.map(card).join("") + (rest.length ? `<details class="plan-more"><summary>${fmtInt(rest.length)} more charit${rest.length === 1 ? "y" : "ies"}</summary>${rest.map(card).join("")}</details>` : "");
+  box.querySelectorAll("button[data-p]").forEach(b => b.onclick = () => {
+    const p = planCache.find(x => x.ch === b.dataset.p), a = p.acts[+b.dataset.a];
+    if (st.charity !== p.ch || st.campaign) { st.charity = p.ch; st.campaign = ""; applyCharity(); }
+    st.planIds = new Set(a.group.map(d => d.id)); st.planLabel = `Plan: ${a.title}`; st.shown = 100;
+    renderTable(); document.querySelector("#tbl").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+$("#planCopy").onclick = async () => {
+  const month = d3.timeFormat("%B %Y")(new Date(st.asOf.getTime() + 15 * DAY));
+  const lines = [`Monthly donor plan · ${month}`, `Data up to ${dfmt(d3.timeDay.offset(st.asOf, -1))}`, ""];
+  for (const p of planCache) {
+    lines.push(`${p.ch}: RFM health ${p.now.toFixed(2)}${p.prev != null ? ` (${p.now >= p.prev ? "+" : ""}${(p.now - p.prev).toFixed(2)} vs 30 days ago)` : ""}, target ${p.proj.toFixed(2)}`);
+    for (const m of ["Recurring", "One-off"]) for (const a of p.acts.filter(x => x.model === m).sort((x, y) => y.value - x.value))
+      lines.push(`  [${m}] ${a.title}: ${a.n} donors, target ${a.k} → +${money(a.value)}${a.unit}. ${a.how}`);
+    if (p.majors) lines.push(`  [Major] ${p.majors} major donors: named owner and a personal call this month.`);
+    lines.push("");
+  }
+  const text = lines.join("\n"), btn = $("#planCopy"), fb = $("#planCopyFallback");
+  try { await navigator.clipboard.writeText(text); fb.hidden = true; btn.textContent = "Copied"; }
+  catch { fb.value = text; fb.hidden = false; fb.style.minHeight = "200px"; fb.focus(); fb.select(); btn.textContent = "Press Ctrl/⌘+C to copy"; }
+  setTimeout(() => btn.textContent = "Copy plan", 2500);
+};
+
+/* ---------- recurring ---------- */
+const REC_LABEL = { recur: "All recurring", Active: "Active recurring", Missed: "Missed last payment", Stopped: "Stopped recurring", "One-off": "One-off donors" };
+function renderRecurring() {
+  const tiles = $("#recTiles"), tb = $("#recCamp");
+  if (!st.viewGifts) {
+    $("#recNote").textContent = ""; tiles.innerHTML = `<div class="msg" style="grid-column:1/-1;cursor:default">Needs one row per gift. A donor-level file can't show giving patterns.</div>`;
+    $("#recCampWrap").hidden = true; return;
+  }
+  const D = st.donors, R = D.filter(d => d.recur), by = k => D.filter(d => d.recStatus === k);
+  const act = by("Active"), mis = by("Missed"), stop = by("Stopped"), one = by("One-off");
+  const flagged = R.filter(d => d.rf).length;
+  $("#recNote").textContent = `Recurring means the same amount to the same campaign every ${REC_GAP[0]}–${REC_GAP[1]} days, or a gift your payment system marks as recurring (${fmtInt(flagged)} donor${flagged === 1 ? "" : "s"}). "Missed" means more than ${REC_GRACE} days since their last monthly gift; "Stopped" means more than ${REC_STOP}.`;
+  const t = (k, label, big, sub, warn) => `<div class="${warn ? "warn" : ""}${st.selRec === k ? " on" : ""}" data-k="${k}" role="button" tabindex="0"><span class="eyebrow">${label}</span><span class="st">${big}</span><span class="small muted">${sub}</span></div>`;
+  tiles.innerHTML = [
+    t("recur", "Recurring donors", fmtInt(R.length), `${pct(R.length / (D.length || 1))} of donors · ${pct(d3.sum(R, d => d.total) / (d3.sum(D, d => d.total) || 1))} of giving`),
+    t("Active", "Active", fmtInt(act.length), `${money(d3.sum(act, d => d.monthly))} a month · avg ${act.length ? money(d3.mean(act, d => d.monthly)) : "–"}`),
+    t("Missed", "Missed last payment", fmtInt(mis.length), `${money(d3.sum(mis, d => d.monthly))} a month at stake`, mis.length > 0),
+    t("Stopped", "Stopped", fmtInt(stop.length), `${money(d3.sum(stop, d => d.monthly))} a month lost`),
+    t("One-off", "One-off donors", fmtInt(one.length), `${pct(one.length / (D.length || 1))} of donors · candidates to convert`),
+  ].join("");
+  tiles.querySelectorAll("[data-k]").forEach(el => {
+    const go = () => { st.selRec = st.selRec === el.dataset.k ? null : el.dataset.k; st.shown = 100; renderRecurring(); renderTable(); };
+    el.onclick = go; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+  });
+  const rows = d3.rollups(R, v => ({ act: v.filter(d => d.recStatus === "Active"), mis: v.filter(d => d.recStatus === "Missed"), stop: v.filter(d => d.recStatus === "Stopped") }), d => d.recCamp)
+    .map(([k, v]) => ({ k, nA: v.act.length, mA: d3.sum(v.act, d => d.monthly), nM: v.mis.length, mM: d3.sum(v.mis, d => d.monthly), nS: v.stop.length }))
+    .sort((a, b) => b.mA - a.mA || b.nM - a.nM);
+  $("#recCampWrap").hidden = !rows.length;
+  tb.querySelector("thead").innerHTML = `<tr><th>Campaign</th><th class="num">Active</th><th class="num">Monthly value</th><th class="num">Missed</th><th class="num">At stake /mo</th><th class="num">Stopped</th></tr>`;
+  tb.querySelector("tbody").innerHTML = rows.slice(0, 12).map(r => `<tr><td style="white-space:normal;min-width:240px;font-weight:700">${esc(r.k || "No campaign")}</td><td class="num">${fmtInt(r.nA)}</td><td class="num"><b>${money(r.mA)}</b></td>
+    <td class="num">${r.nM ? `<span class="rp Missed">${fmtInt(r.nM)}</span>` : "0"}</td><td class="num">${r.mM ? money(r.mM) : "–"}</td><td class="num">${fmtInt(r.nS)}</td></tr>`).join("")
+    + (rows.length > 12 ? `<tr><td colspan="6" class="small muted">${fmtInt(rows.length - 12)} more campaigns with fewer recurring donors.</td></tr>` : "");
+}
+
+/* ---------- campaign value ---------- */
+const VALUABLE = new Set(["champ", "loyal", "potential"]), SLIP = new Set(["drifting", "risk", "cantlose", "lapsed"]);
+function campRows() {
+  const D = st.donors; if (!st.viewGifts || !D.length || !D[0].cset) return null;
+  const chOf = new Map(); for (const g of st.viewGifts) if (!chOf.has(g.cn)) chOf.set(g.cn, g.ch);
+  const by = new Map();
+  for (const d of D) {
+    for (const k of st.cMode === "first" ? [d.firstCamp] : d.cset) {
+      let e = by.get(k); if (!e) { e = { k, ch: chOf.get(k) || "", n: 0, total: 0, rep: 0, val: 0, slip: 0, seg: {} }; by.set(k, e); }
+      e.n++; e.total += d.total; if (d.count > 1) e.rep++; if (VALUABLE.has(d.seg)) e.val++; if (SLIP.has(d.seg)) e.slip++; e.seg[d.seg] = (e.seg[d.seg] || 0) + 1;
+    }
+  }
+  return [...by.values()].map(e => ({ ...e, avg: e.total / e.n, repR: e.rep / e.n, valR: e.val / e.n, slipR: e.slip / e.n }));
+}
+function renderCampRank() {
+  const all = campRows(), tb = $("#campTbl"), ins = $("#campInsights");
+  if (!all || all.length < 1) {
+    ins.innerHTML = `<div class="msg" style="grid-column:1/-1;cursor:default">Needs one row per gift with a campaign column.</div>`; tb.querySelector("thead").innerHTML = ""; tb.querySelector("tbody").innerHTML = ""; $("#campRankNote").textContent = ""; return;
+  }
+  const minN = Math.min(st.cMin, d3.max(all, r => r.n));
+  const rows = all.filter(r => r.n >= minN);
+  $("#campRankNote").textContent = st.cMode === "first"
+    ? `Each donor is credited to the campaign of their first gift, so this shows which campaigns recruit donors who go on to give more. Totals are each donor's giving across all campaigns${st.charity || st.campaign ? " in the current filter" : ""}.`
+    : `Each donor is counted under every campaign they gave to, so a donor can appear in several rows. Totals are each donor's giving across all campaigns${st.charity || st.campaign ? " in the current filter" : ""}.`;
+  // highlights
+  const best = (key, filt = () => true) => rows.filter(filt).slice().sort((a, b) => b[key] - a[key] || b.n - a.n)[0];
+  const big = best("n"), rich = best("avg"), reg = best("valR"), back = best("repR"), slip = best("slipR", r => r.slipR > 0);
+  const card = (eyebrow, r, stat, sub, warn) => r ? `<div class="${warn ? "warn" : ""}" data-k="${esc(r.k)}" role="button" tabindex="0"><span class="eyebrow">${eyebrow}</span><span class="st">${stat}</span><span class="nm" title="${esc(r.k)}">${esc(r.k)}</span><span class="small muted">${sub}</span></div>` : "";
+  ins.innerHTML = rows.length ? [
+    card("Highest value per donor", rich, money(rich.avg), `per donor · ${fmtInt(rich.n)} donors`),
+    card("Best at building regulars", reg, pct(reg.valR), `now Champions, Loyal or Potential loyalists · ${fmtInt(reg.n)} donors`),
+    card("Most donors came back", back, pct(back.repR), `gave 2+ times · ${fmtInt(back.n)} donors`),
+    card(st.cMode === "first" ? "Biggest recruiter" : "Most donors", big, fmtInt(big.n), `donors · ${moneyShort(big.total)} given`),
+    slip ? card("Most donors slipping", slip, pct(slip.slipR), `now Drifting, At risk, Can't lose them or Lapsed · ${fmtInt(slip.n)} donors`, true) : "",
+  ].join("") : `<div class="msg" style="grid-column:1/-1;cursor:default">No campaign has ${minN}+ donors in this view. Lower the minimum.</div>`;
+  // table
+  const C = [["k", "Campaign"], ["ch", "Charity"], ["n", "Donors", 1], ["total", "Their giving", 1], ["avg", "Per donor", 1], ["repR", "Came back", 1], ["valR", "Now valuable", 1], ["slipR", "Slipping", 1], ["mix", "Segment mix"]];
+  const { key, dir } = st.cSort;
+  rows.sort((a, b) => { const va = a[key], vb = b[key]; return (typeof va === "string" ? va.localeCompare(vb) : va - vb) * dir; });
+  tb.querySelector("thead").innerHTML = "<tr>" + C.map(([k, l, n]) => `<th class="${n ? "num" : ""}" data-k="${k}" tabindex="0" aria-sort="${key === k ? (dir > 0 ? "ascending" : "descending") : "none"}">${l}</th>`).join("") + "</tr>";
+  const mix = r => `<div class="mix" title="${SEGS.filter(s => r.seg[s.id]).map(s => `${s.name} ${pct(r.seg[s.id] / r.n)}`).join(" · ")}">${SEGS.filter(s => r.seg[s.id]).map(s => `<span style="width:${(r.seg[s.id] / r.n) * 100}%;background:var(${s.c})"></span>`).join("")}</div>`;
+  tb.querySelector("tbody").innerHTML = rows.map(r => `<tr class="${st.selCamp === r.k ? "on" : ""}" data-k="${esc(r.k)}">
+    <td class="cn">${esc(r.k)}</td><td>${esc(r.ch)}</td><td class="num">${fmtInt(r.n)}</td><td class="num">${money(r.total)}</td><td class="num"><b>${money(r.avg)}</b></td>
+    <td class="num">${pct(r.repR)}</td><td class="num">${pct(r.valR)}</td><td class="num">${pct(r.slipR)}</td><td>${mix(r)}</td></tr>`).join("")
+    || `<tr><td colspan="9" class="muted">No campaigns match.</td></tr>`;
+  tb.querySelectorAll("th").forEach(th => {
+    const go = () => { const k = th.dataset.k; if (k === "mix") return; st.cSort = { key: k, dir: st.cSort.key === k ? -st.cSort.dir : (k === "k" || k === "ch" ? 1 : -1) }; renderCampRank(); };
+    th.onclick = go; th.onkeydown = e => { if (e.key === "Enter") go(); };
+  });
+  const pick = k => { st.selCamp = st.selCamp === k ? null : k; st.selCampMode = st.cMode; st.shown = 100; renderCampRank(); renderTable(); };
+  tb.querySelectorAll("tbody tr[data-k]").forEach(tr => tr.onclick = () => pick(tr.dataset.k));
+  ins.querySelectorAll("[data-k]").forEach(c => { c.onclick = () => pick(c.dataset.k); c.onkeydown = e => { if (e.key === "Enter") pick(c.dataset.k); }; });
+}
+document.querySelectorAll("[data-cm]").forEach(b => b.onclick = () => { st.cMode = b.dataset.cm; st.selCamp = null; document.querySelectorAll("[data-cm]").forEach(x => x.setAttribute("aria-pressed", x === b)); renderCampRank(); renderTable(); });
+$("#cMin").onchange = e => { st.cMin = +e.target.value; renderCampRank(); };
+
+/* ---------- interests ---------- */
+const tagCol = v => v === "Untagged" ? "Untagged" : st.affTop.includes(v) ? v : "Other";
+const mixStr = (o, total) => Object.entries(o).filter(([v]) => v !== "Untagged").sort((a, b) => b[1] - a[1]).map(([v, a]) => `${v} ${Math.round(a / total * 100)}%`).join("; ");
+function initTagDim() {
+  const sel = $("#tagDim");
+  sel.innerHTML = TDIMS.map(x => `<option value="${x.k}">${x.l}</option>`).join("");
+  sel.onchange = () => { st.tagDim = sel.value; st.selTag = null; st.shown = 100; renderAffinity(); renderTable(); };
+}
+function renderAffinity() {
+  const box = $("#aff"); $("#tagDim").disabled = !st.hasCamp;
+  if (!st.hasCamp) {
+    box.innerHTML = `<div class="msg" style="grid-column:1/-1">${st.mode === "donor" && st.source === "file"
+      ? "Interests need one row per gift with a campaign column. A donor-level file has no campaign for each gift."
+      : "Choose a campaign column when you load your gifts (URL, slug or campaign name) and each donor gets an interest profile from the 88 tagged campaigns."}</div>`;
+    return;
+  }
+  const dim = st.tagDim, D = st.donors, T = d3.sum(D, d => d.total) || 1;
+  const giving = new Map(), mainN = new Map();
+  for (const d of D) { for (const [v, a] of Object.entries(d.tag[dim])) giving.set(v, (giving.get(v) || 0) + a); mainN.set(d.main[dim], (mainN.get(d.main[dim]) || 0) + 1); }
+  const vals = [...giving.entries()].sort((a, b) => (a[0] === "Untagged") - (b[0] === "Untagged") || b[1] - a[1]);
+  const tagged = vals.filter(v => v[0] !== "Untagged");
+  st.affTop = tagged.slice(0, 7).map(v => v[0]);
+  const cols = st.affTop.concat(tagged.length > 7 ? ["Other"] : [], vals.some(v => v[0] === "Untagged") ? ["Untagged"] : []);
+  const max = d3.max(vals, v => v[1]) || 1;
+  const multi = D.filter(d => d.nInt > 1).length;
+  const bars = vals.map(([v, a]) => `<div class="tb${st.selTag === tagCol(v) && st.affTop.includes(v) || st.selTag === v ? " on" : ""}${v === "Untagged" ? " untagged" : ""}" data-v="${esc(v)}" role="button" tabindex="0">
+      <span class="lab">${esc(v)}</span><span class="small muted"><b>${pct(a / T)}</b> of giving · ${fmtInt(mainN.get(v) || 0)} donors</span>
+      <div class="track"><div class="bar" style="width:${(a / max) * 100}%"></div></div></div>`).join("");
+  const rows = SEGS.map(s => { const g = D.filter(d => d.seg === s.id); const c = {}; g.forEach(d => { const k = tagCol(d.main[dim]); c[k] = (c[k] || 0) + 1; }); return { s, n: g.length, c }; }).filter(r => r.n);
+  const ramp = d3.interpolateRgb(cssVar("--seq-lo"), cssVar("--seq-hi"));
+  const cell = (r, c) => {
+    const n = r.c[c] || 0, sh = n / r.n, bg = n ? ramp(Math.sqrt(sh)) : cssVar("--panel"), dark = n && d3.lab(bg).l < 62;
+    const on = st.selSeg === r.s.id && st.selTag === c;
+    return `<td class="${on ? "on" : ""}" data-seg="${r.s.id}" data-v="${esc(c)}" data-n="${n}" data-sh="${sh}" style="background:${bg};color:${!n ? cssVar("--muted") : dark ? "#fff" : "#0b2a27"}">${n ? pct(sh) : "·"}</td>`;
+  };
+  box.innerHTML = `
+    <div><div class="tbars">${bars}</div>
+      <p class="small muted" style="margin-top:10px">${fmtInt(multi)} donors (${pct(multi / D.length)}) gave to more than one interest. Gifts tagged with two values are split evenly between them.</p></div>
+    <div><h3>Main ${esc(TDIMS.find(x => x.k === dim).l.toLowerCase())} by segment</h3>
+      <p class="small muted">Share of each segment's donors whose main ${esc(TDIMS.find(x => x.k === dim).l.toLowerCase())} is in the column. Click a cell to list them.</p>
+      <div class="mx-wrap"><table class="mx"><thead><tr><th></th>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map(r => `<tr><th class="row"><span class="row" style="gap:6px;flex-wrap:nowrap"><span class="sw" style="background:var(${r.s.c})"></span>${r.s.name}</span></th>${cols.map(c => cell(r, c)).join("")}</tr>`).join("")}</tbody></table></div></div>`;
+  box.querySelectorAll(".tb").forEach(el => {
+    const go = () => { const v = tagCol(el.dataset.v); st.selTag = st.selTag === v ? null : v; st.shown = 100; renderAffinity(); renderTable(); };
+    el.onclick = go; el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+  });
+  box.querySelectorAll("td[data-seg]").forEach(td => {
+    td.onclick = () => { const same = st.selSeg === td.dataset.seg && st.selTag === td.dataset.v; st.selSeg = same ? null : td.dataset.seg; st.selTag = same ? null : td.dataset.v; st.selCell = null; st.hl = st.selSeg; st.shown = 100; renderInteractive(); };
+    td.onmousemove = e => showTip(e, `<b>${SEG[td.dataset.seg].name}</b> · ${esc(td.dataset.v)}<br>${fmtInt(+td.dataset.n)} donors, ${pct(+td.dataset.sh)} of the segment`);
+    td.onmouseleave = hideTip;
+  });
+}
+function renderCampList() {
+  $("#campCount").textContent = TAGS.length;
+  const draw = () => {
+    const q = normT($("#cq").value);
+    const list = TAGS.filter(t => !q || normT([t.t, t.c, t.i, t.ca, t.g, t.a, t.l, t.f, t.ap].join(" ")).includes(q));
+    $("#ctbl tbody").innerHTML = list.map(t => `<tr><td style="white-space:normal;min-width:240px"><a href="${CAMP_BASE + t.s}/" target="_blank" rel="noopener">${esc(t.t)}</a></td>
+      <td>${esc(t.c)}</td><td>${esc(t.i)}</td><td>${esc(t.ca)}</td><td style="white-space:normal;min-width:180px">${esc(t.g)}</td><td>${esc(t.a)}</td><td>${esc(t.l)}</td><td>${esc(t.f)}</td><td>${esc(t.ap)}</td></tr>`).join("")
+      || `<tr><td colspan="9" class="muted">No campaigns match.</td></tr>`;
+  };
+  $("#cq").oninput = draw; draw();
+}
+function renderCampBox() {
+  const box = $("#campBox");
+  if (!st.gifts || !st.gifts.some(g => g.camp)) { box.hidden = true; return; }
+  const by = new Map();
+  for (const g of st.gifts) if (g.camp) { const e = by.get(g.camp) || { amt: 0, n: 0 }; e.amt += g.amount; e.n++; by.set(g.camp, e); }
+  const all = [...by.entries()], T = d3.sum(all, e => e[1].amt) || 1;
+  const un = all.filter(([k]) => { const r = resolveCampaign(k); return !r || r.manual; }).sort((a, b) => b[1].amt - a[1].amt);
+  const matchedAmt = d3.sum(all.filter(([k]) => { const r = resolveCampaign(k); return r && !r.manual; }), e => e[1].amt);
+  const noCamp = st.gifts.filter(g => !g.camp).length;
+  box.classList.toggle("warn", un.some(([k]) => !st.manual[k]));
+  box.hidden = false;
+  box.innerHTML = `<div><b>Campaigns:</b> matched ${fmtInt(all.length - un.length)} of ${fmtInt(all.length)} campaign names to the tag list, covering ${pct(matchedAmt / T)} of giving.${noCamp ? ` ${fmtInt(noCamp)} gifts have no campaign and count as Untagged.` : ""}</div>
+    ${un.length ? `<p class="small" style="margin-top:6px">Pick an interest for campaigns that aren't on the site (largest first):</p>
+    <div class="camp-rows" style="margin-top:6px">${un.slice(0, 25).map(([k, e], i) => `<label class="camp-row" for="man-${i}"><span>${esc(k)} <span class="muted">· ${money(e.amt)}</span></span>
+      <select id="man-${i}" data-k="${esc(k)}"><option value="">Untagged</option>${INTERESTS.map(v => `<option${st.manual[k] === v ? " selected" : ""}>${v}</option>`).join("")}</select></label>`).join("")}</div>
+    ${un.length > 25 ? `<p class="small muted">${fmtInt(un.length - 25)} smaller unmatched campaigns stay Untagged.</p>` : ""}` : ""}`;
+  box.querySelectorAll("select[data-k]").forEach(sel => sel.onchange = () => {
+    const k = sel.dataset.k; if (sel.value) st.manual[k] = sel.value; else delete st.manual[k];
+    if (st.source === "file") saveTemp();
+    resCache.delete(k);
+    applyCharity();
+    renderCampBox();
+  });
+}
+
+/* ---------- table ---------- */
+const recPill = d => d.recStatus === undefined ? '<span class="muted">—</span>' : d.recur
+  ? `<span class="rp ${d.recStatus}" title="Detected by ${d.recurBy}; next gift due ${dfmt(d.nextDue)}">${d.recStatus === "Active" ? "Monthly" : d.recStatus} · ${money(d.monthly)}</span>`
+  : '<span class="rp One-off">One-off</span>';
+const COLS = [
+  { k: "name", l: "Donor" }, { k: "seg", l: "Segment" }, { k: "rfm", l: "RFM" }, { k: "last", l: "Last gift" },
+  { k: "rec", l: "Giving" }, { k: "interest", l: "Main interest" }, { k: "days", l: "Days", n: 1 }, { k: "count", l: "Gifts", n: 1 }, { k: "total", l: "Total", n: 1 }, { k: "avg", l: "Avg gift", n: 1 },
+];
+function filtered() {
+  const q = st.q.trim().toLowerCase();
+  let D = st.selSeg === "major" ? st.majors : st.donors;
+  if (st.selSeg) D = D.filter(d => d.seg === st.selSeg);
+  if (st.selCell) D = D.filter(d => d.R === st.selCell.r && d.F === st.selCell.f);
+  if (st.selTag && st.hasCamp) D = D.filter(d => tagCol(d.main[st.tagDim]) === st.selTag);
+  if (st.planIds) D = D.filter(d => st.planIds.has(d.id));
+  if (st.selRec) D = D.filter(d => st.selRec === "recur" ? d.recur : d.recStatus === st.selRec);
+  if (st.selCamp) D = D.filter(d => st.selCampMode === "first" ? d.firstCamp === st.selCamp : d.cset && d.cset.has(st.selCamp));
+  if (q) D = D.filter(d => (d.name + " " + d.id).toLowerCase().includes(q));
+  const { key, dir } = st.sort, segIdx = Object.fromEntries(SEGS.map((s, i) => [s.id, i]));
+  const val = d => key === "rfm" ? d.R * 100 + d.F * 10 + d.M + d.total / 1e9 : key === "seg" ? -segIdx[d.seg] : key === "name" ? (d.name || d.id).toLowerCase() : key === "last" ? d.last.getTime() : key === "interest" ? (d.main ? d.main.i : "") : key === "rec" ? ({ Missed: 4, Active: 3, Stopped: 2, "One-off": 1 }[d.recStatus] || 0) * 1e6 + (d.monthly || 0) : d[key];
+  return D.slice().sort((a, b) => { const va = val(a), vb = val(b); return (va < vb ? -1 : va > vb ? 1 : 0) * dir; });
+}
+function renderTable() {
+  const D = filtered();
+  $("#tbl thead").innerHTML = "<tr>" + COLS.map(c => `<th class="${c.n ? "num" : ""}" data-k="${c.k}" tabindex="0" aria-sort="${st.sort.key === c.k ? (st.sort.dir > 0 ? "ascending" : "descending") : "none"}">${c.l}</th>`).join("") + "</tr>";
+  $("#tbl tbody").innerHTML = D.slice(0, st.shown).map(d => `<tr>
+    <td><b>${esc(d.name || d.id)}</b>${d.name ? ` <span class="small muted">${esc(d.id)}</span>` : ""}</td>
+    <td><span class="pill"><span class="sw" style="background:var(${SEG[d.seg].c})"></span>${SEG[d.seg].name}</span></td>
+    <td class="code">${d.code}</td><td>${dfmt(d.last)}</td><td>${recPill(d)}</td><td>${d.main && d.main.i !== "Untagged" ? esc(d.main.i) + (d.nInt > 1 ? ` <span class="small muted">+${d.nInt - 1}</span>` : "") : '<span class="muted">—</span>'}</td><td class="num">${fmtInt(d.days)}</td>
+    <td class="num">${fmtInt(d.count)}</td><td class="num">${money(d.total)}</td><td class="num">${money(d.avg)}</td></tr>`).join("")
+    || `<tr><td colspan="10" class="muted">No donors match this filter.</td></tr>`;
+  $("#tbl thead").querySelectorAll("th").forEach(th => {
+    const go = () => { const k = th.dataset.k; st.sort = { key: k, dir: st.sort.key === k ? -st.sort.dir : (k === "name" || k === "days" ? 1 : -1) }; renderTable(); };
+    th.onclick = go; th.onkeydown = e => { if (e.key === "Enter") go(); };
+  });
+  $("#more").hidden = D.length <= st.shown;
+  $("#tblNote").textContent = `${fmtInt(D.length)} donors${D.length > st.shown ? `, showing the first ${fmtInt(st.shown)}` : ""}. Click a column to sort.`;
+  const tags = [];
+  if (st.selSeg) tags.push([SEG[st.selSeg].name, () => { st.selSeg = null; st.hl = null; }]);
+  if (st.selCell) tags.push([`R${st.selCell.r} · F${st.selCell.f}`, () => { st.selCell = null; st.hl = null; }]);
+  if (st.planIds) tags.push([st.planLabel, () => { st.planIds = null; }]);
+  if (st.selRec) tags.push([REC_LABEL[st.selRec], () => { st.selRec = null; renderRecurring(); }]);
+  if (st.selCamp) tags.push([`${st.selCampMode === "first" ? "First gift to" : "Gave to"}: ${st.selCamp}`, () => { st.selCamp = null; }]);
+  if (st.selTag && st.hasCamp) tags.push([`${TDIMS.find(x => x.k === st.tagDim).l}: ${st.selTag}`, () => { st.selTag = null; }]);
+  const af = $("#activeFilters"); af.innerHTML = "";
+  tags.forEach(([t, clear]) => { const s = document.createElement("span"); s.className = "tag"; s.innerHTML = `${esc(t)} <button type="button" aria-label="Clear ${esc(t)} filter">✕</button>`; s.querySelector("button").onclick = () => { clear(); st.shown = 100; renderInteractive(); }; af.appendChild(s); });
+}
+$("#q").oninput = e => { st.q = e.target.value; st.shown = 100; renderTable(); };
+$("#more").onclick = () => { st.shown += 200; renderTable(); };
+$("#copyCsv").onclick = async () => {
+  const D = filtered();
+  const q = v => /[",\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
+  const csv = ["donor_id,name,segment,rfm,r,f,m,last_gift,days_since,gifts,total,avg_gift,main_interest,interest_mix,first_campaign,campaigns,giving_type,recurring_status,monthly_amount,next_due,recurring_detected_by"].concat(D.map(d =>
+    [d.id, d.name, SEG[d.seg].name, d.code, d.R, d.F, d.M, d3.timeFormat("%Y-%m-%d")(d.last), d.days, d.count, d.total.toFixed(2), d.avg.toFixed(2), d.main ? d.main.i : "", d.tag ? mixStr(d.tag.i, d.total) : "", d.firstCamp || "", d.cset ? [...d.cset].join("; ") : "", d.recur ? "Recurring" : "One-off", d.recur ? d.recStatus : "", d.recur ? d.monthly.toFixed(2) : "", d.nextDue ? d3.timeFormat("%Y-%m-%d")(d.nextDue) : "", d.recurBy || ""].map(q).join(","))).join("\n");
+  const btn = $("#copyCsv"), fb = $("#copyFallback");
+  try { await navigator.clipboard.writeText(csv); fb.hidden = true; btn.textContent = `Copied ${fmtInt(D.length)} donors`; }
+  catch { fb.value = csv; fb.hidden = false; fb.focus(); fb.select(); btn.textContent = "Press Ctrl/⌘+C to copy"; }
+  setTimeout(() => btn.textContent = "Copy list as CSV", 2500);
+};
+
+/* ---------- loading files ---------- */
+const GUESS = {
+  id: /^(donor|constituent|supporter|contact|member|customer)?[ _-]*(id|no|number|ref|code)$|^email|donor|constituent|supporter/i,
+  name: /name/i,
+  date: /date|received|created|when|time/i,
+  amount: /amount|value|gift|donation|total|sum|paid/i,
+  campaign: /campaign|appeal|fund(?!ing date)|project|event|page|url|link|cause/i,
+  charity: /charity|organi[sz]ation|ngo|beneficiary/i,
+  pay: /payment method|payment type|frequency|recurr|subscription|gift type/i,
+  last: /last|recent|latest/i,
+  count: /count|number of|num|freq|# ?gifts|gifts$/i,
+  total: /total|lifetime|sum|ltv/i,
+};
+function mapSpec() {
+  return st.mode === "gift"
+    ? [["id", "Donor ID", true], ["name", "Donor name", false], ["date", "Gift date", true], ["amount", "Amount", true], ["campaign", "Campaign (URL, slug or name)", false], ["charity", "Charity", false], ["pay", "Payment method (optional)", false]]
+    : [["id", "Donor ID", true], ["name", "Donor name", false], ["last", "Last gift date", true], ["count", "Number of gifts", true], ["total", "Total given", true]];
+}
+const PREFER = { amount: /^(donation to charity|nett donation|net donation|gift amount|donation amount|amount)$/i, id: /^(donor )?e-?mail( address)?$|^donor email address$/i,
+  name: /^(donor |full |supporter )?name$/i, charity: /^(charity|organi[sz]ation|ngo|beneficiary)( name)?$/i, pay: /^(payment (method|type)|frequency|recurring|gift type|donation type)$/i, campaign: /^(campaign|appeal|fund|project)( name| title| url| link)?$/i };
+function guessCol(fields, key, used) {
+  if (PREFER[key]) { const p = fields.find(f => PREFER[key].test(f.trim()) && !used.has(f)); if (p) return p; }
+  const order = key === "campaign" ? fields.filter(f => !/date|amount|^id$|donor|email|owner|\bid$/i.test(f)) : key === "name" ? fields.filter(f => !/campaign|appeal|event|charity|organi[sz]ation|fund|project/i.test(f)) : key === "amount" ? fields.filter(f => !/id|date|campaign|appeal|url|page|status|number|type|method/i.test(f)) : key === "total" ? fields.filter(f => !/id|date|count/i.test(f)) : key === "count" ? fields.filter(f => !/date|total|amount/i.test(f)) : key === "id" ? fields.filter(f => !/name|date/i.test(f)) : fields;
+  return order.find(f => GUESS[key].test(f) && !used.has(f)) || "";
+}
+function renderMapping() {
+  const fields = st.csv.meta.fields, used = new Set();
+  const spec = mapSpec();
+  $("#mapFields").innerHTML = spec.map(([k, l, req]) => {
+    const g = guessCol(fields, k, used); if (g) used.add(g);
+    return `<label class="f">${l}${req ? "" : " (optional)"}<select id="map-${k}"><option value="">${req ? "Choose column" : "None"}</option>${fields.map(f => `<option${f === g ? " selected" : ""}>${esc(f)}</option>`).join("")}</select></label>`;
+  }).join("") + `<label class="f">Date format<select id="map-dfmt"><option value="auto">Detect</option><option value="dmy">Day/Month/Year</option><option value="mdy">Month/Day/Year</option></select></label>`;
+  $("#mapping").hidden = false;
+  $("#modeGift").setAttribute("aria-pressed", st.mode === "gift"); $("#modeDonor").setAttribute("aria-pressed", st.mode === "donor");
+}
+$("#modeGift").onclick = () => { st.mode = "gift"; renderMapping(); };
+$("#modeDonor").onclick = () => { st.mode = "donor"; renderMapping(); };
+
+function dateParser(values, pref) {
+  let fmt = pref;
+  if (fmt === "auto") {
+    fmt = "dmy";
+    for (const v of values) { const m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-]\d{2,4}/.exec(String(v).trim()); if (!m) continue; if (+m[1] > 12) { fmt = "dmy"; break; } if (+m[2] > 12) { fmt = "mdy"; break; } }
+  }
+  return v => {
+    const s = String(v ?? "").trim(); if (!s) return null;
+    let m = /^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/.exec(s);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/.exec(s);
+    if (m) { let yy = +m[3]; if (yy < 100) yy += 2000; const [d, mo] = fmt === "dmy" ? [+m[1], +m[2]] : [+m[2], +m[1]]; if (mo > 12 || d > 31) return null; return new Date(yy, mo - 1, d); }
+    if (/^\d{5}(\.\d+)?$/.test(s)) { const n = +s; if (n > 20000 && n < 80000) return new Date(Math.round((n - 25569) * DAY) + new Date().getTimezoneOffset() * 60000); }
+    m = /^([A-Za-z]{3,9})\.? (\d{1,2}),? (\d{4})/.exec(s);
+    if (m) { const t = Date.parse(`${m[1]} ${m[2]}, ${m[3]}`); if (!isNaN(t)) return new Date(t); }
+    const t = Date.parse(s.replace(/\s+-\s+/, " ")); return isNaN(t) ? null : new Date(t);
+  };
+}
+const num = v => { const s = String(v ?? "").replace(/[^0-9.\-,]/g, ""); const n = parseFloat(/,\d{1,2}$/.test(s) && !s.includes(".") ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "")); return isFinite(n) ? n : NaN; };
+
+function applyMapping() {
+  const rows = st.csv.data, get = k => $("#map-" + k)?.value || "";
+  const missing = mapSpec().filter(([k, , req]) => req && !get(k)).map(([, l]) => l);
+  if (missing.length) return say(`Choose a column for: ${missing.join(", ")}.`, true);
+  let skipped = 0, refunds = 0, notPaid = 0, notGift = 0, donors;
+  if (st.mode === "gift") {
+    const pd = dateParser(rows.slice(0, 500).map(r => r[get("date")]), get("dfmt"));
+    const gifts = [], fields = st.csv.meta.fields;
+    const statusCol = fields.find(f => /^(donation |payment |order )?status$/i.test(f.trim())), typeCol = fields.find(f => /^row type$/i.test(f.trim()));
+    const OKSTATUS = /^(paid|received|completed?|succeeded|success|successful|settled|captured)$/i;
+    for (const r of rows) {
+      if (statusCol && r[statusCol] && !OKSTATUS.test(String(r[statusCol]).trim())) { notPaid++; continue; }
+      if (typeCol && r[typeCol] && !/donation/i.test(r[typeCol])) { notGift++; continue; }
+      const id0 = String(r[get("id")] ?? "").trim(), id = id0.includes("@") ? id0.toLowerCase() : id0, date = pd(r[get("date")]), amount = num(r[get("amount")]);
+      if (!id || !date || isNaN(amount)) { skipped++; continue; }
+      if (amount <= 0) { refunds++; continue; }
+      gifts.push({ id, name: get("name") ? String(r[get("name")] ?? "").trim() : "", date, amount, camp: get("campaign") ? String(r[get("campaign")] ?? "").trim() : "", ch: get("charity") ? decEnt(String(r[get("charity")] ?? "").trim()) : "", rec: get("pay") ? /recurr|subscri|monthly|regular|standing/i.test(String(r[get("pay")] ?? "")) : false });
+    }
+    st.gifts = gifts; st.charity = ""; st.campaign = ""; fillCharity(gifts); donors = aggregate(gifts);
+  } else {
+    const pd = dateParser(rows.slice(0, 500).map(r => r[get("last")]), get("dfmt"));
+    donors = [];
+    for (const r of rows) {
+      const id = String(r[get("id")] ?? "").trim(), last = pd(r[get("last")]), count = Math.round(num(r[get("count")])), total = num(r[get("total")]);
+      if (!id || !last || !(count > 0) || !(total > 0)) { skipped++; continue; }
+      donors.push({ id, name: get("name") ? String(r[get("name")] ?? "").trim() : "", last, first: last, count, total });
+    }
+  }
+  if (donors.length < 5) return say(`Only ${donors.length} usable donors found. Check the column choices and date format.`, true);
+  if (st.mode !== "gift") { st.gifts = null; st.charity = ""; st.campaign = ""; }
+  loadDonors(donors, st.fileName || "Your data");
+  renderCampBox(); renderCharityFilter();
+  if (!st.restoring) saveTemp();
+  if ((!skipped || skipped < rows.length * 0.2) && !$("#campBox").classList.contains("warn")) { $("#setup").open = false; window.scrollTo({ top: 0, behavior: "smooth" }); }
+  say(`Analysed ${fmtInt(donors.length)} donors and ${fmtInt(st.mode === "gift" ? st.gifts.length : donors.length)} gifts from ${fmtInt(rows.length)} rows.${skipped ? ` Skipped ${fmtInt(skipped)} rows with a missing ID, date or amount.` : ""}${refunds ? ` Left out ${fmtInt(refunds)} zero or negative amounts (refunds).` : ""}${notPaid ? ` Left out ${fmtInt(notPaid)} rows that aren't paid (cancelled, refunded).` : ""}${notGift ? ` Left out ${fmtInt(notGift)} non-donation rows (tickets, refunds).` : ""}`, !!skipped);
+}
+$("#applyMap").onclick = applyMapping;
+
+function say(t, warn) { const m = $("#loadMsg"); m.textContent = t; m.hidden = false; m.classList.toggle("warn", !!warn); }
+function parseText(text, name) {
+  const res = Papa.parse(text.trim(), { header: true, skipEmptyLines: true, transformHeader: h => h.trim() });
+  if (!res.meta.fields || res.meta.fields.length < 2 || !res.data.length) return say("That doesn't look like a table with a header row. Export as CSV with column names in the first row.", true);
+  st.csv = res; st.fileName = name; st.rawText = text;
+  const f = res.meta.fields.join(" ");
+  st.mode = /last/i.test(f) && /(count|number|freq)/i.test(f) && !/(^|\s)(gift[ _-]?)?date(\s|$)/i.test(f) ? "donor" : "gift";
+  renderMapping();
+  $("#setup").open = true;
+  say(`Read ${fmtInt(res.data.length)} rows from ${name}. Check the columns, then run the analysis.`);
+}
+function readFile(file) { if (!file) return; const fr = new FileReader(); fr.onload = () => parseText(String(fr.result), file.name); fr.onerror = () => say("Couldn't read that file. Try saving it again as CSV.", true); fr.readAsText(file); }
+$("#file").onchange = e => { readFile(e.target.files[0]); e.target.value = ""; };
+let dragDepth = 0;
+const hasFiles = e => [...(e.dataTransfer?.types || [])].includes("Files");
+document.addEventListener("dragenter", e => { if (!hasFiles(e)) return; dragDepth++; document.body.classList.add("dragging"); });
+document.addEventListener("dragleave", e => { if (!hasFiles(e)) return; if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove("dragging"); } });
+document.addEventListener("dragover", e => { if (hasFiles(e)) e.preventDefault(); });
+document.addEventListener("drop", e => { if (!hasFiles(e)) return; e.preventDefault(); dragDepth = 0; document.body.classList.remove("dragging"); if (!e.target.closest("#drop")) readFile(e.dataTransfer.files[0]); });
+const drop = $("#drop");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => readFile(e.dataTransfer.files[0]));
+$("#pasteBtn").onclick = () => { $("#setup").open = true; $("#pasteBox").hidden = !$("#pasteBox").hidden; if (!$("#pasteBox").hidden) $("#pasteText").focus(); };
+$("#pasteGo").onclick = () => parseText($("#pasteText").value, "pasted rows");
+$("#sampleBtn").onclick = () => { $("#mapping").hidden = true; $("#loadMsg").hidden = true; st.fileName = null; st.manual = {}; resCache.clear(); st.gifts = sample(); st.charity = ""; st.campaign = ""; fillCharity(st.gifts); loadDonors(aggregate(st.gifts), null); renderCampBox(); renderCharityFilter(); };
+
+function splitMajors() {
+  const isMajor = d => st.majorOn && (st.majorBasis === "gift" && d.maxGift !== undefined ? d.maxGift : d.total) >= st.majorMin;
+  st.majors = st.allDonors.filter(isMajor);
+  st.donors = st.allDonors.filter(d => !isMajor(d));
+  st.donors.hasCamp = st.allDonors.hasCamp;
+  st.majorIds = new Set(st.majors.map(d => d.id));
+}
+function loadDonors(donors, label) {
+  st.allDonors = donors; splitMajors(); st.source = label ? "file" : "sample";
+  st.selSeg = null; st.selCell = null; st.hl = null; st.shown = 100; st.dims.M.cuts = null; st.selTag = null;
+  st.hasCamp = !!donors.hasCamp && donors.some(d => d.main && d.main.i !== "Untagged");
+  const maxLast = st.gifts && st.gifts.length ? d3.max(st.gifts, g => g.date) : d3.max(donors, d => d.last);
+  st.asOf = new Date(maxLast.getFullYear(), maxLast.getMonth(), maxLast.getDate() + 1);
+  const span = Math.round((st.asOf - (st.gifts && st.gifts.length ? d3.min(st.gifts, g => g.date) : d3.min(donors, d => d.first))) / DAY);
+  const short = span < 365;
+  st.dims.R.cuts = short ? [1 / 6, 1 / 3, 1 / 2, 2 / 3].map(f => Math.max(1, Math.round(span * f / 5) * 5)) : [90, 180, 365, 730];
+  st.dims.F.cuts = short ? [1, 2, 3, 5] : [1, 2, 4, 9];
+  st.viewGifts = st.gifts ? viewFilter(st.gifts) : null; st.selCamp = null; st.selRec = null; st.planIds = null;
+  $("#scaleNote").hidden = !short;
+  $("#scaleNote").textContent = short ? `Your gifts cover ${fmtInt(span)} days, so recency and frequency bands were scaled to that window. "Lapsed" here means no gift for about ${st.dims.R.cuts[3]} days, not years.` : "";
+  $("#asOf").value = d3.timeFormat("%Y-%m-%d")(st.asOf);
+  const chip = $("#srcChip");
+  chip.textContent = (label ? `${label} · ${fmtInt(donors.length)} donors` : `Sample data · ${fmtInt(donors.length)} fictional donors`) + (st.charity ? ` · ${st.charity}` : "");
+  chip.classList.toggle("real", !!label);
+  for (const d of donors) { d.mv = d.total; d.days = 0; }
+  renderScoring(); run();
+}
+
+/* ---------- global controls ---------- */
+$("#asOf").onchange = e => { const v = e.target.value; if (!v) return; const [y, m, d] = v.split("-").map(Number); st.asOf = new Date(y, m - 1, d); run(); };
+$("#mBasis").onchange = e => { st.mBasis = e.target.value; st.dims.M.cuts = null; if (st.dims.M.method === "bands") { score(); renderScoring(); } run(); };
+$("#cur").oninput = e => { st.cur = e.target.value; run(); };
+document.querySelectorAll("[data-hm]").forEach(b => b.onclick = () => { st.hm = b.dataset.hm; document.querySelectorAll("[data-hm]").forEach(x => x.setAttribute("aria-pressed", x === b)); renderHeat(); });
+
+function renderInteractive() { const s = segStats(); renderSegbars(s); renderPlay(s); renderHeat(); renderLegend(); renderScatter(); drawTrend(); renderAffinity(); renderCampRank(); renderRecurring(); renderTable(); }
+$("#recBoost").onchange = e => { st.recBoost = e.target.checked; run(); };
+const reMajor = () => { splitMajors(); st.selSeg = null; st.selCell = null; st.viewGifts = st.gifts ? viewFilter(st.gifts) : null; run(); };
+$("#majorOn").onchange = e => { st.majorOn = e.target.checked; reMajor(); };
+$("#majorBasis").onchange = e => { st.majorBasis = e.target.value; reMajor(); };
+$("#majorMin").onchange = e => { const v = +e.target.value; if (isFinite(v) && v > 0) { st.majorMin = v; reMajor(); } };
+function setupSummary() {
+  const src = st.source === "file" ? (st.fileName || "Your data") : "Sample data (fictional donors)";
+  const r = st.dims.R.method === "bands" ? `recency bands ${st.dims.R.cuts.join("/")} days` : "recency quintiles";
+  const nb = st.donors.filter(d => d.fBoost).length;
+  $("#majorNote").textContent = st.majorOn ? `${fmtInt(st.majors.length)} major donor${st.majors.length === 1 ? "" : "s"} (${moneyShort(d3.sum(st.majors, d => d.total))}) left out of the scores and shown as their own segment.` : "Off: every donor is scored, including very large gifts.";
+  $("#recBoostBox").hidden = !st.viewGifts;
+  $("#recBoostN").textContent = st.recBoost ? `${fmtInt(nb)} donor${nb === 1 ? "" : "s"} moved up by this rule.` : "Off: every donor is scored on gift count only.";
+  $("#setupSum").textContent = `${src} · ${fmtInt(st.donors.length)} donors · analysis date ${dfmt(st.asOf)} · ${r}${st.viewGifts ? (st.recBoost ? " · monthly donors count as frequent" : " · monthly boost off") : ""}${st.majors.length ? ` · ${fmtInt(st.majors.length)} major donors set apart` : ""}`;
+}
+function run() { if (!st.donors.length) return; score(); computeTrend(); renderKpis(); renderInteractive(); setupSummary(); renderPlan(); }
+
+let rz; new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if (st.donors.length) { renderHeat(); renderScatter(); drawTrend(); } }, 120); }).observe($("#scatter"));
+const rethemed = () => { if (st.donors.length) { renderHeat(); renderScatter(); drawTrend(); } };
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rethemed);
+new MutationObserver(rethemed).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+renderCampList(); initTagDim();
+st.gifts = sample(); fillCharity(st.gifts); loadDonors(aggregate(st.gifts), null); renderCampBox(); renderCharityFilter();
+
+/* ---------- temporary storage (demo, no backend yet) ----------
+   The last analysed CSV is kept in this browser's IndexedDB with its column mapping,
+   and re-run on load. Replace these three functions with API calls once the BE/DB exist. */
+const TEMP_DB = "tgc-donor-insights", TEMP_STORE = "uploads", TEMP_KEY = "last";
+function tempDb() {
+  return new Promise((res, rej) => {
+    if (!("indexedDB" in window)) return rej(new Error("no indexedDB"));
+    const r = indexedDB.open(TEMP_DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(TEMP_STORE);
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function tempTx(mode, fn) {
+  const db = await tempDb();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(TEMP_STORE, mode), req = fn(tx.objectStore(TEMP_STORE));
+    tx.oncomplete = () => { db.close(); res(req && req.result); }; tx.onerror = () => { db.close(); rej(tx.error); };
+  });
+}
+async function saveTemp() {
+  if (!st.rawText) return;
+  const map = {}; document.querySelectorAll("#mapFields select[id^='map-']").forEach(s => { map[s.id.slice(4)] = s.value; });
+  try {
+    await tempTx("readwrite", o => o.put({ v: 1, text: st.rawText, name: st.fileName, mode: st.mode, map, manual: st.manual, savedAt: new Date().toISOString() }, TEMP_KEY));
+    markSaved(new Date());
+  } catch (e) { console.warn("Donor Insights: could not save to this browser", e); }
+}
+async function clearTemp() { try { await tempTx("readwrite", o => o.delete(TEMP_KEY)); } catch (e) { console.warn(e); } }
+function markSaved(when) {
+  const b = $("#clearSaved"); b.hidden = !when;
+  const chip = $("#srcChip");
+  if (when && !/saved/.test(chip.textContent)) chip.textContent += " · saved in this browser";
+  chip.title = when ? `Saved in this browser on ${when.toLocaleString()}` : "";
+}
+$("#clearSaved").onclick = async () => { await clearTemp(); markSaved(null); st.rawText = null; $("#sampleBtn").click(); say("Saved data removed from this browser. Showing sample data."); };
+async function restoreTemp() {
+  let rec; try { rec = await tempTx("readonly", o => o.get(TEMP_KEY)); } catch { return; }
+  if (!rec || !rec.text) return;
+  const res = Papa.parse(rec.text.trim(), { header: true, skipEmptyLines: true, transformHeader: h => h.trim() });
+  if (!res.meta.fields || !res.data.length) return;
+  st.csv = res; st.fileName = rec.name; st.rawText = rec.text; st.mode = rec.mode || "gift"; st.manual = rec.manual || {}; resCache.clear();
+  renderMapping();
+  for (const [k, v] of Object.entries(rec.map || {})) { const sel = $("#map-" + k); if (sel && [...sel.options].some(o => o.value === v)) sel.value = v; }
+  st.restoring = true;
+  try { applyMapping(); } finally { st.restoring = false; }
+  if (st.source === "file") { markSaved(new Date(rec.savedAt)); $("#setup").open = false; say(`Restored ${rec.name || "your data"} saved in this browser on ${new Date(rec.savedAt).toLocaleString()}.`); }
+}
+restoreTemp();
+})();
+</script>
+
+</body>
+</html>
